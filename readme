@@ -33,3 +33,27 @@ https://www.w3schools.com/django/django_install_django.php
 
 python -m pip install Django
 
+
+
+<!-- 
+ -->
+<!-- 
+ -->
+
+ myApp\Scripts\activate
+
+
+python manage.py makemigrations
+python manage.py migrate
+python manage.py runserver
+ 
+
+python manage.py createsuperuser
+
+
+ # Видалити старі міграції:
+del oids/migrations/0*.py
+# (крім __init__.py, його не чіпай!)
+
+# Видалити стару базу (якщо вона неважлива):
+del db.sqlite3
