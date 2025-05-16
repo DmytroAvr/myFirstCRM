@@ -1,0 +1,35 @@
+https://packaging.python.org/en/latest/tutorials/installing-packages/
+
+
+
+py --version
+
+py -m pip --version
+py -m ensurepip --default-pip
+
+
+
+
+
+py -m venv <DIR>
+<DIR>\Scripts\activate
+
+
+
+virtualenv <DIR>
+<DIR>\Scripts\activate
+
+
+In both of the above cases, Windows users should not use the source command, but should rather run the activate script directly from the command shell like so:
+
+<DIR>\Scripts\activate
+
+
+
+///////////
+
+https://www.w3schools.com/django/django_install_django.php
+
+
+python -m pip install Django
+
