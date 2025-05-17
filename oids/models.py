@@ -1,12 +1,6 @@
 from django.db import models
-# from django import forms
 from multiselectfield import MultiSelectField
 
-# WORK_TYPE_CHOICES = [
-#     ('repair', 'Ремонт'),
-#     ('installation', 'Монтаж'),
-#     ('maintenance', 'Обслуговування'),
-# ]
 
 class Unit(models.Model):  # Військова частина
     MANAGEMENT_UNIT_CHOICES = [

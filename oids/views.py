@@ -1,20 +1,9 @@
-# views.py
+# C:\myFirstCRM\oids\views.py
 from django.shortcuts import render, redirect
 from .models import Document, Unit, OID
 from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet
 from django.http import JsonResponse
 import traceback        #check
-
-def document_create33(request):
-    if request.method == 'POST':
-        form = DocumentForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect('document_create')  # або інша сторінка
-    else:
-        form = DocumentForm()
-    return render(request, 'oids/document_form.html', {'form': form})
-
 
 def load_oids(request):
     try:
@@ -25,10 +14,7 @@ def load_oids(request):
         traceback.print_exc()  # ← виведе помилку у консоль VSCode
         return JsonResponse({'error': str(e)}, status=500)
 
-
-
 # C:\myFirstCRM\oids\views.py
-
 def document_create(request):
     if request.method == 'POST':
         header_form = DocumentHeaderForm(request.POST)

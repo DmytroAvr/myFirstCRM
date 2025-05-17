@@ -1,8 +1,4 @@
 from django.contrib import admin
-# from django_admin_multi_select_filter.filters import MultiSelectFieldListFilter
-
-# %%%%%ооо111111
-# from .forms import DocumentForm
 from .models import Unit, OID, Document, Trip, Person, WorkRequest, DocumentType
 
 @admin.register(Unit)
