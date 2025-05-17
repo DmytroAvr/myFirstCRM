@@ -1,5 +1,5 @@
 from django.db import models
-from django import forms
+# from django import forms
 from multiselectfield import MultiSelectField
 
 # WORK_TYPE_CHOICES = [
@@ -88,8 +88,8 @@ class Document(models.Model):
         ('Атестація', 'Атестація'),
         ('ІК', 'ІК'),
     ]
-    Unit = models.ForeignKey('Unit', on_delete=models.CASCADE, verbose_name="Військова частина")
-    oid = models.ForeignKey('OID', on_delete=models.CASCADE, verbose_name="ОІД")
+    unit = models.ForeignKey(Unit, on_delete=models.CASCADE, verbose_name="Військова частина")  # ← Ось це додай
+    oid = models.ForeignKey(OID, on_delete=models.CASCADE, verbose_name="ОІД")
    
     work_type = models.CharField(max_length=20, choices=WORK_TYPE_CHOICES, verbose_name="Тип роботи")
     document_type = models.ForeignKey(DocumentType, on_delete=models.CASCADE, verbose_name="Документ")

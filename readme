@@ -40,7 +40,7 @@ python -m pip install Django
 <!-- 
  -->
 
- myApp\Scripts\activate
+myApp\Scripts\activate
 
 
 python manage.py makemigrations

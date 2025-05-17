@@ -28,22 +28,29 @@ class WorkRequestAdmin(admin.ModelAdmin):
         ('start_date', admin.DateFieldListFilter),
     )
 
-
 @admin.register(DocumentType)
 class DocumentType(admin.ModelAdmin):
     list_display = ('oid_type', 'work_type', 'name', 'valid_days')
 
 
 @admin.register(Document)
-class DocumentAdmin(admin.ModelAdmin):
+class Document(admin.ModelAdmin):
+    list_display = ('unit', 'oid', 'work_date', 'work_type', 'document_type', 'document_number', 'process_date')
+
+
+# @admin.register(Document)
+# class DocumentAdmin(admin.ModelAdmin):
 #     form = DocumentForm
 
+
+    
 # %%%%%ооо111111
 # class DocumentAdmin(admin.ModelAdmin):
 #     form = DocumentForm
 # class Media:
 #     js = ('admin/js/jquery.init.js', 'js/filter_document_type.js',)
     
+
 
 
     admin.site.register(Person)
