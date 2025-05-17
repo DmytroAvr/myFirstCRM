@@ -41,12 +41,12 @@ class OID(models.Model):  # Об'єкт інформаційної діяльн�
     ]
 
     name = models.CharField(max_length=255, verbose_name="Назва")
-    Unit = models.ForeignKey(Unit, on_delete=models.CASCADE, verbose_name="Військова частина")
+    unit = models.ForeignKey(Unit, on_delete=models.CASCADE, verbose_name="Військова частина")
     room = models.CharField(max_length=255, verbose_name="Приміщення №")  # address -> room
     note = models.TextField(verbose_name="Примітка", blank=True, null=True)  # purpose -> note
     oid_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='ПЕМІН', verbose_name="Тип ОІД")
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='створюється', verbose_name="Поточний стан ОІД")
-
+    
     def __str__(self):
         return self.name
 

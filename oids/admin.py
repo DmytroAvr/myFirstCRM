@@ -12,8 +12,8 @@ class UnitAdmin(admin.ModelAdmin):
 
 @admin.register(OID)
 class OIDAdmin(admin.ModelAdmin):
-    list_display = ('name', 'Unit', 'status')
-    list_filter = ('Unit', 'status', 'oid_type')
+    list_display = ('name', 'unit', 'status')
+    list_filter = ('unit', 'status', 'oid_type')
 
 @admin.register(WorkRequest)
 class WorkRequestAdmin(admin.ModelAdmin):
@@ -23,7 +23,6 @@ class WorkRequestAdmin(admin.ModelAdmin):
 
 @admin.register(Trip)
 class WorkRequestAdmin(admin.ModelAdmin):
-    # list_display = ('__str__', 'start_date', 'end_date')
     list_filter = (
         ('start_date', admin.DateFieldListFilter),
     )
@@ -37,31 +36,4 @@ class DocumentType(admin.ModelAdmin):
 class Document(admin.ModelAdmin):
     list_display = ('unit', 'oid', 'work_date', 'work_type', 'document_type', 'document_number', 'process_date')
 
-
-# @admin.register(Document)
-# class DocumentAdmin(admin.ModelAdmin):
-#     form = DocumentForm
-
-
-    
-# %%%%%ооо111111
-# class DocumentAdmin(admin.ModelAdmin):
-#     form = DocumentForm
-# class Media:
-#     js = ('admin/js/jquery.init.js', 'js/filter_document_type.js',)
-    
-
-
-
     admin.site.register(Person)
-
-
-# admin.site.register(DocumentType)
-# admin.site.register()
-
-
-
-    # list_filter = (
-    #     # … інші фільтри …,
-    #     ('work_type', MultiSelectFieldListFilter),  # фільтр для MultiSelectField
-    # )

@@ -1,0 +1,37 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Додати документ</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h2>Додати документ</h2>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Зберегти</button>
+    </form>
+
+    <script type="text/javascript">
+        $("#id_unit").change(function () {
+            var url = "{% url 'ajax_load_oids' %}";
+            var unitId = $(this).val();
+            $.ajax({
+                url: url,
+                data: {
+                    'unit': unitId
+                },
+                success: function (data) {
+                    $("#id_oid").html("");
+                    $.each(data, function (index, oid) {
+                        $("#id_oid").append(
+                            $("<option></option>").attr("value", oid.id).text(oid.name)
+                        );
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
