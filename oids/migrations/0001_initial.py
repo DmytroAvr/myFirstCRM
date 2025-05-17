@@ -75,7 +75,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('work_type', models.CharField(choices=[('Атестація', 'Атестація'), ('ІК', 'ІК')], max_length=20, verbose_name='Тип роботи')),
-                ('document_number', models.CharField(default='27/14-', max_length=50, verbose_name='Підготовлений № документу')),
+                ('document_number', models.CharField(default='27/14-', max_length=50, verbose_name='Підготовлений № документа')),
                 ('process_date', models.DateField(verbose_name='Дата опрацювання')),
                 ('work_date', models.DateField(verbose_name='Дата проведення робіт')),
                 ('author', models.CharField(max_length=255, verbose_name='Виконавець (ПІБ)')),

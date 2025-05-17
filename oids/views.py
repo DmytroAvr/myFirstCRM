@@ -40,7 +40,8 @@ def document_create(request):
             work_type = header_form.cleaned_data['work_type']
             work_date = header_form.cleaned_data['work_date']
             author = header_form.cleaned_data['author']
-
+            process_date = header_form.cleaned_data['process_date']
+            
             for form in formset:
                 if form.cleaned_data and not form.cleaned_data.get('DELETE', False):
                     doc = form.save(commit=False)
@@ -49,6 +50,7 @@ def document_create(request):
                     doc.work_type = work_type
                     doc.work_date = work_date
                     doc.author = author
+                    doc.process_date = process_date
                     doc.save()
             return redirect('document_create')
     else:

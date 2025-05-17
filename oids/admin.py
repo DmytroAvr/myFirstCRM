@@ -34,6 +34,7 @@ class DocumentType(admin.ModelAdmin):
 
 @admin.register(Document)
 class Document(admin.ModelAdmin):
-    list_display = ('unit', 'oid', 'work_date', 'work_type', 'document_type', 'document_number', 'process_date')
+    list_display = ('unit', 'oid', 'work_date', 'work_type', 'document_type', 'document_number', 'process_date', 'author')
+    list_filter = ('unit', 'oid', 'work_date', 'work_type', 'process_date', 'author')
 
     admin.site.register(Person)
