@@ -28,8 +28,7 @@ class Unit(models.Model):  # Військова частина
 
 class OID(models.Model):  # Об'єкт інформаційної діяльності
     TYPE_CHOICES = [
-        ('ПЕМІН', 'ПЕМІН'),
-        ('МОВНА', 'МОВНА'),
+        ('ПЕМІН', 'ПЕМІН'), ('МОВНА', 'МОВНА'),
     ]
 
     STATUS_CHOICES = [
@@ -58,9 +57,6 @@ class Person(models.Model):
     def __str__(self):
         return self.name
 
-# --------------------
-# -------------
-# -------------
 # -------------
 class DocumentType(models.Model):
     oid_type = models.CharField(
@@ -84,15 +80,14 @@ class DocumentType(models.Model):
 
 class Document(models.Model):
     WORK_TYPE_CHOICES = [
-        ('Атестація', 'Атестація'),
-        ('ІК', 'ІК'),
+        ('Атестація', 'Атестація'), ('ІК', 'ІК'),
     ]
     unit = models.ForeignKey(Unit, on_delete=models.CASCADE, verbose_name="Військова частина")  # ← Ось це додай
     oid = models.ForeignKey(OID, on_delete=models.CASCADE, verbose_name="ОІД")
    
     work_type = models.CharField(max_length=20, choices=WORK_TYPE_CHOICES, verbose_name="Тип роботи")
     document_type = models.ForeignKey(DocumentType, on_delete=models.CASCADE, verbose_name="Документ")
-    document_number = models.CharField(max_length=50, help_text="Наприклад, 27/14-...", default='27/14-', verbose_name="Підготовлений № документу")
+    document_number = models.CharField(max_length=50, default='27/14-', verbose_name="Підготовлений № документу")
     process_date = models.DateField(verbose_name="Дата опрацювання")
     work_date = models.DateField(verbose_name="Дата проведення робіт")
     author = models.CharField(max_length=255, verbose_name="Виконавець (ПІБ)")
@@ -100,33 +95,6 @@ class Document(models.Model):
 
     def __str__(self):
         return f"{self.document_type.name} / {self.document_number}"
-
-
-
-# class Document(models.Model):
-#     DOCUMENT_TYPE_CHOICES = [
-#         ('Програма і методика', 'Програма і методика'),
-#         ('План пошуку ЗП', 'План пошуку ЗП'),
-#         ('Акт пошуку ЗП', 'Акт пошуку ЗП'),
-#         ('Протокол1 ІК', 'Протокол1 ІК'),
-#         ('Протокол2 ІК', 'Протокол2 ІК'),
-#         ('Висновок', 'Висновок'),
-#         ('Припис', 'Припис'),
-#         ('Акт атестації', 'Акт атестації'),
-#         ('Протокол ІК', 'Протокол ІК'),
-#         ('Висновок ІК', 'Висновок ІК'),
-#     ]
-
-#     oid = models.ForeignKey(OID, on_delete=models.CASCADE, verbose_name="ОІД")
-#     document_type = models.CharField(max_length=50, choices=DOCUMENT_TYPE_CHOICES, verbose_name="Документ")
-#     document_number = models.CharField(max_length=50, help_text="Наприклад, 27/14-...", default='27/14-', verbose_name="Підготовлений № документу")
-#     process_date = models.DateField(verbose_name="Дата опрацювання")
-#     work_date = models.DateField(verbose_name="Дата проведення робіт")
-#     author = models.CharField(max_length=255, verbose_name="Виконав (ПІБ)")
-#     note = models.TextField(blank=True, null=True, verbose_name="Примітки")
-
-#     def __str__(self):
-#         return f"{self.document_type} ({self.document_number})"
 
 
 class Trip(models.Model):  # Відрядження
@@ -153,15 +121,11 @@ class Trip(models.Model):  # Відрядження
 
 class WorkRequest(models.Model):  # Заявка на проведення робіт
     WORK_TYPE_CHOICES = [
-        ('Атестація', 'Атестація'),
-        ('ІК', 'ІК'),
+        ('Атестація', 'Атестація'), ('ІК', 'ІК'),
     ]
 
     STATUS_CHOICES = [
-        ('очікує', 'очікує'),
-        ('в роботі', 'в роботі'),
-        ('виконано', 'виконано'),
-        ('скасовано', 'скасовано'),
+        ('очікує', 'очікує'), ('в роботі', 'в роботі'), ('виконано', 'виконано'), ('скасовано', 'скасовано'),
     ]
 
     Unit = models.ForeignKey('Unit', on_delete=models.CASCADE, verbose_name="Військова частина")

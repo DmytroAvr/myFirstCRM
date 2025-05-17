@@ -1,0 +1,48 @@
+<form method="post">
+  {% csrf_token %}
+  <label>Військова частина:</label>
+  <select name="unit" id="unit-select">
+    {% for unit in units %}
+      <option value="{{ unit.id }}">{{ unit.name }}</option>
+    {% endfor %}
+  </select>
+
+  <label>ОІД:</label>
+  <select name="oid" id="oid-select">
+    <!-- наповнюється через JS -->
+  </select>
+
+  <label>Тип роботи:</label>
+  <select name="work_type">
+    <option value="Атестація">Атестація</option>
+    <option value="ІК">ІК</option>
+  </select>
+
+  <hr>
+  {{ formset.management_form }}
+  {% for form in formset %}
+    <div class="form-block">
+      {{ form.as_p }}
+    </div>
+  {% endfor %}
+
+  <button type="submit">Зберегти</button>
+</form>
+
+<script>
+document.getElementById('unit-select').addEventListener('change', function() {
+  const unitId = this.value;
+  const oidSelect = document.getElementById('oid-select');
+  fetch(`/oids/ajax/load-oids/?unit=${unitId}`)
+    .then(response => response.json())
+    .then(data => {
+      oidSelect.innerHTML = '';
+      data.forEach(oid => {
+        const option = document.createElement('option');
+        option.value = oid.id;
+        option.textContent = oid.name;
+        oidSelect.appendChild(option);
+      });
+    });
+});
+</script>
