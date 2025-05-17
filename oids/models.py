@@ -83,7 +83,6 @@ class DocumentType(models.Model):
         return f"{self.name} ({self.oid_type}, {self.work_type})"
 
 class Document(models.Model):
-
     WORK_TYPE_CHOICES = [
         ('Атестація', 'Атестація'),
         ('ІК', 'ІК'),
@@ -93,8 +92,6 @@ class Document(models.Model):
    
     work_type = models.CharField(max_length=20, choices=WORK_TYPE_CHOICES, verbose_name="Тип роботи")
     document_type = models.ForeignKey(DocumentType, on_delete=models.CASCADE, verbose_name="Документ")
-
-    # document_type = models.ForeignKey('DocumentType', on_delete=models.PROTECT, verbose_name="Тип документа")
     document_number = models.CharField(max_length=50, help_text="Наприклад, 27/14-...", default='27/14-', verbose_name="Підготовлений № документу")
     process_date = models.DateField(verbose_name="Дата опрацювання")
     work_date = models.DateField(verbose_name="Дата проведення робіт")
