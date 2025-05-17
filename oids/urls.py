@@ -4,5 +4,6 @@ from . import views
 
 urlpatterns = [
     path('documents/create/', views.document_create, name='document_create'),
+    path('documents/request/', views.document_request, name='document_request'),
     path('ajax/load-oids/', views.load_oids, name='ajax_load_oids'),
 ]

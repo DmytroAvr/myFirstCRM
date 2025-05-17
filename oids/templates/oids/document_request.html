@@ -30,10 +30,10 @@
     <form method="post">
         {% csrf_token %}
 
-        <h3>Основна інформація</h3>
+        <h3>Заявки на проведення робіт</h3>
         {{ header_form.as_p }}
 
-        <h3>Документи</h3>
+        <h3>ОІД в заявці:</h3>
         <div id="formset">
             {{ formset.management_form }}
             {% for form in formset %}

@@ -1,6 +1,6 @@
 # C:\myFirstCRM\oids\forms.py
 from django import forms
-from .models import Document, OID, Unit, Person
+from .models import Document, OID, Unit, Person, WorkRequest
 from django.forms import modelformset_factory
 
 class DocumentForm(forms.ModelForm):
@@ -25,11 +25,42 @@ class DocumentHeaderForm(forms.Form):
                 self.fields['oid'].queryset = OID.objects.filter(unit_id=unit_id).exclude(status='скасовано').order_by('name')
             except (ValueError, TypeError):
                 pass
-            
 
 DocumentFormSet = modelformset_factory(
     Document,
     form=DocumentForm,
     extra=3,
+    can_delete=True
+)
+
+# 
+# 
+# 
+# 
+
+class requestForm(forms.ModelForm):
+    class Meta:
+        model = WorkRequest
+        fields = ['oids', 'work_type','status']
+        # fields = ['Unit', 'work_type', 'oids', 'incoming_number', 'incoming_date', 'status']
+
+class requestHeaderForm(forms.Form):
+    unit = forms.ModelChoiceField(queryset=Unit.objects.all(), label="Військова частина")
+    incoming_number = forms.CharField(label="Вхідний номер заявки", max_length=50)
+    incoming_date = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}), label="Дата вхідного")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'unit' in self.data:
+            try:
+                unit_id = int(self.data.get('unit'))
+                self.fields['oid'].queryset = OID.objects.filter(unit_id=unit_id).exclude(status='скасовано').order_by('name')
+            except (ValueError, TypeError):
+                pass
+
+requestFormSet = modelformset_factory(
+    WorkRequest,
+    form=requestForm,
+    extra=2,
     can_delete=True
 )

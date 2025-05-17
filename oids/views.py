@@ -1,7 +1,7 @@
 # C:\myFirstCRM\oids\views.py
 from django.shortcuts import render, redirect
-from .models import Document, Unit, OID
-from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet
+from .models import Document, Unit, OID, WorkRequest, DocumentType
+from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet
 from django.http import JsonResponse
 import traceback        #check
 
@@ -44,6 +44,38 @@ def document_create(request):
         formset = DocumentFormSet(queryset=Document.objects.none())
 
     return render(request, 'oids/document_form.html', {
+        'header_form': header_form,
+        'formset': formset
+    })
+
+# C:\myFirstCRM\oids\views.py
+def document_request(request):
+    if request.method == 'POST':
+        header_form = requestHeaderForm(request.POST)
+        formset = requestFormSet(request.POST)
+
+        if header_form.is_valid() and formset.is_valid():
+            unit = header_form.cleaned_data['unit']
+            oid = header_form.cleaned_data['oid']
+            incoming_number = header_form.cleaned_data['incoming_number']
+            incoming_date = header_form.cleaned_data['incoming_date']
+
+            for form in formset:
+                if form.cleaned_data and not form.cleaned_data.get('DELETE', False):
+                    doc = form.save(commit=False)
+                    doc.unit = unit
+                    doc.oid = oid
+                    doc.work_type = work_type
+                    doc.work_date = work_date
+                    doc.incoming_number = incoming_number
+                    doc.incoming_date = incoming_date
+                    doc.save()
+            return redirect('document_create')
+    else:
+        header_form = requestHeaderForm()
+        formset = requestFormSet(queryset=WorkRequest.objects.none())
+
+    return render(request, 'oids/document_request.html', {
         'header_form': header_form,
         'formset': formset
     })

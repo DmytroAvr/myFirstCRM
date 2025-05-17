@@ -45,13 +45,13 @@ class OID(models.Model):  # Об'єкт інформаційної діяльн�
 
 
 class Person(models.Model):
-    name = models.CharField(max_length=255, verbose_name="П.І.Б.")
+    name = models.CharField(max_length=255, verbose_name="Призвище, ім'я")
     position = models.CharField(max_length=255, verbose_name="Посада")
 
     def __str__(self):
         return self.name
 
-# -------------
+
 class DocumentType(models.Model):
     oid_type = models.CharField(
         "Тип ОІД",
@@ -126,10 +126,10 @@ class WorkRequest(models.Model):  # Заявка на проведення ро�
     work_type = MultiSelectField(choices=WORK_TYPE_CHOICES, verbose_name="Типи роботи")
     # work_type = models.CharField("Тип роботи", max_length=20, choices=WORK_TYPE_CHOICES)
     oids = models.ManyToManyField('OID', verbose_name="Об’єкти інформаційної діяльності")
-    incoming_number = models.CharField("Вхідний номер заявки", max_length=50)
-    incoming_date = models.DateField("Дата заявки")
-    status = models.CharField("Статус заявки", max_length=20, choices=STATUS_CHOICES, default='очікує')
-    note = models.TextField("Примітки", blank=True, null=True)
+    incoming_number = models.CharField(verbose_name="Вхідний номер заявки", max_length=50)
+    incoming_date = models.DateField(verbose_name="Дата заявки")
+    status = models.CharField(verbose_name="Статус заявки", max_length=20, choices=STATUS_CHOICES, default='очікує')
+    note = models.TextField(verbose_name="Примітки", blank=True, null=True)
 
     def __str__(self):
         return f"{self.incoming_number} — {self.get_status_display()}"
