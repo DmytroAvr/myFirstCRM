@@ -1,7 +1,7 @@
 # views.py
 from django.shortcuts import render, redirect
 from .models import Document, Unit, OID
-from .forms import DocumentForm
+from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet
 from django.http import JsonResponse
 import traceback        #check
 
@@ -27,9 +27,7 @@ def load_oids(request):
 
 
 
-
 # C:\myFirstCRM\oids\views.py
-from .forms import DocumentHeaderForm, DocumentFormSet
 
 def document_create(request):
     if request.method == 'POST':
@@ -40,6 +38,8 @@ def document_create(request):
             unit = header_form.cleaned_data['unit']
             oid = header_form.cleaned_data['oid']
             work_type = header_form.cleaned_data['work_type']
+            work_date = header_form.cleaned_data['work_date']
+            author = header_form.cleaned_data['author']
 
             for form in formset:
                 if form.cleaned_data and not form.cleaned_data.get('DELETE', False):
@@ -47,6 +47,8 @@ def document_create(request):
                     doc.unit = unit
                     doc.oid = oid
                     doc.work_type = work_type
+                    doc.work_date = work_date
+                    doc.author = author
                     doc.save()
             return redirect('document_create')
     else:
