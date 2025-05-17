@@ -51,19 +51,19 @@
 </body>
 
 <script>
-    document.querySelector('#id_unit').addEventListener('change', function () {
-        const unitId = this.value;
-        const oidSelect = document.querySelector('#id_oid');
-        fetch(`/oids/ajax/load-oids/?unit=${unitId}`)
-            .then(response => response.json())
-            .then(data => {
-                oidSelect.innerHTML = '';
-                data.forEach(oid => {
-                    const option = new Option(oid.name, oid.id);
-                    oidSelect.add(option);
-                });
-            });
-    });
+    // document.querySelector('#id_unit').addEventListener('change', function () {
+    //     const unitId = this.value;
+    //     const oidSelect = document.querySelector('#id_oid');
+    //     fetch(`/oids/ajax/load-oids/?unit=${unitId}`)
+    //         .then(response => response.json())
+    //         .then(data => {
+    //             oidSelect.innerHTML = '';
+    //             data.forEach(oid => {
+    //                 const option = new Option(oid.name, oid.id);
+    //                 oidSelect.add(option);
+    //             });
+    //         });
+    // });
 
     // button to add new form
     document.addEventListener('DOMContentLoaded', function () {
