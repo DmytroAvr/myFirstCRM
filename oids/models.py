@@ -1,3 +1,4 @@
+# C:\myFirstCRM\oids\models.py
 from django.db import models
 from multiselectfield import MultiSelectField
 
@@ -112,7 +113,7 @@ class Trip(models.Model):  # Відрядження
         end = self.end_date.strftime("%d-%m-%Y")
         return f"Виїзд з {start} до {end}  Частини: {unitss} --- ОІД: ({oids})"
 
-
+# C:\myFirstCRM\oids\models.py
 class WorkRequest(models.Model):  # Заявка на проведення робіт
     WORK_TYPE_CHOICES = [
         ('Атестація', 'Атестація'), ('ІК', 'ІК'),
@@ -122,7 +123,7 @@ class WorkRequest(models.Model):  # Заявка на проведення ро�
         ('очікує', 'очікує'), ('в роботі', 'в роботі'), ('виконано', 'виконано'), ('скасовано', 'скасовано'),
     ]
 
-    Unit = models.ForeignKey('Unit', on_delete=models.CASCADE, verbose_name="Військова частина")
+    unit = models.ForeignKey('Unit', on_delete=models.CASCADE, verbose_name="Військова частина")
     work_type = MultiSelectField(choices=WORK_TYPE_CHOICES, verbose_name="Типи роботи")
     # work_type = models.CharField("Тип роботи", max_length=20, choices=WORK_TYPE_CHOICES)
     oids = models.ManyToManyField('OID', verbose_name="Об’єкти інформаційної діяльності")
@@ -133,3 +134,16 @@ class WorkRequest(models.Model):  # Заявка на проведення ро�
 
     def __str__(self):
         return f"{self.incoming_number} — {self.get_status_display()}"
+
+class WorkRequestItem(models.Model):
+    WORK_TYPE_CHOICES = [
+        ('Атестація', 'Атестація'),
+        ('ІК', 'ІК'),
+    ]
+    
+    request = models.ForeignKey(WorkRequest, on_delete=models.CASCADE, related_name="items")
+    oid = models.ForeignKey('OID', on_delete=models.CASCADE)
+    work_type = models.CharField(max_length=20, choices=WORK_TYPE_CHOICES)
+
+    def __str__(self):
+        return f"{self.oid} — {self.work_type}"

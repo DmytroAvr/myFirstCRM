@@ -13,9 +13,18 @@ class OIDAdmin(admin.ModelAdmin):
 
 @admin.register(WorkRequest)
 class WorkRequestAdmin(admin.ModelAdmin):
-    list_display = ('Unit', 'work_type', 'incoming_number', 'incoming_date', 'status')
-   
-    list_filter = ('Unit', 'work_type', 'status')
+    list_display = ('unit', 'get_work_types', 'get_oids', 'incoming_number', 'incoming_date', 'status')
+    list_filter = ('unit', 'items__work_type', 'items__oid', 'status')
+
+    @admin.display(description='Типи робіт')
+    def get_work_types(self, obj):
+        work_types = obj.items.values_list('work_type', flat=True).distinct()
+        return ", ".join(work_types)
+
+    @admin.display(description='ОІД')
+    def get_oids(self, obj):
+        oids = obj.items.values_list('oid__name', flat=True).distinct()
+        return ", ".join(oids)
 
 @admin.register(Trip)
 class WorkRequestAdmin(admin.ModelAdmin):

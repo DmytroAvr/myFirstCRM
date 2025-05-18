@@ -1,5 +1,4 @@
-<!-- C:\myFirstCRM\oids\templates\oids\document_form.html -->
-
+<!-- C:\myFirstCRM\oids\templates\oids\document_request.html -->
 <style>
     body {
         font-family: 'Times New Roman', Times, serif;
@@ -30,17 +29,24 @@
     <form method="post">
         {% csrf_token %}
 
-        <h3>Заявки на проведення робіт</h3>
+        <h3>Заявка на проведення робіт</h3>
         {{ header_form.as_p }}
 
         <h3>ОІД в заявці:</h3>
         <div id="formset">
-            {{ formset.management_form }}
+            <!-- {{ formset.management_form }}
             {% for form in formset %}
                 <div class="document-form" style="border: 1px solid #ccc; margin: 10px; padding: 10px; position: relative;">
                     {{ form.as_p }}
                     <button type="button" class="remove-form">🗑 Видалити</button>
                 </div>
+            {% endfor %} -->
+            {{ formset.management_form }}
+            {% for form in formset %}
+            <div class="document-form" style="border: 1px solid #ccc; margin: 10px; padding: 10px; position: relative;">
+            {{ form.as_p }}
+            <button type="button" class="remove-form">🗑 Видалити</button>
+            </div>
             {% endfor %}
         </div>
 
@@ -51,19 +57,19 @@
 </body>
 
 <script>
-    // document.querySelector('#id_unit').addEventListener('change', function () {
-    //     const unitId = this.value;
-    //     const oidSelect = document.querySelector('#id_oid');
-    //     fetch(`/oids/ajax/load-oids/?unit=${unitId}`)
-    //         .then(response => response.json())
-    //         .then(data => {
-    //             oidSelect.innerHTML = '';
-    //             data.forEach(oid => {
-    //                 const option = new Option(oid.name, oid.id);
-    //                 oidSelect.add(option);
-    //             });
-    //         });
-    // });
+    document.querySelector('#id_unit').addEventListener('change', function () {
+        const unitId = this.value;
+        const oidSelect = document.querySelector('#id_oid');
+        fetch(`/oids/ajax/load-oids/?unit=${unitId}`)
+            .then(response => response.json())
+            .then(data => {
+                oidSelect.innerHTML = '';
+                data.forEach(oid => {
+                    const option = new Option(oid.name, oid.id);
+                    oidSelect.add(option);
+                });
+            });
+    });
 
     // button to add new form
     document.addEventListener('DOMContentLoaded', function () {

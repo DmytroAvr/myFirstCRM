@@ -1,7 +1,7 @@
 # C:\myFirstCRM\oids\views.py
 from django.shortcuts import render, redirect
-from .models import Document, Unit, OID, WorkRequest, DocumentType
-from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet
+from .models import Document, Unit, OID, WorkRequest, DocumentType, WorkRequestItem
+from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet, requestItemFormSet, requestItemForm
 from django.http import JsonResponse
 import traceback        #check
 
@@ -49,31 +49,83 @@ def document_create(request):
     })
 
 # C:\myFirstCRM\oids\views.py
+# def document_request(request):
+#     if request.method == 'POST':
+#         header_form = requestHeaderForm(request.POST)
+#         formset = requestFormSet(request.POST)
+
+#         if header_form.is_valid() and formset.is_valid():
+#             unit = header_form.cleaned_data['unit']
+#             oid = header_form.cleaned_data['oid']
+#             incoming_number = header_form.cleaned_data['incoming_number']
+#             incoming_date = header_form.cleaned_data['incoming_date']
+
+#             for form in formset:
+#                 if form.cleaned_data and not form.cleaned_data.get('DELETE', False):
+#                     doc = form.save(commit=False)
+#                     doc.unit = unit
+#                     doc.oid = oid
+#                     doc.work_type = work_type
+#                     doc.work_date = work_date
+#                     doc.incoming_number = incoming_number
+#                     doc.incoming_date = incoming_date
+#                     doc.save()
+#             return redirect('document_create')
+#     else:
+#         header_form = requestHeaderForm()
+#         formset = requestFormSet(queryset=WorkRequest.objects.none())
+
+#     return render(request, 'oids/document_request.html', {
+#         'header_form': header_form,
+#         'formset': formset
+#     })
+
+# def document_request(request):
+#     if request.method == 'POST':
+#         header_form = requestHeaderForm(request.POST)
+#         formset = requestFormSet(request.POST)
+
+#         if header_form.is_valid() and formset.is_valid():
+#             unit = header_form.cleaned_data['unit']
+#             incoming_number = header_form.cleaned_data['incoming_number']
+#             incoming_date = header_form.cleaned_data['incoming_date']
+
+#             for form in formset:
+#                 if form.cleaned_data and not form.cleaned_data.get('DELETE', False):
+#                     req = form.save(commit=False)
+#                     req.Unit = unit
+#                     req.incoming_number = incoming_number
+#                     req.incoming_date = incoming_date
+#                     req.save()
+#                     form.save_m2m()  # для oids і work_type
+#             return redirect('document_request')
+#     else:
+#         header_form = requestHeaderForm()
+#         formset = requestFormSet(queryset=WorkRequest.objects.none())
+
+#     return render(request, 'oids/document_request.html', {
+#         'header_form': header_form,
+#         'formset': formset
+#     })
+
 def document_request(request):
     if request.method == 'POST':
         header_form = requestHeaderForm(request.POST)
-        formset = requestFormSet(request.POST)
+        formset = requestItemFormSet(request.POST)
 
         if header_form.is_valid() and formset.is_valid():
-            unit = header_form.cleaned_data['unit']
-            oid = header_form.cleaned_data['oid']
-            incoming_number = header_form.cleaned_data['incoming_number']
-            incoming_date = header_form.cleaned_data['incoming_date']
+            work_request = header_form.save()
 
             for form in formset:
                 if form.cleaned_data and not form.cleaned_data.get('DELETE', False):
-                    doc = form.save(commit=False)
-                    doc.unit = unit
-                    doc.oid = oid
-                    doc.work_type = work_type
-                    doc.work_date = work_date
-                    doc.incoming_number = incoming_number
-                    doc.incoming_date = incoming_date
-                    doc.save()
-            return redirect('document_create')
+                    item = form.save(commit=False)
+                    item.request = work_request
+                    item.save()
+
+            return redirect('document_request')  # або інша сторінка
     else:
         header_form = requestHeaderForm()
-        formset = requestFormSet(queryset=WorkRequest.objects.none())
+        formset = requestItemFormSet(queryset=WorkRequestItem.objects.none())
 
     return render(request, 'oids/document_request.html', {
         'header_form': header_form,

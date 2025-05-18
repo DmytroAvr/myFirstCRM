@@ -1,6 +1,6 @@
 # C:\myFirstCRM\oids\forms.py
 from django import forms
-from .models import Document, OID, Unit, Person, WorkRequest
+from .models import Document, OID, Unit, Person, WorkRequest, WorkRequestItem
 from django.forms import modelformset_factory
 
 class DocumentForm(forms.ModelForm):
@@ -36,29 +36,64 @@ DocumentFormSet = modelformset_factory(
 # 
 
 
+
+# C:\myFirstCRM\oids\forms.py
 class requestForm(forms.ModelForm):
     class Meta:
         model = WorkRequest
         fields = ['oids', 'work_type','status']
         # fields = ['Unit', 'work_type', 'oids', 'incoming_number', 'incoming_date', 'status']
 
-class requestHeaderForm(forms.Form):
-    unit = forms.ModelChoiceField(queryset=Unit.objects.all(), label="Військова частина")
-    incoming_number = forms.CharField(label="Вхідний номер заявки", max_length=50)
-    incoming_date = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}), label="Дата вхідного")
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if 'unit' in self.data:
-            try:
-                unit_id = int(self.data.get('unit'))
-                self.fields['oid'].queryset = OID.objects.filter(unit_id=unit_id).exclude(status='скасовано').order_by('name')
-            except (ValueError, TypeError):
-                pass
+# test field
+class requestHeaderForm(forms.ModelForm):
+    class Meta:
+        model = WorkRequest
+        fields = ['unit', 'incoming_number', 'incoming_date', 'status', 'note']
+        widgets = {
+            'incoming_date': forms.DateInput(attrs={'type': 'date'}),
+        }
+
+class requestItemForm(forms.ModelForm):
+    class Meta:
+        model = WorkRequestItem
+        fields = ['oid', 'work_type']
+
+# class requestForm(forms.ModelForm):
+#     class Meta:
+#         model = WorkRequest
+#         fields = ['oids', 'work_type', 'status']
+#         widgets = {
+#             'oids': forms.SelectMultiple(attrs={'size': 5}),
+#             'work_type': forms.CheckboxSelectMultiple(),  # або SelectMultiple
+#         }
+
+# class requestHeaderForm(forms.Form):
+#     unit = forms.ModelChoiceField(queryset=Unit.objects.all(), label="Військова частина")
+#     incoming_number = forms.CharField(label="Вхідний номер заявки", max_length=50)
+#     incoming_date = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}), label="Дата вхідного")
+
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+class requestHeaderForm(forms.ModelForm):
+    class Meta:
+        model = WorkRequest
+        fields = ['unit', 'incoming_number', 'incoming_date', 'status', 'note']
+        widgets = {
+            'incoming_date': forms.DateInput(attrs={'type': 'date'}),
+        }
+
 
 requestFormSet = modelformset_factory(
     WorkRequest,
     form=requestForm,
+    extra=2,
+    can_delete=True
+)
+
+requestItemFormSet = modelformset_factory(
+    WorkRequestItem,
+    form=requestItemForm,
     extra=2,
     can_delete=True
 )
