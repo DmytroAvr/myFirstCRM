@@ -51,6 +51,7 @@ class requestHeaderForm(forms.ModelForm):
         model = WorkRequest
         fields = ['unit', 'incoming_number', 'incoming_date', 'status', 'note']
         widgets = {
+            'work_type': forms.Select(),  # одиночний вибір
             'incoming_date': forms.DateInput(attrs={'type': 'date'}),
         }
 
@@ -80,6 +81,7 @@ class requestHeaderForm(forms.ModelForm):
         model = WorkRequest
         fields = ['unit', 'incoming_number', 'incoming_date', 'status', 'note']
         widgets = {
+            'unit': forms.Select(attrs={'id': 'id_unit'}),
             'incoming_date': forms.DateInput(attrs={'type': 'date'}),
         }
 

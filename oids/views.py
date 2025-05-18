@@ -9,10 +9,23 @@ def load_oids(request):
     try:
         unit_id = request.GET.get('unit')
         oids = OID.objects.filter(unit_id=unit_id).exclude(status='скасовано').order_by('name')
+        data = [{'id': oid.id, 'name': oid.name} for oid in oids]
+ 
         return JsonResponse(list(oids.values('id', 'name')), safe=False)
+        # return JsonResponse(data, safe=False)  #proposition for request
     except Exception as e:
         traceback.print_exc()  # ← виведе помилку у консоль VSCode
         return JsonResponse({'error': str(e)}, status=500)
+
+
+
+
+
+def get_oids_by_unit(request):
+    unit_id = request.GET.get('unit_id')
+    oids = OID.objects.filter(unit__id=unit_id, status__in=['діючий', 'новий'])
+    data = [{'id': oid.id, 'name': str(oid)} for oid in oids]
+    return JsonResponse(data, safe=False)
 
 # C:\myFirstCRM\oids\views.py
 def document_create(request):
@@ -49,65 +62,6 @@ def document_create(request):
     })
 
 # C:\myFirstCRM\oids\views.py
-# def document_request(request):
-#     if request.method == 'POST':
-#         header_form = requestHeaderForm(request.POST)
-#         formset = requestFormSet(request.POST)
-
-#         if header_form.is_valid() and formset.is_valid():
-#             unit = header_form.cleaned_data['unit']
-#             oid = header_form.cleaned_data['oid']
-#             incoming_number = header_form.cleaned_data['incoming_number']
-#             incoming_date = header_form.cleaned_data['incoming_date']
-
-#             for form in formset:
-#                 if form.cleaned_data and not form.cleaned_data.get('DELETE', False):
-#                     doc = form.save(commit=False)
-#                     doc.unit = unit
-#                     doc.oid = oid
-#                     doc.work_type = work_type
-#                     doc.work_date = work_date
-#                     doc.incoming_number = incoming_number
-#                     doc.incoming_date = incoming_date
-#                     doc.save()
-#             return redirect('document_create')
-#     else:
-#         header_form = requestHeaderForm()
-#         formset = requestFormSet(queryset=WorkRequest.objects.none())
-
-#     return render(request, 'oids/document_request.html', {
-#         'header_form': header_form,
-#         'formset': formset
-#     })
-
-# def document_request(request):
-#     if request.method == 'POST':
-#         header_form = requestHeaderForm(request.POST)
-#         formset = requestFormSet(request.POST)
-
-#         if header_form.is_valid() and formset.is_valid():
-#             unit = header_form.cleaned_data['unit']
-#             incoming_number = header_form.cleaned_data['incoming_number']
-#             incoming_date = header_form.cleaned_data['incoming_date']
-
-#             for form in formset:
-#                 if form.cleaned_data and not form.cleaned_data.get('DELETE', False):
-#                     req = form.save(commit=False)
-#                     req.Unit = unit
-#                     req.incoming_number = incoming_number
-#                     req.incoming_date = incoming_date
-#                     req.save()
-#                     form.save_m2m()  # для oids і work_type
-#             return redirect('document_request')
-#     else:
-#         header_form = requestHeaderForm()
-#         formset = requestFormSet(queryset=WorkRequest.objects.none())
-
-#     return render(request, 'oids/document_request.html', {
-#         'header_form': header_form,
-#         'formset': formset
-#     })
-
 def document_request(request):
     if request.method == 'POST':
         header_form = requestHeaderForm(request.POST)
@@ -131,3 +85,4 @@ def document_request(request):
         'header_form': header_form,
         'formset': formset
     })
+

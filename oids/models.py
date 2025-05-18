@@ -147,3 +147,4 @@ class WorkRequestItem(models.Model):
 
     def __str__(self):
         return f"{self.oid} — {self.work_type}"
+

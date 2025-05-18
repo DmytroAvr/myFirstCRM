@@ -32,9 +32,9 @@ class WorkRequestAdmin(admin.ModelAdmin):
         ('start_date', admin.DateFieldListFilter),
     )
 
-@admin.register(DocumentType)
-class DocumentType(admin.ModelAdmin):
-    list_display = ('oid_type', 'work_type', 'name', 'valid_days')
+# @admin.register(DocumentType)
+# class DocumentType(admin.ModelAdmin):
+#     list_display = ('oid_type', 'work_type', 'name', 'valid_days')
 
 
 @admin.register(Document)

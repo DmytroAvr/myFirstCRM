@@ -43,7 +43,7 @@
             {% endfor %} -->
             {{ formset.management_form }}
             {% for form in formset %}
-            <div class="document-form" style="border: 1px solid #ccc; margin: 10px; padding: 10px; position: relative;">
+            <div class="document-form" data-form-index="{{ forloop.counter0 }}" style="border: 1px solid #ccc; margin: 10px; padding: 10px; position: relative;">
             {{ form.as_p }}
             <button type="button" class="remove-form">🗑 Видалити</button>
             </div>
@@ -70,6 +70,42 @@
                 });
             });
     });
+
+    document.addEventListener('DOMContentLoaded', function () { 
+        const unitSelect = document.querySelector('#id_unit');
+
+        unitSelect.addEventListener('change', function () {
+            const unitId = this.value;
+
+            fetch(`/oids/ajax/load-oids/?unit=${unitId}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Знайти всі форми
+                    document.querySelectorAll('.document-form').forEach((formDiv, index) => {
+                        const oidSelect = formDiv.querySelector(`#id_form-${index}-oid`);
+                        if (oidSelect) {
+                            oidSelect.innerHTML = ''; // Очистити
+
+
+                            // Додати порожній варіант
+                            const emptyOption = document.createElement('option');
+                            emptyOption.value = '';
+                            emptyOption.textContent = '---------';
+                            oidSelect.appendChild(emptyOption);
+
+                            // Тепер додати справжні OID
+                            data.forEach(oid => {
+                                const option = document.createElement('option');
+                                option.value = oid.id;
+                                option.textContent = oid.name;
+                                oidSelect.appendChild(option);
+                            });
+                        }
+                    });
+                });
+        });
+    });
+
 
     // button to add new form
     document.addEventListener('DOMContentLoaded', function () {
