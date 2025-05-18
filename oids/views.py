@@ -4,6 +4,7 @@ from .models import Document, Unit, OID, WorkRequest, DocumentType, WorkRequestI
 from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet, requestItemFormSet, requestItemForm
 from django.http import JsonResponse
 import traceback        #check
+from django.contrib import messages
 
 def load_oids(request):
     try:
@@ -74,8 +75,9 @@ def document_request(request):
                 if form.cleaned_data and not form.cleaned_data.get('DELETE', False):
                     item = form.save(commit=False)
                     item.request = work_request
-                    item.save()
+                    item.save() 
 
+                    messages.success(request, "Заявка успішно збережена!")
             return redirect('document_request')  # або інша сторінка
     else:
         header_form = requestHeaderForm()

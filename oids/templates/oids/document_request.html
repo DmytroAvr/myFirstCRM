@@ -41,15 +41,43 @@
                     <button type="button" class="remove-form">🗑 Видалити</button>
                 </div>
             {% endfor %} -->
-            {{ formset.management_form }}
+
+
+
+            <!-- {{ formset.management_form }}
             {% for form in formset %}
             <div class="document-form" data-form-index="{{ forloop.counter0 }}" style="border: 1px solid #ccc; margin: 10px; padding: 10px; position: relative;">
             {{ form.as_p }}
             <button type="button" class="remove-form">🗑 Видалити</button>
             </div>
+            {% endfor %} -->
+
+
+            <h3>test my label</h3>
+            {{ formset.management_form }}
+
+            {% for form in formset %}
+            <div class="document-form" data-form-index="{{ forloop.counter0 }}" style="border: 1px solid #ccc; margin: 10px; padding: 10px; position: relative;">
+
+                <div class="form-row">
+                    <label for="{{ form.oid.id_for_label }}">Об’єкт інформаційної діяльності:</label>
+                    {{ form.oid }}
+                </div>
+
+                <div class="form-row">
+                    <label for="{{ form.work_type.id_for_label }}">Тип роботи:</label>
+                    {{ form.work_type }}
+                </div>
+
+                <button type="button" class="remove-form">🗑 Видалити</button>
+            </div>
             {% endfor %}
         </div>
-
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-success">{{ message }}</div>
+    {% endfor %}
+{% endif %}
         <button type="button" id="add-form">➕ Додати документ</button>
         <br><br>
         <button type="submit">💾 Зберегти всі документи</button>
