@@ -80,3 +80,4 @@ class TripResultForUnitAdmin(admin.ModelAdmin):
     def get_documents_count(self, obj):
         return obj.documents.count()
     get_documents_count.short_description = "К-сть документів"
+

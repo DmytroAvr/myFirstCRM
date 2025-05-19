@@ -2,6 +2,7 @@
 from django import forms
 from .models import Document, OID, Unit, Person, WorkRequest, WorkRequestItem, AttestationRegistration, TripResultForUnit
 from django.forms import modelformset_factory
+from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget
 
 
 class DocumentForm(forms.ModelForm):
@@ -116,13 +117,65 @@ class OidCreateForm(forms.ModelForm):
             'status': forms.Select(attrs={'class': 'form-control'}),
         }
 
-# 
+#  нові поля. додати АА, відправку документів до частини
 class AttestationRegistrationForm(forms.ModelForm):
     class Meta:
         model = AttestationRegistration
         fields = '__all__'
+        widgets = {
+            'units': Select2MultipleWidget,
+            'oids': Select2MultipleWidget,
+        }
 
 class TripResultForUnitForm(forms.ModelForm):
     class Meta:
         model = TripResultForUnit
         fields = '__all__'
+        widgets = {
+            'units': Select2MultipleWidget,
+            'oids': Select2MultipleWidget,
+            'documents': Select2MultipleWidget,
+        }
+
+
+# Вибір військових частин
+class UnitWidget(ModelSelect2MultipleWidget):
+    model = Unit
+    search_fields = ["name__icontains"]
+
+
+# Вибір ОІД, фільтрація по обраних частинах
+class OIDWidget(ModelSelect2MultipleWidget):
+    model = OID
+    search_fields = ["name__icontains"]
+
+    dependent_fields = {"units": "Unit"}
+
+
+# Вибір Документів, фільтрація по обраних ОІД
+class DocumentWidget(ModelSelect2MultipleWidget):
+    model = Document
+    search_fields = ["document_number__icontains"]
+
+    dependent_fields = {"oids": "oid"}
+
+
+class AttestationRegistrationForm(forms.ModelForm):
+    class Meta:
+        model = AttestationRegistration
+        fields = "__all__"
+        widgets = {
+            "units": UnitWidget,
+            "oids": OIDWidget,
+        }
+
+
+class TripResultForUnitForm(forms.ModelForm):
+    class Meta:
+        model = TripResultForUnit
+        fields = "__all__"
+        widgets = {
+            "units": UnitWidget,
+            "oids": OIDWidget,
+            "documents": DocumentWidget,
+        }
