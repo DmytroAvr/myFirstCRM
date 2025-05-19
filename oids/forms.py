@@ -1,6 +1,6 @@
 # C:\myFirstCRM\oids\forms.py
 from django import forms
-from .models import Document, OID, Unit, Person, WorkRequest, WorkRequestItem
+from .models import Document, OID, Unit, Person, WorkRequest, WorkRequestItem, AttestationRegistration, TripResultForUnit
 from django.forms import modelformset_factory
 
 
@@ -103,8 +103,7 @@ requestItemFormSet = modelformset_factory(
 
 # oids/forms.py
 
-
-
+# aside oid create form
 class OidCreateForm(forms.ModelForm):
     class Meta:
         model = OID
@@ -116,3 +115,14 @@ class OidCreateForm(forms.ModelForm):
             'oid_type': forms.Select(attrs={'class': 'form-control'}),
             'status': forms.Select(attrs={'class': 'form-control'}),
         }
+
+# 
+class AttestationRegistrationForm(forms.ModelForm):
+    class Meta:
+        model = AttestationRegistration
+        fields = '__all__'
+
+class TripResultForUnitForm(forms.ModelForm):
+    class Meta:
+        model = TripResultForUnit
+        fields = '__all__'

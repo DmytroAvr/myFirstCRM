@@ -1,0 +1,10 @@
+{% load static %}
+{% block content %}
+<h2>Результати роботи у відрядженні (відправка в частину)</h2>
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  {{ form.as_p }}
+
+  <button type="submit" class="btn btn-success">Відправити</button>
+</form>
+{% endblock %}

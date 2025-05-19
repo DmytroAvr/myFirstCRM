@@ -77,7 +77,7 @@ class Document(models.Model):
     WORK_TYPE_CHOICES = [
         ('Атестація', 'Атестація'), ('ІК', 'ІК'),
     ]
-    unit = models.ForeignKey(Unit, on_delete=models.CASCADE, verbose_name="Військова частина")  # ← Ось це додай
+    unit = models.ForeignKey(Unit, on_delete=models.CASCADE, verbose_name="Військова частина")
     oid = models.ForeignKey(OID, on_delete=models.CASCADE, verbose_name="ОІД")
    
     work_type = models.CharField(max_length=20, choices=WORK_TYPE_CHOICES, verbose_name="Тип роботи")
@@ -148,3 +148,35 @@ class WorkRequestItem(models.Model):
     def __str__(self):
         return f"{self.oid} — {self.work_type}"
 
+
+# нові процесси
+class AttestationRegistration(models.Model):
+    units = models.ManyToManyField("Unit", verbose_name="Військові частини")
+    oids = models.ManyToManyField("OID", through='AttestationItem', verbose_name="ОІД для реєстрації")
+    process_date = models.DateField(verbose_name="Дата відправки на реєстрацію")
+    attachment = models.FileField(upload_to="attestation_docs/", blank=True, null=True, verbose_name="Файл (опційно)")
+    note = models.TextField(blank=True, null=True, verbose_name="Примітка")
+
+    def __str__(self):
+        return f"Акти від {self.process_date}"
+
+class AttestationItem(models.Model):
+    registration = models.ForeignKey(AttestationRegistration, on_delete=models.CASCADE)
+    oid = models.ForeignKey("OID", on_delete=models.CASCADE, verbose_name="ОІД")
+    document_number = models.CharField(max_length=50, verbose_name="Номер Акту Атестації")
+
+    def __str__(self):
+        return f"{self.oid.name} — {self.document_number}"
+
+class TripResultForUnit(models.Model):
+    units = models.ManyToManyField("Unit", verbose_name="Військові частини призначення")
+    oids = models.ManyToManyField("OID", verbose_name="ОІД призначення")
+    
+    documents = models.ManyToManyField("Document", verbose_name="Документи до відправки")
+    
+    process_date = models.DateField(verbose_name="Дата відправки до частини")
+    attachment = models.FileField(upload_to="trip_results_docs/", blank=True, null=True, verbose_name="Файл (опційно)")
+    note = models.TextField(blank=True, null=True, verbose_name="Примітка")
+
+    def __str__(self):
+        return f"Відправка {self.process_date} — {self.documents.count()} документів"

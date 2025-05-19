@@ -9,5 +9,7 @@ urlpatterns = [
     path('ajax/get-oids/', views.get_oids_by_unit, name='get_oids_by_unit'),
     # D:\myFirstCRM\oids\urls.py
     path('ajax/create/', views.create_oid_ajax, name='create_oid_ajax'),
+    path('attestation/new/', views.create_attestation_registration, name='attestation_new'),
+    path('trip_result/new/', views.create_trip_result, name='trip_result_new'),
 
 ]

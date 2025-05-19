@@ -1,7 +1,7 @@
 # C:\myFirstCRM\oids\views.py
 from django.shortcuts import render, redirect
 from .models import Document, Unit, OID, WorkRequest, DocumentType, WorkRequestItem
-from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet, requestItemFormSet, requestItemForm, OidCreateForm
+from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet, requestItemFormSet, requestItemForm, OidCreateForm, AttestationRegistrationForm, TripResultForUnitForm
 from django.http import JsonResponse
 import traceback        #check
 from django.contrib import messages
@@ -107,5 +107,26 @@ def create_oid_ajax(request):
     else:
         return JsonResponse({'success': False, 'errors': form.errors}, status=400)
     
+# додавання документів
 
-    
+
+def create_attestation_registration(request):
+    if request.method == 'POST':
+        form = AttestationRegistrationForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            return redirect('attestation_list')  # або інша сторінка
+    else:
+        form = AttestationRegistrationForm()
+    return render(request, 'attestation_registration_form.html', {'form': form})
+
+def create_trip_result(request):
+    if request.method == 'POST':
+        form = TripResultForUnitForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            return redirect('trip_result_list')  # або інша сторінка
+    else:
+        form = TripResultForUnitForm()
+    return render(request, 'trip_result_form.html', {'form': form})
+
