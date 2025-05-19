@@ -40,7 +40,7 @@ class OID(models.Model):  # Об'єкт інформаційної діяльн�
     note = models.TextField(verbose_name="Примітка", blank=True, null=True)  # purpose -> note
     oid_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='ПЕМІН', verbose_name="Тип ОІД")
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='створюється', verbose_name="Поточний стан ОІД")
-    
+    # name unit room note oit_type status 
     def __str__(self):
         return self.name
 

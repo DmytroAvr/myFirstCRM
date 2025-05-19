@@ -26,6 +26,9 @@
 </style>
 
 <body>
+    <script>
+        const selectedUnitId = document.querySelector('#id_unit')?.value;
+    </script>
     <form method="post">
         {% csrf_token %}
 
@@ -69,6 +72,7 @@
                     {{ form.work_type }}
                 </div>
 
+                <button type="button" class="add-oid-button">Додати ОІД</button>
                 <button type="button" class="remove-form">🗑 Видалити</button>
             </div>
             {% endfor %}
@@ -82,23 +86,70 @@
         <br><br>
         <button type="submit">💾 Зберегти всі документи</button>
     </form>
+    <!-- Кнопка поруч із кожним oid-полем -->
+<script>
+    document.addEventListener("click", function (e) {
+        if (e.target.classList.contains("add-oid-button")) {
+            document.getElementById("oid-aside").style.display = "block";
+        }
+    });
+</script>
+
+<!-- Aside для створення ОІД -->
+<aside id="oid-aside" style="display:none; position: fixed; right: 0; top: 0; width: 300px; background: #f9f9f9; padding: 20px; border-left: 1px solid #ccc;">
+    <h4>Новий ОІД</h4>
+    <form id="oid-create-form">
+        {% csrf_token %}
+        <label for="id_name">Назва:</label>
+        <input type="text" name="name" id="id_name" required><br>
+
+        <label for="id_room">Кімната:</label>
+        <input type="text" name="room" id="id_room"><br>
+
+        <label for="id_oid_type">Тип:</label>
+        <select name="oid_type" id="id_oid_type">
+            <option value="ПЕМІН">ПЕМІН</option>
+            <option value="МОВНА">МОВНА</option>
+        </select><br>
+
+  
+
+
+        <label for="id_status">Статус:</label>
+        <select name="status" id="id_status">
+            <option value="створюється">Створюється</option>
+            <option value="діючий">Діючий</option>
+        </select><br>
+
+        <label for="id_note">Примітка:</label>
+        <textarea name="note" id="id_note"></textarea><br>
+
+        <button type="submit">➕ Додати ОІД</button>
+        <button type="button" onclick="document.getElementById('oid-aside').style.display='none'">✖ Закрити</button>
+    </form>
+</aside>
+
 </body>
 
 <script>
-    document.querySelector('#id_unit').addEventListener('change', function () {
-        const unitId = this.value;
-        const oidSelect = document.querySelector('#id_oid');
-        fetch(`/oids/ajax/load-oids/?unit=${unitId}`)
-            .then(response => response.json())
-            .then(data => {
-                oidSelect.innerHTML = '';
-                data.forEach(oid => {
-                    const option = new Option(oid.name, oid.id);
-                    oidSelect.add(option);
-                });
-            });
-    });
 
+    // фільтр ОІД на базі чатини для однієї form
+    // document.querySelector('#id_unit').addEventListener('change', function () {
+    //     const unitId = this.value;
+    //     const oidSelect = document.querySelector('#id_oid');
+    //     fetch(`/oids/ajax/load-oids/?unit=${unitId}`)
+    //         .then(response => response.json())
+    //         .then(data => {
+    //             oidSelect.innerHTML = '';
+    //             data.forEach(oid => {
+    //                 const option = new Option(oid.name, oid.id);
+    //                 oidSelect.add(option);
+    //             });
+    //         });
+    // });
+        
+        
+    // js для один ОІД з requestHeaderForm як фільтр в усі requestItemFormSet
     document.addEventListener('DOMContentLoaded', function () { 
         const unitSelect = document.querySelector('#id_unit');
 
@@ -113,7 +164,6 @@
                         const oidSelect = formDiv.querySelector(`#id_form-${index}-oid`);
                         if (oidSelect) {
                             oidSelect.innerHTML = ''; // Очистити
-
 
                             // Додати порожній варіант
                             const emptyOption = document.createElement('option');
@@ -134,13 +184,45 @@
         });
     });
 
+    // a side form create OID
+    document.getElementById("oid-create-form").addEventListener("submit", function (e) {
+        e.preventDefault();
 
-    // button to add new form
+        const formData = new FormData(this);
+        // new
+       const currentUnitId = document.querySelector('#id_unit')?.value;
+        formData.append('unit_id', currentUnitId);
+
+        fetch("{% url 'create_oid_ajax' %}", {
+            method: "POST",
+            body: formData,
+            headers: {
+                'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+            }
+        })
+
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert("ОІД створено");
+                document.getElementById("oid-create-form").reset();
+                document.getElementById("oid-aside").style.display = "none";
+            } else {
+                console.error("❌ Сервер повернув помилки:", data.errors);
+                alert("Помилка створення ОІД: " + JSON.stringify(data.errors));
+            }
+})
+
+        
+    });
+    
+    // button to add one more form !!!! requestItemFormSet
     document.addEventListener('DOMContentLoaded', function () {
         const formset = document.getElementById('formset');
         const addFormBtn = document.getElementById('add-form');
         const totalForms = document.querySelector('#id_form-TOTAL_FORMS');
-
+        
+        
         function updateDeleteButtons() {
             document.querySelectorAll('.remove-form').forEach(btn => {
                 btn.removeEventListener('click', removeForm);

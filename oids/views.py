@@ -1,10 +1,12 @@
 # C:\myFirstCRM\oids\views.py
 from django.shortcuts import render, redirect
 from .models import Document, Unit, OID, WorkRequest, DocumentType, WorkRequestItem
-from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet, requestItemFormSet, requestItemForm
+from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet, requestItemFormSet, requestItemForm, OidCreateForm
 from django.http import JsonResponse
 import traceback        #check
 from django.contrib import messages
+from django.views.decorators.http import require_POST
+
 
 def load_oids(request):
     try:
@@ -17,10 +19,6 @@ def load_oids(request):
     except Exception as e:
         traceback.print_exc()  # ← виведе помилку у консоль VSCode
         return JsonResponse({'error': str(e)}, status=500)
-
-
-
-
 
 def get_oids_by_unit(request):
     unit_id = request.GET.get('unit_id')
@@ -88,3 +86,26 @@ def document_request(request):
         'formset': formset
     })
 
+# aside for request 
+@require_POST
+def create_oid_ajax(request):
+    form = OidCreateForm(request.POST)
+    unit_id = request.POST.get('unit_id')
+
+    if not unit_id:
+        return JsonResponse({'success': False, 'errors': {'unit_id': ['Unit ID не передано']}}, status=400)
+
+    if form.is_valid():
+        oid = form.save(commit=False)
+        try:
+            unit = Unit.objects.get(id=unit_id)
+            oid.unit = unit
+            oid.save()
+            return JsonResponse({'success': True, 'oid': {'id': oid.id, 'name': oid.name}})
+        except Unit.DoesNotExist:
+            return JsonResponse({'success': False, 'errors': {'unit': ['Unit не знайдено']}}, status=400)
+    else:
+        return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+    
+
+    
