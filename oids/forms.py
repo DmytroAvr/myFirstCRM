@@ -2,7 +2,8 @@
 from django import forms
 from .models import Document, OID, Unit, Person, WorkRequest, WorkRequestItem, AttestationRegistration, TripResultForUnit
 from django.forms import modelformset_factory
-from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget
+from django_select2.forms import Select2MultipleWidget
+# from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget
 
 
 class DocumentForm(forms.ModelForm):
@@ -138,44 +139,44 @@ class TripResultForUnitForm(forms.ModelForm):
         }
 
 
-# Вибір військових частин
-class UnitWidget(ModelSelect2MultipleWidget):
-    model = Unit
-    search_fields = ["name__icontains"]
+# # Вибір військових частин
+# class UnitWidget(ModelSelect2MultipleWidget):
+#     model = Unit
+#     search_fields = ["name__icontains"]
 
 
-# Вибір ОІД, фільтрація по обраних частинах
-class OIDWidget(ModelSelect2MultipleWidget):
-    model = OID
-    search_fields = ["name__icontains"]
+# # Вибір ОІД, фільтрація по обраних частинах
+# class OIDWidget(ModelSelect2MultipleWidget):
+#     model = OID
+#     search_fields = ["name__icontains"]
 
-    dependent_fields = {"units": "Unit"}
-
-
-# Вибір Документів, фільтрація по обраних ОІД
-class DocumentWidget(ModelSelect2MultipleWidget):
-    model = Document
-    search_fields = ["document_number__icontains"]
-
-    dependent_fields = {"oids": "oid"}
+#     dependent_fields = {"units": "Unit"}
 
 
-class AttestationRegistrationForm(forms.ModelForm):
-    class Meta:
-        model = AttestationRegistration
-        fields = "__all__"
-        widgets = {
-            "units": UnitWidget,
-            "oids": OIDWidget,
-        }
+# # Вибір Документів, фільтрація по обраних ОІД
+# class DocumentWidget(ModelSelect2MultipleWidget):
+#     model = Document
+#     search_fields = ["document_number__icontains"]
+
+#     dependent_fields = {"oids": "oid"}
 
 
-class TripResultForUnitForm(forms.ModelForm):
-    class Meta:
-        model = TripResultForUnit
-        fields = "__all__"
-        widgets = {
-            "units": UnitWidget,
-            "oids": OIDWidget,
-            "documents": DocumentWidget,
-        }
+# class AttestationRegistrationForm(forms.ModelForm):
+#     class Meta:
+#         model = AttestationRegistration
+#         fields = "__all__"
+#         widgets = {
+#             "units": UnitWidget,
+#             "oids": OIDWidget,
+#         }
+
+
+# class TripResultForUnitForm(forms.ModelForm):
+#     class Meta:
+#         model = TripResultForUnit
+#         fields = "__all__"
+#         widgets = {
+#             "units": UnitWidget,
+#             "oids": OIDWidget,
+#             "documents": DocumentWidget,
+#         }
