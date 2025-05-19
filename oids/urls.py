@@ -1,4 +1,4 @@
-# urls.py
+# D:\myFirstCRM\oids\urls.py
 from django.urls import path
 from . import views
 
@@ -11,5 +11,7 @@ urlpatterns = [
     path('ajax/create/', views.create_oid_ajax, name='create_oid_ajax'),
     path('attestation/new/', views.create_attestation_registration, name='attestation_new'),
     path('trip_result/new/', views.create_trip_result, name='trip_result_new'),
+    path('ajax/load-oids-for-units/', views.load_oids_for_units, name='ajax_load_oids_for_units'),
+    path('ajax/load-documents-for-oids/', views.load_documents_for_oids, name='ajax_load_documents_for_oids'),
 
 ]

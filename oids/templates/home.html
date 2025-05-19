@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Головна сторінка</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        h1 { margin-bottom: 20px; }
+        ul { list-style-type: none; padding: 0; }
+        li { margin: 10px 0; }
+        a { text-decoration: none; color: #0056b3; font-size: 18px; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <h1>Система обліку робіт з ОІД</h1>
+    <ul>
+        <li><a href="{% url 'document_create' %}">➕ Додати обробку документів</a></li>
+        <li><a href="{% url 'document_request' %}">📨 Заявка на проведення робіт</a></li>
+        <li><a href="{% url 'attestation_new' %}">🧾 Реєстрація атестації</a></li>
+        <li><a href="{% url 'trip_result_new' %}">📤 Результати відрядження</a></li>
+    </ul>
+</body>
+</html>

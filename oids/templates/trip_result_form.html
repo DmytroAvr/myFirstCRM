@@ -1,3 +1,4 @@
+<!-- C:\myFirstCRM\oids\templates\trip_result_form.html -->
 {% load static %}
 <!DOCTYPE html>
 <html>
@@ -6,11 +7,32 @@
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 </head>
 <body>
+    <style>
+        .select2 {
+            width: 300px !important;
+        }
+    </style>
+
     {% block content %}
     <h2>Результати роботи у відрядженні (відправка в частину)</h2>
     <form method="post" enctype="multipart/form-data">
       {% csrf_token %}
       {{ form.as_p }}
+
+
+
+                    <!-- <select id="id_units" name="units" multiple>
+                    {% for unit in units %}
+                    <option value="{{ unit.id }}">{{ unit.name }}</option>
+                    {% endfor %}
+                    </select>
+
+                    <select id="id_oids" name="oids" multiple></select>
+
+                    <select id="id_documents" name="documents" multiple></select> -->
+
+
+
 
       <button type="submit" class="btn btn-success">Відправити</button>
     </form>
@@ -23,5 +45,60 @@
             $('select').select2();
         });
     </script>
+<script>
+$(document).ready(function() {
+$('select').select2();
+
+$('#id_units').on('change', function() {
+    const unitIds = $(this).val();
+    if (!unitIds.length) return;
+
+    $.ajax({
+        url: "{% url 'ajax_load_oids_for_units' %}",
+        data: {
+            'units[]': unitIds
+        },
+        success: function(data) {
+            const $oidSelect = $('#id_oids');
+            $oidSelect.empty();
+            data.forEach(function(oid) {
+                $oidSelect.append($('<option>', {
+                    value: oid.id,
+                    text: oid.name
+                }));
+            });
+            $oidSelect.trigger('change');
+        }
+    });
+});
+
+$('#id_oids').on('change', function() {
+    const oidIds = $(this).val();
+    if (!oidIds.length) return;
+
+    $.ajax({
+        url: "{% url 'ajax_load_documents_for_oids' %}",
+        data: {
+            'oids[]': oidIds
+        },
+        success: function(data) {
+            const $docSelect = $('#id_documents');
+            $docSelect.empty();
+            data.forEach(function(doc) {
+                $docSelect.append($('<option>', {
+                    value: doc.id,
+                    text: doc.document_type__name + ' — ' + doc.document_number
+                }));
+            });
+        }
+    });
+});
+});
+</script>
+
 </body>
 </html>
+
+
+
+

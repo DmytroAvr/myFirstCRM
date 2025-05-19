@@ -7,6 +7,8 @@ import traceback        #check
 from django.contrib import messages
 from django.views.decorators.http import require_POST
 
+def home_view(request):
+    return render(request, 'home.html')
 
 def load_oids(request):
     try:
@@ -130,3 +132,13 @@ def create_trip_result(request):
         form = TripResultForUnitForm()
     return render(request, 'trip_result_form.html', {'form': form})
 
+
+def load_oids_for_units(request):
+    unit_ids = request.GET.getlist('units[]')
+    oids = OID.objects.filter(unit__id__in=unit_ids).exclude(status="скасовано").order_by('name')
+    return JsonResponse(list(oids.values('id', 'name')), safe=False)
+
+def load_documents_for_oids(request):
+    oid_ids = request.GET.getlist('oids[]')
+    documents = Document.objects.filter(oid__id__in=oid_ids).order_by('document_type__name', 'document_number')
+    return JsonResponse(list(documents.values('id', 'document_type__name', 'document_number')), safe=False)
