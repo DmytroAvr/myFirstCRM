@@ -71,9 +71,10 @@
                     <label for="{{ form.work_type.id_for_label }}">Тип роботи:</label>
                     {{ form.work_type }}
                 </div>
+                
+                <button type="button" class="add-oid-button">➕ Додати ОІД</button>
 
-                <button type="button" class="add-oid-button">Додати ОІД</button>
-                <button type="button" class="remove-form">🗑 Видалити</button>
+                <button type="button" class="remove-form">🗑 Видалити це поле</button>
             </div>
             {% endfor %}
         </div>
@@ -88,15 +89,83 @@
     </form>
     <!-- Кнопка поруч із кожним oid-полем -->
 <script>
-    document.addEventListener("click", function (e) {
-        if (e.target.classList.contains("add-oid-button")) {
-            document.getElementById("oid-aside").style.display = "block";
-        }
+    let targetSelect = null; // глобально збережемо, в яке поле вставити новий ОІД
+
+    document.addEventListener("DOMContentLoaded", function () {
+        const unitSelect = document.querySelector('#id_unit');
+
+        // Клік по "Додати ОІД"
+        document.querySelectorAll('.add-oid-button').forEach(button => {
+            button.addEventListener('click', function (e) {
+                const unitId = unitSelect.value;
+                if (!unitId) {
+                    alert("⚠️ Спершу оберіть військову частину у формі зверху.");
+                    return;
+                }
+
+                // Визначити select-oid, який поруч із кнопкою
+                const formDiv = e.target.closest('.document-form');
+                targetSelect = formDiv.querySelector('select[name$="-oid"]');
+
+                // Відкрити aside + overlay
+                document.getElementById('oid-aside').style.display = "block";
+                document.getElementById('overlay').style.display = "block";
+            });
+        });
+
+        // Закрити aside вручну
+        document.getElementById('oid-aside-close').addEventListener('click', function () {
+            document.getElementById('oid-aside').style.display = "none";
+            document.getElementById('overlay').style.display = "none";
+        });
+
+        // Відправка форми створення ОІД
+        document.getElementById("oid-create-form").addEventListener("submit", function (e) {
+            e.preventDefault();
+
+            const formData = new FormData(this);
+            const currentUnitId = unitSelect.value;
+            formData.append('unit_id', currentUnitId);
+
+            fetch("{% url 'create_oid_ajax' %}", {
+                method: "POST",
+                body: formData,
+                headers: {
+                    'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert("✅ ОІД створено");
+
+                    // Очистити форму і закрити
+                    this.reset();
+                    document.getElementById('oid-aside').style.display = "none";
+                    document.getElementById('overlay').style.display = "none";
+
+                    if (targetSelect) {
+                        const newOption = document.createElement('option');
+                        newOption.value = data.oid.id;
+                        newOption.textContent = data.oid.name;
+                        newOption.selected = true;
+                        targetSelect.appendChild(newOption);
+                    }
+                } else {
+                    alert("❌ Помилка створення ОІД:\n" + JSON.stringify(data.errors));
+                }
+            })
+            .catch(err => {
+                console.error("❌ Сервер не відповів:", err);
+                alert("⚠️ Помилка зв’язку із сервером");
+            });
+        });
     });
 </script>
 
+
 <!-- Aside для створення ОІД -->
-<aside id="oid-aside" style="display:none; position: fixed; right: 0; top: 0; width: 300px; background: #f9f9f9; padding: 20px; border-left: 1px solid #ccc;">
+<aside id="oid-aside" style="display:none; position: fixed; z-index: 999; right: 0; top: 0; width: 300px; background: #f9f9f9; padding: 20px; border-left: 1px solid #ccc;">
     <h4>Новий ОІД</h4>
     <form id="oid-create-form">
         {% csrf_token %}
@@ -125,9 +194,12 @@
         <textarea name="note" id="id_note"></textarea><br>
 
         <button type="submit">➕ Додати ОІД</button>
-        <button type="button" onclick="document.getElementById('oid-aside').style.display='none'">✖ Закрити</button>
+        <button type="button" id="oid-aside-close" onclick="document.getElementById('oid-aside').style.display='none'">✖ Закрити</button>
+        <!-- <button type="button" id="oid-aside-close">✖ Закрити</button> -->
+
     </form>
 </aside>
+    <div id="overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.5); z-index:998;"></div>
 
 </body>
 
@@ -205,8 +277,26 @@
         .then(data => {
             if (data.success) {
                 alert("ОІД створено");
+
+                // ⏹ Очистити форму aside
                 document.getElementById("oid-create-form").reset();
                 document.getElementById("oid-aside").style.display = "none";
+
+                // ✅ Додати новий ОІД до всіх select-oid
+                const newOption = document.createElement('option');
+                newOption.value = data.oid.id;
+                newOption.textContent = data.oid.name;
+
+                document.querySelectorAll('select[name$="-oid"]').forEach(select => {
+                    select.appendChild(newOption.cloneNode(true)); // додати копію в кожне поле
+                });
+
+                // 🔁 Автоматично обрати новий ОІД у останньому полі
+                const lastSelect = document.querySelector('select[name="form-' + (parseInt(document.getElementById("id_form-TOTAL_FORMS").value) - 1) + '-oid"]');
+                if (lastSelect) {
+                    lastSelect.value = data.oid.id;
+                }
+
             } else {
                 console.error("❌ Сервер повернув помилки:", data.errors);
                 alert("Помилка створення ОІД: " + JSON.stringify(data.errors));
