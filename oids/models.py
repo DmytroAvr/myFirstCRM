@@ -180,3 +180,21 @@ class TripResultForUnit(models.Model):
 
     def __str__(self):
         return f"Відправка {self.process_date} — {self.documents.count()} документів"
+
+# Технічне завдання 
+class Task(models.Model): 
+    REVIEW_RESULT_CHOICES = [
+        ('погоджено', 'Погоджено'),
+        ('на доопрацювання', 'На доопрацювання'),
+        ('чекаємо папір', 'Чекаємо папір'),
+    ]
+
+    oid = models.ForeignKey('OID', on_delete=models.CASCADE, verbose_name="ОІД", related_name='tasks')
+    input_number = models.CharField(max_length=50, verbose_name="Вхідний номер")
+    input_date = models.DateField(verbose_name="Вхідна дата")
+    reviewed_by = models.CharField(max_length=255, verbose_name="Хто ознайомився")
+    review_result = models.CharField(max_length=30, choices=REVIEW_RESULT_CHOICES, verbose_name="Результат розгляду")
+    note = models.TextField(blank=True, null=True, verbose_name="Примітка")
+
+    def __str__(self):
+        return f"{self.input_number} / {self.input_date}"

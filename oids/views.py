@@ -1,7 +1,7 @@
 # C:\myFirstCRM\oids\views.py
 from django.shortcuts import render, redirect
 from .models import Document, Unit, OID, WorkRequest, DocumentType, WorkRequestItem
-from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet, requestItemFormSet, requestItemForm, OidCreateForm, AttestationRegistrationForm, TripResultForUnitForm
+from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet, requestItemFormSet, requestItemForm, OidCreateForm, AttestationRegistrationForm, TripResultForUnitForm, TaskForm
 from django.http import JsonResponse
 import traceback        #check
 from django.contrib import messages
@@ -142,3 +142,17 @@ def load_documents_for_oids(request):
     oid_ids = request.GET.getlist('oids[]')
     documents = Document.objects.filter(oid__id__in=oid_ids).order_by('document_type__name', 'document_number')
     return JsonResponse(list(documents.values('id', 'document_type__name', 'document_number')), safe=False)
+
+
+
+
+# Технічне завдання
+def create_task(request):
+    if request.method == 'POST':
+        form = TaskForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('task_create')  # або інша сторінка
+    else:
+        form = TaskForm()
+    return render(request, 'oids/task_form.html', {'form': form})

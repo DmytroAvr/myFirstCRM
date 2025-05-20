@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Unit, OID, Document, Trip, Person, WorkRequest, DocumentType, AttestationItem,  AttestationRegistration, TripResultForUnit
+from .models import Unit, OID, Document, Trip, Person, WorkRequest, DocumentType, AttestationItem,  AttestationRegistration, TripResultForUnit, Task
 
 @admin.register(Unit)
 class UnitAdmin(admin.ModelAdmin):
@@ -81,3 +81,9 @@ class TripResultForUnitAdmin(admin.ModelAdmin):
         return obj.documents.count()
     get_documents_count.short_description = "К-сть документів"
 
+# Технічне завдання
+@admin.register(Task) 
+class TaskAdmin(admin.ModelAdmin):
+    list_display = ('input_number', 'input_date', 'oid', 'reviewed_by', 'review_result')
+    list_filter = ('review_result', 'input_date')
+    search_fields = ('input_number', 'reviewed_by', 'oid__name')

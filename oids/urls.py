@@ -13,5 +13,6 @@ urlpatterns = [
     path('trip_result/new/', views.create_trip_result, name='trip_result_new'),
     path('ajax/load-oids-for-units/', views.load_oids_for_units, name='ajax_load_oids_for_units'),
     path('ajax/load-documents-for-oids/', views.load_documents_for_oids, name='ajax_load_documents_for_oids'),
+    path('tasks/create/', views.create_task, name='task_create'),
 
 ]
