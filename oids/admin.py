@@ -1,5 +1,8 @@
 from django.contrib import admin
 from .models import Unit, OID, Document, Trip, Person, WorkRequest, DocumentType, AttestationItem,  AttestationRegistration, TripResultForUnit, Task
+from .forms import TripResultForUnitForm
+
+
 
 @admin.register(Unit)
 class UnitAdmin(admin.ModelAdmin):
@@ -66,6 +69,7 @@ class AttestationRegistrationAdmin(admin.ModelAdmin):
 
 @admin.register(TripResultForUnit)
 class TripResultForUnitAdmin(admin.ModelAdmin):
+    form = TripResultForUnitForm
     list_display = ("process_date", "get_units", "get_oids", "get_documents_count")
     filter_horizontal = ("units", "oids", "documents")
 
@@ -87,3 +91,4 @@ class TaskAdmin(admin.ModelAdmin):
     list_display = ('input_number', 'input_date', 'oid', 'reviewed_by', 'review_result')
     list_filter = ('review_result', 'input_date')
     search_fields = ('input_number', 'reviewed_by', 'oid__name')
+

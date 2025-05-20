@@ -152,8 +152,8 @@ class WorkRequestItem(models.Model):
 # нові процесси
 class AttestationRegistration(models.Model):
     units = models.ManyToManyField("Unit", verbose_name="Військові частини")
-    oids = models.ManyToManyField("OID", through='AttestationItem', verbose_name="ОІД для реєстрації")
-    process_date = models.DateField(verbose_name="Дата відправки на реєстрацію")
+    oids = models.ManyToManyField("OID", through='AttestationItem', verbose_name="ОІД що реєструються")
+    process_date = models.DateField(verbose_name="Дата відправки на реєстрацію в ДССЗЗІ")
     attachment = models.FileField(upload_to="attestation_docs/", blank=True, null=True, verbose_name="Файл (опційно)")
     note = models.TextField(blank=True, null=True, verbose_name="Примітка")
 
@@ -198,3 +198,4 @@ class Task(models.Model):
 
     def __str__(self):
         return f"{self.input_number} / {self.input_date}"
+

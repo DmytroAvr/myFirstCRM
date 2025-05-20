@@ -10,6 +10,8 @@ from django.views.decorators.http import require_POST
 def home_view(request):
     return render(request, 'home.html')
 
+
+
 def load_oids(request):
     try:
         unit_id = request.GET.get('unit')
@@ -22,11 +24,33 @@ def load_oids(request):
         traceback.print_exc()  # ← виведе помилку у консоль VSCode
         return JsonResponse({'error': str(e)}, status=500)
 
+def load_oids_for_unit(request):
+    unit_id = request.GET.get('unit')
+    oids = OID.objects.filter(unit_id=unit_id).exclude(status='скасовано').order_by('name')
+    return JsonResponse(list(oids.values('id', 'name')), safe=False)
+
+
+def load_oids_for_units(request):
+    unit_ids = request.GET.getlist('units[]')
+    oids = OID.objects.filter(unit__id__in=unit_ids).exclude(status="скасовано").order_by('name')
+    return JsonResponse(list(oids.values('id', 'name')), safe=False)
+
+
+def load_documents_for_oids(request):
+    oid_ids = request.GET.getlist('oids[]')
+    documents = Document.objects.filter(oid__id__in=oid_ids).order_by('document_type__name', 'document_number')
+    return JsonResponse(list(documents.values('id', 'document_type__name', 'document_number')), safe=False)
+
+
+
 def get_oids_by_unit(request):
     unit_id = request.GET.get('unit_id')
     oids = OID.objects.filter(unit__id=unit_id, status__in=['діючий', 'новий'])
     data = [{'id': oid.id, 'name': str(oid)} for oid in oids]
     return JsonResponse(data, safe=False)
+
+
+
 
 # C:\myFirstCRM\oids\views.py
 def document_create(request):
@@ -117,7 +141,7 @@ def create_attestation_registration(request):
         form = AttestationRegistrationForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
-            return redirect('attestation_list')  # або інша сторінка
+            return redirect('attestation_new')  # або інша сторінка
     else:
         form = AttestationRegistrationForm()
     return render(request, 'attestation_registration_form.html', {'form': form})
@@ -127,23 +151,15 @@ def create_trip_result(request):
         form = TripResultForUnitForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
-            return redirect('trip_result_list')  # або інша сторінка
+            return redirect('trip_result_new')  # або інша сторінка
+            # return redirect('trip_result_list')  # або інша сторінка
     else:
         form = TripResultForUnitForm()
     return render(request, 'trip_result_form.html', {'form': form})
 
-
-def load_oids_for_units(request):
-    unit_ids = request.GET.getlist('units[]')
-    oids = OID.objects.filter(unit__id__in=unit_ids).exclude(status="скасовано").order_by('name')
-    return JsonResponse(list(oids.values('id', 'name')), safe=False)
-
-def load_documents_for_oids(request):
-    oid_ids = request.GET.getlist('oids[]')
-    documents = Document.objects.filter(oid__id__in=oid_ids).order_by('document_type__name', 'document_number')
-    return JsonResponse(list(documents.values('id', 'document_type__name', 'document_number')), safe=False)
-
-
+def trip_result_list(request):
+    results = TripResult.objects.all()
+    return render(request, 'oids/trip_result_list.html', {'results': results})
 
 
 # Технічне завдання
@@ -156,3 +172,14 @@ def create_task(request):
     else:
         form = TaskForm()
     return render(request, 'oids/task_form.html', {'form': form})
+
+
+def create_oid(request):
+    if request.method == 'POST':
+        form = OIDForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('task_form')  # або назад до Task
+    else:
+        form = OIDForm()
+    return render(request, 'oids/oid_form.html', {'form': form})

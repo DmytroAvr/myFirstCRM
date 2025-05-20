@@ -1,8 +1,51 @@
 {% block content %}
-  <h2>Додати технічне завдання</h2>
-  <form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Зберегти</button>
-  </form>
+<h2>Додати технічне завдання</h2>
+
+<form method="post">
+  {% csrf_token %}
+  {{ form.unit.label_tag }} {{ form.unit }}
+  <br>
+  {{ form.oid.label_tag }}
+  <select name="oid" id="id_oid">
+    <option value="">---------</option>
+    {% for oid in form.fields.oid.queryset %}
+      <option value="{{ oid.id }}">{{ oid.name }}</option>
+    {% endfor %}
+  </select>
+
+  <br><br>
+  {{ form.input_number.label_tag }} {{ form.input_number }}
+  {{ form.input_date.label_tag }} {{ form.input_date }}
+  {{ form.reviewed_by.label_tag }} {{ form.reviewed_by }}
+  {{ form.review_result.label_tag }} {{ form.review_result }}
+  {{ form.note.label_tag }} {{ form.note }}
+
+  <br>
+  <button type="submit">Зберегти</button>
+</form>
+
+<!-- Посилання на створення нового ОІД -->
+<p>Не знайшли потрібного ОІД?
+<a href="{% url 'oid_create' %}" target="_blank">Додати новий ОІД</a></p>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+  $('#id_unit').change(function() {
+    var unitId = $(this).val();
+    $.ajax({
+      url: '{% url "ajax_load_oids_for_unit" %}',
+      data: {'unit': unitId},
+      success: function(data) {
+        var $oid = $('#id_oid');
+        $oid.empty();
+        $oid.append('<option value="">---------</option>');
+        data.forEach(function(item) {
+          $oid.append('<option value="' + item.id + '">' + item.name + '</option>');
+        });
+      }
+    });
+  });
+</script>
+
+
 {% endblock %}

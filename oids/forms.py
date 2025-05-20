@@ -185,6 +185,20 @@ class TripResultForUnitForm(forms.ModelForm):
 
 # Технічне завдання
 class TaskForm(forms.ModelForm):
+    unit = forms.ModelChoiceField(queryset=Unit.objects.all(), label="Військова частина", required=True)
+    oid = forms.ModelChoiceField(queryset=OID.objects.none(), label="ОІД", required=True)
+
     class Meta:
         model = Task
-        fields = ['oid', 'input_number', 'input_date', 'reviewed_by', 'review_result', 'note']
+        fields = ['unit', 'oid', 'input_number', 'input_date', 'reviewed_by', 'review_result', 'note']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'unit' in self.data:
+            try:
+                unit_id = int(self.data.get('unit'))
+                self.fields['oid'].queryset = OID.objects.filter(unit_id=unit_id).exclude(status='скасовано')
+            except (ValueError, TypeError):
+                pass
+        elif self.instance.pk:
+            self.fields['oid'].queryset = OID.objects.filter(unit=self.instance.oid.unit)

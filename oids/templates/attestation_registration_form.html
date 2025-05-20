@@ -7,6 +7,12 @@
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 </head>
 <body>
+        <style>
+        .select2 {
+            width: 300px !important;
+        }
+    </style>
+    
     {% block content %}
     <h2>Нова відправка Акту Атестації</h2>
     <form method="post" enctype="multipart/form-data">
@@ -24,6 +30,38 @@
         $(document).ready(function() {
             $('select').select2();
         });
-    </script>
+    </script> 
+
+
+
+<script>
+    $(document).ready(function() {
+    $('select').select2();
+        $('#id_units').on('change', function() {
+            const unitIds = $(this).val();
+            if (!unitIds.length) return;
+
+            $.ajax({
+                url: "{% url 'ajax_load_oids_for_units' %}",
+                data: {
+                    'units[]': unitIds
+                },
+                success: function(data) {
+                    const $oidSelect = $('#id_oids');
+                    $oidSelect.empty();
+                    data.forEach(function(oid) {
+                        $oidSelect.append($('<option>', {
+                            value: oid.id,
+                            text: oid.name
+                        }));
+                    });
+                    $oidSelect.trigger('change');
+                }
+            });
+        });
+    });
+</script>
+
+
 </body>
 </html>

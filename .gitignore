@@ -1,3 +1,4 @@
 oids/__pycache__/*
 myApp/*
 oids/*.pyc
+oids/__pycache__/*.pyc
