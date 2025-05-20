@@ -4,6 +4,7 @@ from .models import Document, OID, Unit, Person, WorkRequest, WorkRequestItem, A
 from django.forms import modelformset_factory
 from django_select2.forms import Select2MultipleWidget
 # from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget
+from .models import StatusChoices, OIDTypeChoices, WorkTypeChoices, ReviewResultChoices
 
 
 class DocumentForm(forms.ModelForm):
@@ -14,7 +15,7 @@ class DocumentForm(forms.ModelForm):
 class DocumentHeaderForm(forms.Form):
     unit = forms.ModelChoiceField(queryset=Unit.objects.all(), label="Військова частина")
     oid = forms.ModelChoiceField(queryset=OID.objects.none(), label="ОІД")
-    work_type = forms.ChoiceField(choices=Document.WORK_TYPE_CHOICES, label="Тип роботи")
+    work_type = forms.ChoiceField(choices=WorkTypeChoices.choices, label="Тип роботи")
     work_date = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}), label="Дата роботи на ОІД")
     author = forms.ModelChoiceField(queryset=Person.objects.all(), label="Хто виконав документи")
     # author = forms.CharField(label="Хто виконав документи", max_length=100) #add to fild #manual enter

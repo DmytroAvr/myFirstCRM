@@ -3,6 +3,31 @@ from django.db import models
 from multiselectfield import MultiSelectField
 
 
+class StatusChoices(models.TextChoices):
+    NEW = 'створюється', 'Створюється'
+    ATTESTED = 'атестована', 'атестована'
+    ACTIVE = 'в експлуатації', 'В експлуатації'
+    TERMINATED = 'обробка призупинена', 'обробка призупинена'
+    CANCELED = 'скасовано', 'скасовано'
+
+class OIDTypeChoices(models.TextChoices):
+    PC = 'ПЕМІН', 'ПЕМІН'
+    SPEAK = 'МОВНА', 'МОВНА'
+
+class WorkTypeChoices(models.TextChoices):
+    ATTESTATION = 'Атестація', 'Атестація'
+    IK = 'ІК', 'ІК'
+
+class ReviewResultChoices(models.TextChoices):
+    REVIEWED = 'погоджено', 'Погоджено'
+    REWORK = 'на доопрацювання', 'На доопрацювання'
+    WAITING = 'чекаємо папір', 'Чекаємо папір'
+
+
+    # oid_type = models.CharField(max_length=10, choices=OIDTypeChoices.choices, default=OIDTypeChoices.PC, verbose_name="Тип ОІД")
+    # work_type = models.CharField(max_length=20, choices=WorkTypeChoices.choices, default=WorkTypeChoices.IK, verbose_name="Тип роботи")
+    # status = models.CharField(max_length=30, choices=StatusChoices.choices, default=StatusChoices.NEW, verbose_name="Поточний стан ОІД")
+    # review_result = models.CharField(max_length=30, choices=ReviewResultChoices.choices, default=ReviewResultChoices.REVIEWED, verbose_name="Результат розгляду")
 class Unit(models.Model):  # Військова частина
     MANAGEMENT_UNIT_CHOICES = [
         ('ПівнічнеТУ', 'ПівнічнеТУ'),
@@ -22,24 +47,13 @@ class Unit(models.Model):  # Військова частина
 
 
 class OID(models.Model):  # Об'єкт інформаційної діяльності
-    TYPE_CHOICES = [
-        ('ПЕМІН', 'ПЕМІН'), ('МОВНА', 'МОВНА'),
-    ]
-
-    STATUS_CHOICES = [
-        ('створюється', 'створюється'),
-        ('атестована', 'атестована'),
-        ('в експлуатації', 'в експлуатації'),
-        ('обробка припинена', 'обробка припинена'),
-        ('скасовано', 'скасовано'),
-    ]
 
     name = models.CharField(max_length=255, verbose_name="Назва")
     unit = models.ForeignKey(Unit, on_delete=models.CASCADE, verbose_name="Військова частина")
     room = models.CharField(max_length=255, verbose_name="Приміщення №")  # address -> room
     note = models.TextField(verbose_name="Примітка", blank=True, null=True)  # purpose -> note
-    oid_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='ПЕМІН', verbose_name="Тип ОІД")
-    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='створюється', verbose_name="Поточний стан ОІД")
+    oid_type = models.CharField(max_length=10, choices=OIDTypeChoices.choices, default=OIDTypeChoices.PC, verbose_name="Тип ОІД")
+    status = models.CharField(max_length=30, choices=StatusChoices.choices, default=StatusChoices.NEW, verbose_name="Поточний стан ОІД")
     # name unit room note oid_type status 
     def __str__(self):
         return self.name
@@ -74,13 +88,13 @@ class DocumentType(models.Model):
         return f"{self.name} ({self.oid_type}, {self.work_type})"
 
 class Document(models.Model):
-    WORK_TYPE_CHOICES = [
-        ('Атестація', 'Атестація'), ('ІК', 'ІК'),
-    ]
+
     unit = models.ForeignKey(Unit, on_delete=models.CASCADE, verbose_name="Військова частина")
     oid = models.ForeignKey(OID, on_delete=models.CASCADE, verbose_name="ОІД")
-   
-    work_type = models.CharField(max_length=20, choices=WORK_TYPE_CHOICES, verbose_name="Тип роботи")
+    
+    oid_type = models.CharField(max_length=20, choices=OIDTypeChoices.choices, default=OIDTypeChoices.PC, verbose_name="Тип ОІД")
+
+    work_type = models.CharField(max_length=20, choices=WorkTypeChoices.choices, default=WorkTypeChoices.IK, verbose_name="Тип роботи")
     document_type = models.ForeignKey(DocumentType, on_delete=models.CASCADE, verbose_name="Документ")
     document_number = models.CharField(max_length=50, default='27/14-', verbose_name="Підготовлений № документа")
     process_date = models.DateField(verbose_name="Дата опрацювання")
@@ -115,35 +129,21 @@ class Trip(models.Model):  # Відрядження
 
 # C:\myFirstCRM\oids\models.py
 class WorkRequest(models.Model):  # Заявка на проведення робіт
-    WORK_TYPE_CHOICES = [
-        ('Атестація', 'Атестація'), ('ІК', 'ІК'),
-    ]
-
-    STATUS_CHOICES = [
-        ('очікує', 'очікує'), ('в роботі', 'в роботі'), ('виконано', 'виконано'), ('скасовано', 'скасовано'),
-    ]
-
     unit = models.ForeignKey('Unit', on_delete=models.CASCADE, verbose_name="Військова частина")
-    work_type = MultiSelectField(choices=WORK_TYPE_CHOICES, verbose_name="Типи роботи")
-    # work_type = models.CharField("Тип роботи", max_length=20, choices=WORK_TYPE_CHOICES)
+    work_type = models.CharField(max_length=20, choices=WorkTypeChoices.choices, default=WorkTypeChoices.IK, verbose_name="Тип роботи")
     oids = models.ManyToManyField('OID', verbose_name="Об’єкти інформаційної діяльності")
     incoming_number = models.CharField(verbose_name="Вхідний номер заявки", max_length=50)
     incoming_date = models.DateField(verbose_name="Дата заявки")
-    status = models.CharField(verbose_name="Статус заявки", max_length=20, choices=STATUS_CHOICES, default='очікує')
+    status = models.CharField(max_length=30, choices=StatusChoices.choices, default=StatusChoices.NEW, verbose_name="Поточний стан ОІД")
     note = models.TextField(verbose_name="Примітки", blank=True, null=True)
 
     def __str__(self):
         return f"{self.incoming_number} — {self.get_status_display()}"
 
 class WorkRequestItem(models.Model):
-    WORK_TYPE_CHOICES = [
-        ('Атестація', 'Атестація'),
-        ('ІК', 'ІК'),
-    ]
-    
     request = models.ForeignKey(WorkRequest, on_delete=models.CASCADE, related_name="items")
     oid = models.ForeignKey('OID', on_delete=models.CASCADE)
-    work_type = models.CharField(max_length=20, choices=WORK_TYPE_CHOICES)
+    work_type = models.CharField(max_length=20, choices=WorkTypeChoices.choices, default=WorkTypeChoices.IK, verbose_name="Тип роботи")
 
     def __str__(self):
         return f"{self.oid} — {self.work_type}"
@@ -177,23 +177,20 @@ class TripResultForUnit(models.Model):
     process_date = models.DateField(verbose_name="Дата відправки до частини")
     attachment = models.FileField(upload_to="trip_results_docs/", blank=True, null=True, verbose_name="Файл (опційно)")
     note = models.TextField(blank=True, null=True, verbose_name="Примітка")
-
+    # пропозиція додавати відрядження 
+    # trip = models.ForeignKey(Trip, on_delete=models.CASCADE, verbose_name="Відрядження", related_name='trip_result')
     def __str__(self):
         return f"Відправка {self.process_date} — {self.documents.count()} документів"
 
 # Технічне завдання 
 class Task(models.Model): 
-    REVIEW_RESULT_CHOICES = [
-        ('погоджено', 'Погоджено'),
-        ('на доопрацювання', 'На доопрацювання'),
-        ('чекаємо папір', 'Чекаємо папір'),
-    ]
+
 
     oid = models.ForeignKey('OID', on_delete=models.CASCADE, verbose_name="ОІД", related_name='tasks')
     input_number = models.CharField(max_length=50, verbose_name="Вхідний номер")
     input_date = models.DateField(verbose_name="Вхідна дата")
     reviewed_by = models.CharField(max_length=255, verbose_name="Хто ознайомився")
-    review_result = models.CharField(max_length=30, choices=REVIEW_RESULT_CHOICES, verbose_name="Результат розгляду")
+    review_result = models.CharField(max_length=30, choices=ReviewResultChoices.choices, default=ReviewResultChoices.REVIEWED, verbose_name="Результат розгляду")
     note = models.TextField(blank=True, null=True, verbose_name="Примітка")
 
     def __str__(self):
