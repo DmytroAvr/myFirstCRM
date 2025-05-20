@@ -1,6 +1,6 @@
 # C:\myFirstCRM\oids\forms.py
 from django import forms
-from .models import Document, OID, Unit, Person, WorkRequest, WorkRequestItem, AttestationRegistration, TripResultForUnit, Task
+from .models import Document, OID, Unit, Person, WorkRequest, WorkRequestItem, AttestationRegistration, TripResultForUnit, TechnicalTask 
 from django.forms import modelformset_factory
 from django_select2.forms import Select2MultipleWidget
 # from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget
@@ -185,12 +185,12 @@ class TripResultForUnitForm(forms.ModelForm):
 
 
 # Технічне завдання
-class TaskForm(forms.ModelForm):
+class TechnicalTaskForm(forms.ModelForm):
     unit = forms.ModelChoiceField(queryset=Unit.objects.all(), label="Військова частина", required=True)
     oid = forms.ModelChoiceField(queryset=OID.objects.none(), label="ОІД", required=True)
 
     class Meta:
-        model = Task
+        model = TechnicalTask
         fields = ['unit', 'oid', 'input_number', 'input_date', 'reviewed_by', 'review_result', 'note']
 
     def __init__(self, *args, **kwargs):

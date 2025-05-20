@@ -16,7 +16,7 @@ urlpatterns = [
     # D:\myFirstCRM\oids\urls.py
     path('attestation/new/', views.create_attestation_registration, name='attestation_new'),
     path('trip_result/new/', views.create_trip_result, name='trip_result_new'),
-    path('tasks/create/', views.create_task, name='task_create'),
+    path('technical_tasks/create/', views.technical_task_create, name='technical_task_create'),
     # path('trip_result/list/', views.trip_result_list, name='trip_result_list'),
     path('oids/create/', views.create_oid, name='oid_create')
 

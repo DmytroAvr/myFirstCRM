@@ -1,7 +1,7 @@
 # C:\myFirstCRM\oids\views.py
 from django.shortcuts import render, redirect
 from .models import Document, Unit, OID, WorkRequest, DocumentType, WorkRequestItem
-from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet, requestItemFormSet, requestItemForm, OidCreateForm, AttestationRegistrationForm, TripResultForUnitForm, TaskForm
+from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet, requestItemFormSet, requestItemForm, OidCreateForm, AttestationRegistrationForm, TripResultForUnitForm, TechnicalTaskForm
 from django.http import JsonResponse
 import traceback        #check
 from django.contrib import messages
@@ -163,15 +163,15 @@ def trip_result_list(request):
 
 
 # Технічне завдання
-def create_task(request):
+def technical_task_create(request):
     if request.method == 'POST':
-        form = TaskForm(request.POST)
+        form = TechnicalTaskForm(request.POST)
         if form.is_valid():
             form.save()
-            return redirect('task_create')  # або інша сторінка
+            return redirect('technical_task_create')  # або інша сторінка
     else:
-        form = TaskForm()
-    return render(request, 'oids/task_form.html', {'form': form})
+        form = TechnicalTaskForm()
+    return render(request, 'oids/technical_task_form.html', {'form': form})
 
 
 def create_oid(request):
@@ -179,7 +179,7 @@ def create_oid(request):
         form = OIDForm(request.POST)
         if form.is_valid():
             form.save()
-            return redirect('task_form')  # або назад до Task
+            return redirect('technical_task_form')  # або назад до TechnicalTask
     else:
         form = OIDForm()
     return render(request, 'oids/oid_form.html', {'form': form})

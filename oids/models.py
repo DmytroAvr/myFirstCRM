@@ -183,10 +183,9 @@ class TripResultForUnit(models.Model):
         return f"Відправка {self.process_date} — {self.documents.count()} документів"
 
 # Технічне завдання 
-class Task(models.Model): 
+class TechnicalTask(models.Model):
 
-
-    oid = models.ForeignKey('OID', on_delete=models.CASCADE, verbose_name="ОІД", related_name='tasks')
+    oid = models.ForeignKey('OID', on_delete=models.CASCADE, verbose_name="ОІД", related_name='TechnicalTasks')
     input_number = models.CharField(max_length=50, verbose_name="Вхідний номер")
     input_date = models.DateField(verbose_name="Вхідна дата")
     reviewed_by = models.CharField(max_length=255, verbose_name="Хто ознайомився")
