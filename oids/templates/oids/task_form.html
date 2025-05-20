@@ -25,8 +25,7 @@
 </form>
 
 <!-- Посилання на створення нового ОІД -->
-<p>Не знайшли потрібного ОІД?
-<a href="{% url 'oid_create' %}" target="_blank">Додати новий ОІД</a></p>
+<p>Не знайшли потрібного ОІД?</p><button type="button" class="add-oid-button" style="margin-right: 30px;">➕ Додати ОІД</button> 
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
@@ -49,3 +48,121 @@
 
 
 {% endblock %}
+
+
+
+
+     <!-- 
+    <button type="button" class="add-oid-button" style="margin-right: 30px;">➕ Додати ОІД</button> 
+    -->
+    <!-- script для забезпечення роботи aside -->
+    <script>
+        let targetSelect = null; // глобально збережемо, в яке поле вставити новий ОІД
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const unitSelect = document.querySelector('#id_unit');
+
+            // Клік по "Додати ОІД"
+            document.querySelectorAll('.add-oid-button').forEach(button => {
+                button.addEventListener('click', function (e) {
+                    const unitId = unitSelect.value;
+                    if (!unitId) {
+                        alert("⚠️ Спершу оберіть військову частину у формі зверху.");
+                        return;
+                    }
+                    // Визначити select-oid, який поруч із кнопкою
+                    const formDiv = e.target.closest('.document-form');
+                    targetSelect = formDiv.querySelector('select[name$="-oid"]');
+
+                    // Відкрити aside + overlay
+                    document.getElementById('oid-aside').style.display = "block";
+                    document.getElementById('overlay').style.display = "block";
+                });
+            });
+
+            // Закрити aside вручну
+            document.getElementById('oid-aside-close').addEventListener('click', function () {
+                document.getElementById('oid-aside').style.display = "none";
+                document.getElementById('overlay').style.display = "none";
+            });
+
+            // Відправка форми створення ОІД
+            document.getElementById("oid-create-form").addEventListener("submit", function (e) {
+                e.preventDefault();
+
+                const formData = new FormData(this);
+                const currentUnitId = unitSelect.value;
+                formData.append('unit_id', currentUnitId);
+
+                // запускає 
+                // # D:\myFirstCRM\oids\urls.py
+                // path('ajax/create/', views.create_oid_ajax, name='create_oid_ajax'),
+
+                fetch("{% url 'create_oid_ajax' %}", {
+                    method: "POST",
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert("✅ ОІД створено");
+
+                        // Очистити форму і закрити
+                        this.reset();
+                        document.getElementById('oid-aside').style.display = "none";
+                        document.getElementById('overlay').style.display = "none";
+
+                        if (targetSelect) {
+                            const newOption = document.createElement('option');
+                            newOption.value = data.oid.id;
+                            newOption.textContent = data.oid.name;
+                            newOption.selected = true;
+                            targetSelect.appendChild(newOption);
+                        }
+                    } else {
+                        alert("❌ Помилка створення ОІД:\n" + JSON.stringify(data.errors));
+                    }
+                })
+                .catch(err => {
+                    console.error("❌ Сервер не відповів:", err);
+                    alert("⚠️ Помилка зв’язку із сервером");
+                });
+            });
+        });
+    </script>
+    <!-- Aside для створення ОІД -->
+    <aside id="oid-aside" style="display:none; position: fixed; z-index: 999; right: 0; top: 0; width: 300px; background: #f9f9f9; padding: 20px; border-left: 1px solid #ccc;">
+        <h4>Додати новий ОІД до в/ч <span id="insert_unit"></span></h4>
+        <form id="oid-create-form">
+            {% csrf_token %}
+            <label for="id_name">Назва ОІД:</label>
+            <input type="text" name="name" id="id_name" required><br>
+
+            <label for="id_room">Приміщення:</label>
+            <input type="text" name="room" id="id_room"><br>
+
+            <label for="id_oid_type">Тип ОІД:</label>
+            <select name="oid_type" id="id_oid_type">
+                <option value="ПЕМІН">ПЕМІН</option>
+                <option value="МОВНА">МОВНА</option>
+            </select><br>
+    
+            <label for="id_status">Статус:</label>
+            <select name="status" id="id_status">
+                <option value="створюється">Створюється</option>
+                <option value="діючий">Діючий</option>
+            </select><br>
+
+            <label for="id_note">Примітка:</label>
+            <textarea name="note" id="id_note"></textarea><br><br>
+
+            <button type="submit" style="background-color: #ddf5a5;">➕ Додати ОІД</button>
+            <button type="button" id="oid-aside-close" onclick="document.getElementById('oid-aside').style.display='none'">✖ Закрити</button>
+            <!-- <button type="button" id="oid-aside-close">✖ Закрити</button> -->
+
+        </form>
+    </aside>
+        <div id="overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.5); z-index:998;"></div>
