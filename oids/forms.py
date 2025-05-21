@@ -165,8 +165,13 @@ class TechnicalTaskForm(forms.ModelForm):
 
     class Meta:
         model = TechnicalTask
-        fields = ['unit', 'oid', 'input_number', 'input_date', 'reviewed_by', 'review_result', 'note']
+        fields = ['oid', 'input_number', 'input_date', 'reviewed_by', 'review_result', 'note']
+        widgets = {
+            'input_date': forms.DateInput(attrs={'type': 'date'}),
+        }
 
+    # reviewed_by = forms.ModelChoiceField(queryset=Person.objects.all(), label="Хто ознайомився")
+   
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if 'unit' in self.data:

@@ -1,7 +1,7 @@
 # C:\myFirstCRM\oids\models.py
 from django.db import models
 from multiselectfield import MultiSelectField
-
+from django.utils import timezone
 
 class StatusChoices(models.TextChoices):
     NEW = 'створюється', 'Створюється'
@@ -233,9 +233,12 @@ class TechnicalTask(models.Model):
     input_number = models.CharField(max_length=50, verbose_name="Вхідний номер")
     input_date = models.DateField(verbose_name="Вхідна дата")
     reviewed_by = models.CharField(max_length=255, verbose_name="Хто ознайомився")
+    # reviewed_by = models.ForeignKey('Person', on_delete=models.SET_NULL, null=True, verbose_name="Хто ознайомився")
+    
     review_result = models.CharField(max_length=30, choices=ReviewResultChoices.choices, default=ReviewResultChoices.REVIEWED, verbose_name="Результат розгляду")
     note = models.TextField(blank=True, null=True, verbose_name="Примітка")
 
+    # created_at = models.DateField(auto_now_add=True, verbose_name="Дата додання інформації")
     def __str__(self):
         return f"{self.input_number} / {self.input_date}"
 
