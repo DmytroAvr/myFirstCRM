@@ -4,7 +4,7 @@ from .models import Document, OID, Unit, Person, WorkRequest, WorkRequestItem, A
 from django.forms import modelformset_factory
 from django_select2.forms import Select2MultipleWidget
 # from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget
-from .models import StatusChoices, OIDTypeChoices, WorkTypeChoices, ReviewResultChoices
+from .models import OidStatusChoices, OIDTypeChoices, WorkTypeChoices, ReviewResultChoices
 
 
 class DocumentForm(forms.ModelForm):
@@ -44,7 +44,6 @@ class requestForm(forms.ModelForm):
         fields = ['oids', 'work_type','status']
         # fields = ['Unit', 'work_type', 'oids', 'incoming_number', 'incoming_date', 'status']
 
-
 # test field
 class requestHeaderForm(forms.ModelForm):
     class Meta:
@@ -75,17 +74,15 @@ class requestHeaderForm(forms.ModelForm):
 
         # Спочатку створюємо список статусів, які потрібно виключити
         exclude_statuses = [
-            StatusChoices.NEW,
-            StatusChoices.TERMINATED,
-            StatusChoices.CANCELED,
+            OidStatusChoices.NEW,
+            OidStatusChoices.TERMINATED,
+            OidStatusChoices.CANCELED,
         ]
         
         # Тепер фільтруємо choices для поля status
         self.fields['status'].choices = [
-            choice for choice in StatusChoices.choices if choice[0] not in exclude_statuses
+            choice for choice in OidStatusChoices.choices if choice[0] not in exclude_statuses
         ]
-
-
 
 requestFormSet = modelformset_factory(
     WorkRequest,
@@ -152,8 +149,6 @@ class OIDStatusChangeForm(forms.ModelForm):
                 pass
         elif self.instance.pk:
             self.fields['old_status'].initial = self.instance.oid.status
-
-
 
 #  нові поля. додати АА, відправку документів до частини
 class AttestationRegistrationForm(forms.ModelForm):

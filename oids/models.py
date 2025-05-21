@@ -3,7 +3,7 @@ from django.db import models
 from multiselectfield import MultiSelectField
 from django.utils import timezone
 
-class StatusChoices(models.TextChoices):
+class OidStatusChoices(models.TextChoices):
     NEW = 'створюється', 'Створюється'
     ATTESTED = 'атестована', 'Атестована'
     ACTIVE = 'в експлуатації', 'В експлуатації'
@@ -26,7 +26,7 @@ class ReviewResultChoices(models.TextChoices):
 
     # oid_type = models.CharField(max_length=10, choices=OIDTypeChoices.choices, default=OIDTypeChoices.PC, verbose_name="Тип ОІД")
     # work_type = models.CharField(max_length=20, choices=WorkTypeChoices.choices, default=WorkTypeChoices.IK, verbose_name="Тип роботи")
-    # status = models.CharField(max_length=30, choices=StatusChoices.choices, default=StatusChoices.NEW, verbose_name="Поточний стан ОІД")
+    # status = models.CharField(max_length=30, choices=OidStatusChoices.choices, default=OidStatusChoices.NEW, verbose_name="Поточний стан ОІД")
     # review_result = models.CharField(max_length=30, choices=ReviewResultChoices.choices, default=ReviewResultChoices.REVIEWED, verbose_name="Результат розгляду")
 class Unit(models.Model):  # Військова частина
     MANAGEMENT_UNIT_CHOICES = [
@@ -53,7 +53,7 @@ class OID(models.Model):  # Об'єкт інформаційної діяльн�
     room = models.CharField(max_length=255, verbose_name="Приміщення №")  # address -> room
     note = models.TextField(verbose_name="Примітка", blank=True, null=True)  # purpose -> note
     oid_type = models.CharField(max_length=10, choices=OIDTypeChoices.choices, default=OIDTypeChoices.PC, verbose_name="Тип ОІД")
-    status = models.CharField(max_length=30, choices=StatusChoices.choices, default=StatusChoices.NEW, verbose_name="Поточний стан ОІД")
+    status = models.CharField(max_length=30, choices=OidStatusChoices.choices, default=OidStatusChoices.NEW, verbose_name="Поточний стан ОІД")
     created_by_document = models.OneToOneField(
         'Document',
         on_delete=models.SET_NULL,
@@ -167,7 +167,7 @@ class WorkRequest(models.Model):  # Заявка на проведення ро�
     oids = models.ManyToManyField('OID', verbose_name="Об’єкти інформаційної діяльності")
     incoming_number = models.CharField(verbose_name="Вхідний номер заявки", max_length=50)
     incoming_date = models.DateField(verbose_name="Дата заявки")
-    status = models.CharField(max_length=30, choices=StatusChoices.choices, default=StatusChoices.NEW, verbose_name="Поточний стан ОІД")
+    status = models.CharField(max_length=30, choices=OidStatusChoices.choices, default=OidStatusChoices.NEW, verbose_name="Поточний стан ОІД")
     note = models.TextField(verbose_name="Примітки", blank=True, null=True)
 
     def __str__(self):
