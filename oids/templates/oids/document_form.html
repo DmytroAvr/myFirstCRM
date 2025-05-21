@@ -30,10 +30,12 @@
     <form method="post">
         {% csrf_token %}
 
-        <h3>Основна інформація</h3>
-        {{ header_form.as_p }}
+        <h2>Додати опрацьовані документи по ОІД</h2>
 
-        <h3>Документи</h3>
+        <h3>загальна інформація:</h3>
+        {{ header_form.as_p }}
+<br>
+        <h3>Документи:</h3>
         <div id="formset">
             {{ formset.management_form }}
             {% for form in formset %}
