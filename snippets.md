@@ -74,3 +74,28 @@ class TechnicalTaskForm(forms.ModelForm):
         self.fields['status'].choices = [
             choice for choice in OIDStatusChoices.choices if choice[0] not in exclude_statuses
         ]
+
+
+
+
+
+
+<!--  add message succsess -->
+<!-- to html -->
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-success">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+<!-- to form -->
+
+
+         for form in formset:
+                if form.cleaned_data and not form.cleaned_data.get('DELETE', False):
+                    item = form.save(commit=False)
+                    item.request = work_request
+                    item.save() 
+            
+            messages.success(request, "Заявка успішно збережена!")

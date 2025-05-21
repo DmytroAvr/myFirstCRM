@@ -3,16 +3,26 @@
 <!DOCTYPE html>
 <html>
 <head>
-    ...
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 </head>
-<body>
         <style>
         .select2 {
             width: 300px !important;
         }
+         .alert-success {
+        color: rgb(69, 143, 9);
+        text-align: center;
+        font-size: 30;
+        font-weight: 700;
+    }
     </style>
-    
+<body>
+{% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-success">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
     {% block content %}
     <h2>Нова відправка Акту Атестації</h2>
     <form method="post" enctype="multipart/form-data">

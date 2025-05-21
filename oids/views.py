@@ -150,6 +150,7 @@ def create_attestation_registration(request):
         form = AttestationRegistrationForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
+            messages.success(request, "Інформація успішно збережена!")
             return redirect('attestation_new')  # або інша сторінка
     else:
         form = AttestationRegistrationForm()
@@ -160,6 +161,7 @@ def create_trip_result(request):
         form = TripResultForUnitForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
+            messages.success(request, "Інформація успішно збережена!")
             return redirect('trip_result_new')  # або інша сторінка
             # return redirect('trip_result_list')  # або інша сторінка
     else:
