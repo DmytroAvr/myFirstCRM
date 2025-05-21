@@ -1,7 +1,7 @@
 {% block content %}
 <h2>Додати технічне завдання</h2>
 
-<form method="post">
+<form id="my-form" method="post">
   {% csrf_token %}
   {{ form.unit.label_tag }} {{ form.unit }}
   <br>
@@ -9,9 +9,10 @@
   <select name="oid" id="id_oid">
     <option value="">---------</option>
     {% for oid in form.fields.oid.queryset %}
-      <option value="{{ oid.id }}">{{ oid.name }}</option>
+    <option value="{{ oid.id }}">{{ oid.name }}</option>
     {% endfor %}
   </select>
+  <p style="display: inline;">         - Не знайшли потрібного ОІД?  </p><button type="button" class="add-oid-button" style="margin-right: 30px;">➕ Додати ОІД</button> 
 
   <br><br>
   {{ form.input_number.label_tag }} {{ form.input_number }}
@@ -23,9 +24,46 @@
   <br>
   <button type="submit">Зберегти</button>
 </form>
+<!-- alert - "Дані збережено" для id="my-form" -->
+<script>
+    document.getElementById("my-form").addEventListener("submit", function(e) {
+        e.preventDefault();  // зупиняє стандартне відправлення
+        const formData = new FormData(this);
 
+        fetch(this.action, {
+            method: "POST",
+            body: formData,
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken') // якщо треба
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                alert("✅ Дані збережено!");
+                location.reload();  // або redirect, якщо треба
+            } else {
+                alert("⚠️ Помилка при збереженні.");
+            }
+        });
+    });
+
+    // Функція для отримання CSRF-токена
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                cookie = cookie.trim();
+                if (cookie.startsWith(name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+</script>
 <!-- Посилання на створення нового ОІД -->
-<p>Не знайшли потрібного ОІД?</p><button type="button" class="add-oid-button" style="margin-right: 30px;">➕ Додати ОІД</button> 
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <!-- <script>
@@ -113,10 +151,9 @@
                         return;
                     }
                     // Визначити select-oid, який поруч із кнопкою
-                    const formDiv = e.target.closest('.document-form');
                     
-                    
-                      // targetSelect = formDiv.querySelector('select[name$="-oid"]');
+                    const formDiv = e.target.closest('form');
+                    targetSelect = formDiv.querySelector('#id_oid');
 
                     // Відкрити aside + overlay
                     document.getElementById('oid-aside').style.display = "block";
@@ -174,6 +211,8 @@
                     console.error("❌ Сервер не відповів:", err);
                     alert("⚠️ Помилка зв’язку із сервером");
                 });
+
+                
             });
         });
     </script>

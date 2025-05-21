@@ -238,7 +238,7 @@ class TechnicalTask(models.Model):
     review_result = models.CharField(max_length=30, choices=ReviewResultChoices.choices, default=ReviewResultChoices.REVIEWED, verbose_name="Результат розгляду")
     note = models.TextField(blank=True, null=True, verbose_name="Примітка")
 
-    # created_at = models.DateField(auto_now_add=True, verbose_name="Дата додання інформації")
+    created_at = models.DateField(auto_now_add=True, verbose_name="Дата додання інформації")
     def __str__(self):
         return f"{self.input_number} / {self.input_date}"
 

@@ -86,22 +86,9 @@ myFirstCRM\oids\templates\trip\_result\_form.html,  - є завершенням 
 після отримання відповіді вписати реєстраційний номер та опрацьовуємо myFirstCRM\oids\templates\trip\_result\_form.html.
 якщо ІК - одразу myFirstCRM\oids\templates\trip\_result\_form.html  -->
 
-from django import forms
-from .models import TechnicalTask, Person
-
-class TechnicalTaskForm(forms.ModelForm):
-    class Meta:
-        model = TechnicalTask
-        fields = ['oid', 'input_number', 'input_date', 'reviewed_by', 'review_result', 'note']
-        widgets = {
-            'input_date': forms.DateInput(attrs={'type': 'date'}),
-        }
-
-    reviewed_by = forms.ModelChoiceField(queryset=Person.objects.all(), label="Хто ознайомився")
 
 
-    
+
 http://127.0.0.1:8000/oids/technical_tasks/create/
 виправити оновлення форми після створення ОІД
-
 
