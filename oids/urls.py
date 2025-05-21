@@ -11,14 +11,13 @@ urlpatterns = [
     path('ajax/load-documents-for-oids/', views.load_documents_for_oids, name='ajax_load_documents_for_oids'),
     path('ajax/get-oid-status/', views.get_oid_status, name='ajax_get_oid_status'),
 
-    path('documents/create/', views.document_create, name='document_create'),
+    path('documents/create/', views.document_done, name='document_done'),
     path('documents/request/', views.document_request, name='document_request'),
-    # D:\myFirstCRM\oids\urls.py
+   
     path('attestation/new/', views.create_attestation_registration, name='attestation_new'),
     path('trip_result/new/', views.create_trip_result, name='trip_result_new'),
     path('technical_tasks/create/', views.technical_task_create, name='technical_task_create'),
-    # path('trip_result/list/', views.trip_result_list, name='trip_result_list'),
+
     path('oids/create/', views.create_oid, name='oid_create'),
     path('oids/status-change/', views.change_oid_status, name='oid_status_change'),
-
 ]

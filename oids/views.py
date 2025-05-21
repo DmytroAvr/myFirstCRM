@@ -59,7 +59,7 @@ def get_oids_by_unit(request):
 
 
 # C:\myFirstCRM\oids\views.py
-def document_create(request):
+def document_done(request):
     if request.method == 'POST':
         header_form = DocumentHeaderForm(request.POST)
         formset = DocumentFormSet(request.POST)
@@ -82,12 +82,15 @@ def document_create(request):
                     doc.author = author
                     doc.process_date = process_date
                     doc.save()
-            return redirect('document_create')
+
+
+                messages.success(request, "Документи успішно додано!")
+            return redirect('document_done')
     else:
         header_form = DocumentHeaderForm()
         formset = DocumentFormSet(queryset=Document.objects.none())
 
-    return render(request, 'oids/document_form.html', {
+    return render(request, 'oids/document_done.html', {
         'header_form': header_form,
         'formset': formset
     })

@@ -1,4 +1,4 @@
-<!-- C:\myFirstCRM\oids\templates\oids\document_form.html -->
+<!-- C:\myFirstCRM\oids\templates\oids\document_done.html -->
 
 <style>
     body {
@@ -23,10 +23,21 @@
     width: 400px; /* Ширина */
     min-height: 20px; /* Мінімальна висота */
 }
-
+    .alert-success {
+        color: rgb(69, 143, 9);
+        text-align: center;
+        font-size: 30;
+        font-weight: 700;
+    }
 </style>
 
 <body>
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-success">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
     <form method="post">
         {% csrf_token %}
 
@@ -50,6 +61,7 @@
         <br><br>
         <button type="submit">💾 Зберегти всі документи</button>
     </form>
+
 </body>
 
 <script>
