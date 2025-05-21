@@ -69,6 +69,23 @@ class requestHeaderForm(forms.ModelForm):
             'incoming_date': forms.DateInput(attrs={'type': 'date'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['incoming_number'].initial = "тип/щось"
+
+        # Спочатку створюємо список статусів, які потрібно виключити
+        exclude_statuses = [
+            StatusChoices.NEW,
+            StatusChoices.TERMINATED,
+            StatusChoices.CANCELED,
+        ]
+        
+        # Тепер фільтруємо choices для поля status
+        self.fields['status'].choices = [
+            choice for choice in StatusChoices.choices if choice[0] not in exclude_statuses
+        ]
+
+
 
 requestFormSet = modelformset_factory(
     WorkRequest,

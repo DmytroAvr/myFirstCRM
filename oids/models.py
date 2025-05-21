@@ -5,10 +5,10 @@ from django.utils import timezone
 
 class StatusChoices(models.TextChoices):
     NEW = 'створюється', 'Створюється'
-    ATTESTED = 'атестована', 'атестована'
+    ATTESTED = 'атестована', 'Атестована'
     ACTIVE = 'в експлуатації', 'В експлуатації'
-    TERMINATED = 'обробка призупинена', 'обробка призупинена'
-    CANCELED = 'скасовано', 'скасовано'
+    TERMINATED = 'обробка призупинена', 'Обробка призупинена'
+    CANCELED = 'скасовано', 'Скасовано'
 
 class OIDTypeChoices(models.TextChoices):
     PC = 'ПЕМІН', 'ПЕМІН'

@@ -49,6 +49,8 @@ from django import forms
 from .models import TechnicalTask, Person
 
 class TechnicalTaskForm(forms.ModelForm):
+    reviewed_by = forms.ModelChoiceField(queryset=Person.objects.all(), label="Хто ознайомився")
+
     class Meta:
         model = TechnicalTask
         fields = ['oid', 'input_number', 'input_date', 'reviewed_by', 'review_result', 'note']
@@ -56,4 +58,19 @@ class TechnicalTaskForm(forms.ModelForm):
             'input_date': forms.DateInput(attrs={'type': 'date'}),
         }
 
-    reviewed_by = forms.ModelChoiceField(queryset=Person.objects.all(), label="Хто ознайомився")
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['input_number'].initial = "24/33-"
+
+        <!-- виключити щось -->
+        # Спочатку створюємо список статусів, які потрібно виключити
+        exclude_statuses = [
+            StatusChoices.NEW,
+            StatusChoices.TERMINATED,
+            StatusChoices.CANCELED,
+        ]
+        
+        # Тепер фільтруємо choices для поля status
+        self.fields['status'].choices = [
+            choice for choice in StatusChoices.choices if choice[0] not in exclude_statuses
+        ]
