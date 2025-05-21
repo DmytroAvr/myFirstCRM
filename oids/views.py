@@ -11,7 +11,6 @@ def home_view(request):
     return render(request, 'home.html')
 
 
-
 def load_oids(request):
     try:
         unit_id = request.GET.get('unit')
@@ -48,7 +47,6 @@ def load_documents_for_oids(request):
     oid_ids = request.GET.getlist('oids[]')
     documents = Document.objects.filter(oid__id__in=oid_ids).order_by('document_type__name', 'document_number')
     return JsonResponse(list(documents.values('id', 'document_type__name', 'document_number')), safe=False)
-
 
 
 def get_oids_by_unit(request):

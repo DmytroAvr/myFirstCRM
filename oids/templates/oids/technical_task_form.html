@@ -28,6 +28,53 @@
 <p>Не знайшли потрібного ОІД?</p><button type="button" class="add-oid-button" style="margin-right: 30px;">➕ Додати ОІД</button> 
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<!-- <script>
+  $(document).ready(function() {
+
+    // Завантаження OID при зміні Unit
+    $('#id_unit').change(function() {
+      var unitId = $(this).val();
+      $.ajax({
+        url: '{% url "ajax_load_oids_for_unit" %}',
+        data: {'unit': unitId},
+        success: function(data) {
+          var $oid = $('#id_oid');
+          var selectedOid = $oid.val();  // зберегти обране значення (якщо є)
+          $oid.empty();
+          $oid.append('<option value="">---------</option>');
+          data.forEach(function(item) {
+            var option = $('<option>', {
+              value: item.id,
+              text: item.name
+            });
+            if (item.id == selectedOid) {
+              option.attr('selected', 'selected');
+            }
+            $oid.append(option);
+          });
+        }
+      });
+    });
+
+    // Автоматичне оновлення поля old_status після вибору OID
+    $('#id_oid').change(function() {
+      const oidId = $(this).val();
+      if (!oidId) return;
+
+      $.ajax({
+        url: '{% url "ajax_get_oid_status" %}',
+        data: {'oid_id': oidId},
+        success: function(data) {
+          $('#id_old_status').val(data.status);
+        }
+      });
+    });
+  });
+</script> -->
+
+
+{% endblock %}
+
 <script>
   $('#id_unit').change(function() {
     var unitId = $(this).val();
@@ -45,11 +92,6 @@
     });
   });
 </script>
-
-
-{% endblock %}
-
-
 
 
      <!-- 

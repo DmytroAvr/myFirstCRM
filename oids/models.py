@@ -75,14 +75,17 @@ class OID(models.Model):  # Об'єкт інформаційної діяльн�
     def __str__(self):
         return self.name
 
+# C:\myFirstCRM\oids\models.py
 class OIDStatusChange(models.Model):
     unit = models.ForeignKey('Unit', on_delete=models.CASCADE, verbose_name="Військова частина")
     oid = models.ForeignKey('OID', on_delete=models.CASCADE, verbose_name="ОІД")
     old_status = models.CharField(max_length=30, verbose_name="Попередній статус")
+    incoming_number = models.CharField(max_length=50, blank=True, null=True, verbose_name="Вхідний номер документа")
     new_status = models.CharField(max_length=30, verbose_name="Новий статус")
     reason = models.TextField(blank=True, null=True, verbose_name="Причина зміни")
     changed_by = models.CharField(max_length=100, verbose_name="Хто змінив")
     changed_at = models.DateField(auto_now_add=True, verbose_name="Дата зміни")
+
 
     def __str__(self):
         return f"{self.oid.name}: {self.old_status} → {self.new_status} ({self.changed_at})"

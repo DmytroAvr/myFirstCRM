@@ -37,10 +37,6 @@ DocumentFormSet = modelformset_factory(
     can_delete=True
 )
 
-# 
-
-
-
 # C:\myFirstCRM\oids\forms.py
 class requestForm(forms.ModelForm):
     class Meta:
@@ -107,26 +103,39 @@ class OIDStatusChangeForm(forms.ModelForm):
     # unit = forms.ModelChoiceField(queryset=Unit.objects.all(), label="Військова частина", required=False)
     class Meta:
         model = OIDStatusChange
-        fields = ['unit', 'oid', 'old_status', 'new_status', 'reason', 'changed_by']
+        fields = ['unit', 'oid', 'old_status', 'incoming_number', 'new_status', 'reason', 'changed_by'] 
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Зробити old_status лише для читання
+        # old_status readonly
         self.fields['old_status'].disabled = True
 
-        # Обмеження вибору нового статусу
-        allowed_choices = [
-            ('скасовано', 'скасовано'),
+        # new_status only two choices
+        self.fields['new_status'].widget = forms.Select(choices=[
             ('обробка припинено', 'обробка припинено'),
+            ('скасовано', 'скасовано'),
             ('діючий', 'діючий'),
-        ]
-        self.fields['new_status'].widget = forms.Select(choices=allowed_choices)
+        ])
 
-        # Попередній статус можна підтягувати автоматично, якщо потрібно
-        if self.instance.pk:
-            self.fields['old_status'].initial = self.instance.old_status
-        # self.fields['oid'].queryset = OID.objects.filter(status__in=['діючий', 'новий'])
+        # Якщо форма вже заповнюється (POST), дозволяємо валідацію будь-якого OID:
+        if self.is_bound:
+            self.fields['oid'].queryset = OID.objects.all()
+        else:
+            # Порожній список при першому завантаженні
+            self.fields['oid'].queryset = OID.objects.none()
+
+        # Вставляємо поточний статус, якщо OID вже вибрано (при сабміті або редагуванні)
+        if 'oid' in self.data:
+            try:
+                oid = OID.objects.get(pk=int(self.data.get('oid')))
+                # Автоматично підставляємо old_status
+                self.fields['old_status'].initial = oid.status
+            except (ValueError, OID.DoesNotExist):
+                pass
+        elif self.instance.pk:
+            self.fields['old_status'].initial = self.instance.oid.status
+
 
 
 #  нові поля. додати АА, відправку документів до частини
