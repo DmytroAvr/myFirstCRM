@@ -65,12 +65,12 @@ class TechnicalTaskForm(forms.ModelForm):
         <!-- виключити щось -->
         # Спочатку створюємо список статусів, які потрібно виключити
         exclude_statuses = [
-            OidStatusChoices.NEW,
-            OidStatusChoices.TERMINATED,
-            OidStatusChoices.CANCELED,
+            OIDStatusChoices.NEW,
+            OIDStatusChoices.TERMINATED,
+            OIDStatusChoices.CANCELED,
         ]
         
         # Тепер фільтруємо choices для поля status
         self.fields['status'].choices = [
-            choice for choice in OidStatusChoices.choices if choice[0] not in exclude_statuses
+            choice for choice in OIDStatusChoices.choices if choice[0] not in exclude_statuses
         ]

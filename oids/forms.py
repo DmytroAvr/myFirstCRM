@@ -4,7 +4,7 @@ from .models import Document, OID, Unit, Person, WorkRequest, WorkRequestItem, A
 from django.forms import modelformset_factory
 from django_select2.forms import Select2MultipleWidget
 # from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget
-from .models import OidStatusChoices, OIDTypeChoices, WorkTypeChoices, ReviewResultChoices
+from .models import OIDStatusChoices, OIDTypeChoices, WorkTypeChoices, ReviewResultChoices, WRequestStatusChoices
 
 
 class DocumentForm(forms.ModelForm):
@@ -74,14 +74,13 @@ class requestHeaderForm(forms.ModelForm):
 
         # Спочатку створюємо список статусів, які потрібно виключити
         exclude_statuses = [
-            OidStatusChoices.NEW,
-            OidStatusChoices.TERMINATED,
-            OidStatusChoices.CANCELED,
+            WRequestStatusChoices.DONE,
+            WRequestStatusChoices.CANCELED,
         ]
         
         # Тепер фільтруємо choices для поля status
         self.fields['status'].choices = [
-            choice for choice in OidStatusChoices.choices if choice[0] not in exclude_statuses
+            choice for choice in WRequestStatusChoices.choices if choice[0] not in exclude_statuses
         ]
 
 requestFormSet = modelformset_factory(
