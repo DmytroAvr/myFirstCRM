@@ -3,6 +3,7 @@ from django.db import models
 from multiselectfield import MultiSelectField
 from django.utils import timezone
 
+
 class OIDStatusChoices(models.TextChoices):
     NEW = 'створюється', 'Створюється'
     ATTESTED = 'атестована', 'Атестована'
@@ -131,7 +132,8 @@ class Document(models.Model):
     oid = models.ForeignKey(OID, on_delete=models.CASCADE, verbose_name="ОІД")
     
     oid_type = models.CharField(max_length=20, choices=OIDTypeChoices.choices, default=OIDTypeChoices.PC, verbose_name="Тип ОІД")
-
+    # додав поле для заявки
+    work_request = models.ForeignKey('WorkRequest', on_delete=models.SET_NULL, blank=True, null=True, verbose_name="Заявка на проведення робіт")
     work_type = models.CharField(max_length=20, choices=WorkTypeChoices.choices, default=WorkTypeChoices.IK, verbose_name="Тип роботи")
     document_type = models.ForeignKey(DocumentType, on_delete=models.CASCADE, verbose_name="Документ")
     document_number = models.CharField(max_length=50, default='27/14-', verbose_name="Підготовлений № документа")

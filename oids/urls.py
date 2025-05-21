@@ -11,9 +11,9 @@ urlpatterns = [
     path('ajax/load-documents-for-oids/', views.load_documents_for_oids, name='ajax_load_documents_for_oids'),
     path('ajax/get-oid-status/', views.get_oid_status, name='ajax_get_oid_status'),
 
-    path('documents/create/', views.document_done, name='document_done'),
+    path('documents/done/', views.document_done, name='document_done'),
     path('documents/request/', views.document_request, name='document_request'),
-   
+
     path('attestation/new/', views.create_attestation_registration, name='attestation_new'),
     path('trip_result/new/', views.create_trip_result, name='trip_result_new'),
     path('technical_tasks/create/', views.technical_task_create, name='technical_task_create'),
