@@ -106,8 +106,8 @@ def document_request(request):
                     item = form.save(commit=False)
                     item.request = work_request
                     item.save() 
-
-                    messages.success(request, "Заявка успішно збережена!")
+            
+            messages.success(request, "Заявка успішно збережена!")
             return redirect('document_request')  # або інша сторінка
     else:
         header_form = requestHeaderForm()
