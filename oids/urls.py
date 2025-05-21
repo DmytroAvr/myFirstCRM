@@ -9,7 +9,7 @@ urlpatterns = [
     path('ajax/load-oids-for-units/', views.load_oids_for_units, name='ajax_load_oids_for_units'),
     path('ajax/load-oids-for-unit/', views.load_oids_for_unit, name='ajax_load_oids_for_unit'),
     path('ajax/load-documents-for-oids/', views.load_documents_for_oids, name='ajax_load_documents_for_oids'),
-
+    path('ajax/get-oid-status/', views.get_oid_status, name='ajax_get_oid_status'),
 
     path('documents/create/', views.document_create, name='document_create'),
     path('documents/request/', views.document_request, name='document_request'),
@@ -18,6 +18,7 @@ urlpatterns = [
     path('trip_result/new/', views.create_trip_result, name='trip_result_new'),
     path('technical_tasks/create/', views.technical_task_create, name='technical_task_create'),
     # path('trip_result/list/', views.trip_result_list, name='trip_result_list'),
-    path('oids/create/', views.create_oid, name='oid_create')
+    path('oids/create/', views.create_oid, name='oid_create'),
+    path('oids/status-change/', views.change_oid_status, name='oid_status_change'),
 
 ]

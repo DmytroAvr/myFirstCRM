@@ -54,9 +54,38 @@ class OID(models.Model):  # Об'єкт інформаційної діяльн�
     note = models.TextField(verbose_name="Примітка", blank=True, null=True)  # purpose -> note
     oid_type = models.CharField(max_length=10, choices=OIDTypeChoices.choices, default=OIDTypeChoices.PC, verbose_name="Тип ОІД")
     status = models.CharField(max_length=30, choices=StatusChoices.choices, default=StatusChoices.NEW, verbose_name="Поточний стан ОІД")
-    # name unit room note oid_type status 
+    created_by_document = models.OneToOneField(
+        'Document',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='first_doc_for_oid',
+        verbose_name="Перший документ (Атестація/ІК)"
+    )
+
+    latest_document = models.ForeignKey(
+        'Document',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='latest_doc_for_oid',
+        verbose_name="Останній документ"
+    )
+
     def __str__(self):
         return self.name
+
+class OIDStatusChange(models.Model):
+    unit = models.ForeignKey('Unit', on_delete=models.CASCADE, verbose_name="Військова частина")
+    oid = models.ForeignKey('OID', on_delete=models.CASCADE, verbose_name="ОІД")
+    old_status = models.CharField(max_length=30, verbose_name="Попередній статус")
+    new_status = models.CharField(max_length=30, verbose_name="Новий статус")
+    reason = models.TextField(blank=True, null=True, verbose_name="Причина зміни")
+    changed_by = models.CharField(max_length=100, verbose_name="Хто змінив")
+    changed_at = models.DateField(auto_now_add=True, verbose_name="Дата зміни")
+
+    def __str__(self):
+        return f"{self.oid.name}: {self.old_status} → {self.new_status} ({self.changed_at})"
 
 
 class Person(models.Model):
@@ -101,6 +130,7 @@ class Document(models.Model):
     work_date = models.DateField(verbose_name="Дата проведення робіт")
     author = models.CharField(max_length=255, verbose_name="Виконавець (ПІБ)")
     note = models.TextField(blank=True, null=True, verbose_name="Примітки")
+    created_at = models.DateField(auto_now_add=True, verbose_name="Дата внесення в систему")
 
     def __str__(self):
         return f"{self.document_type.name} / {self.document_number}"
@@ -153,6 +183,7 @@ class WorkRequestItem(models.Model):
 class AttestationRegistration(models.Model):
     units = models.ManyToManyField("Unit", verbose_name="Військові частини")
     oids = models.ManyToManyField("OID", through='AttestationItem', verbose_name="ОІД що реєструються")
+    registration_number = models.CharField(max_length=50, blank=True, null=True, verbose_name="Реєстраційний номер листа до ДССЗЗІ")
     process_date = models.DateField(verbose_name="Дата відправки на реєстрацію в ДССЗЗІ")
     attachment = models.FileField(upload_to="attestation_docs/", blank=True, null=True, verbose_name="Файл (опційно)")
     note = models.TextField(blank=True, null=True, verbose_name="Примітка")
@@ -168,6 +199,13 @@ class AttestationItem(models.Model):
     def __str__(self):
         return f"{self.oid.name} — {self.document_number}"
 
+class AttestationResponse(models.Model):
+    registration = models.OneToOneField(AttestationRegistration, on_delete=models.CASCADE)
+    registered_number = models.CharField(max_length=50, verbose_name="Зареєстровано за номером")
+    registered_date = models.DateField(verbose_name="Дата реєстрації")
+    note = models.TextField(blank=True, null=True, verbose_name="Примітка")
+    recorded_date = models.DateField(auto_now_add=True, verbose_name="Дата внесення")
+
 class TripResultForUnit(models.Model):
     units = models.ManyToManyField("Unit", verbose_name="Військові частини призначення")
     oids = models.ManyToManyField("OID", verbose_name="ОІД призначення")
@@ -179,6 +217,9 @@ class TripResultForUnit(models.Model):
     note = models.TextField(blank=True, null=True, verbose_name="Примітка")
     # пропозиція додавати відрядження 
     # trip = models.ForeignKey(Trip, on_delete=models.CASCADE, verbose_name="Відрядження", related_name='trip_result')
+    trip = models.ForeignKey('Trip', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Пов’язане відрядження")
+    related_request = models.ForeignKey('WorkRequest', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Пов’язана заявка")
+
     def __str__(self):
         return f"Відправка {self.process_date} — {self.documents.count()} документів"
 

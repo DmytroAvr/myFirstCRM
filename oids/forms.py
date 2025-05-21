@@ -1,6 +1,6 @@
 # C:\myFirstCRM\oids\forms.py
 from django import forms
-from .models import Document, OID, Unit, Person, WorkRequest, WorkRequestItem, AttestationRegistration, TripResultForUnit, TechnicalTask 
+from .models import Document, OID, Unit, Person, WorkRequest, WorkRequestItem, AttestationRegistration, TripResultForUnit, TechnicalTask, AttestationResponse, OIDStatusChange
 from django.forms import modelformset_factory
 from django_select2.forms import Select2MultipleWidget
 # from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget
@@ -64,22 +64,6 @@ class requestItemForm(forms.ModelForm):
         model = WorkRequestItem
         fields = ['oid', 'work_type']
 
-# class requestForm(forms.ModelForm):
-#     class Meta:
-#         model = WorkRequest
-#         fields = ['oids', 'work_type', 'status']
-#         widgets = {
-#             'oids': forms.SelectMultiple(attrs={'size': 5}),
-#             'work_type': forms.CheckboxSelectMultiple(),  # або SelectMultiple
-#         }
-
-# class requestHeaderForm(forms.Form):
-#     unit = forms.ModelChoiceField(queryset=Unit.objects.all(), label="Військова частина")
-#     incoming_number = forms.CharField(label="Вхідний номер заявки", max_length=50)
-#     incoming_date = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}), label="Дата вхідного")
-
-#     def __init__(self, *args, **kwargs):
-#         super().__init__(*args, **kwargs)
 class requestHeaderForm(forms.ModelForm):
     class Meta:
         model = WorkRequest
@@ -119,6 +103,32 @@ class OidCreateForm(forms.ModelForm):
             'status': forms.Select(attrs={'class': 'form-control'}),
         }
 
+class OIDStatusChangeForm(forms.ModelForm):
+    # unit = forms.ModelChoiceField(queryset=Unit.objects.all(), label="Військова частина", required=False)
+    class Meta:
+        model = OIDStatusChange
+        fields = ['unit', 'oid', 'old_status', 'new_status', 'reason', 'changed_by']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Зробити old_status лише для читання
+        self.fields['old_status'].disabled = True
+
+        # Обмеження вибору нового статусу
+        allowed_choices = [
+            ('скасовано', 'скасовано'),
+            ('обробка припинено', 'обробка припинено'),
+            ('діючий', 'діючий'),
+        ]
+        self.fields['new_status'].widget = forms.Select(choices=allowed_choices)
+
+        # Попередній статус можна підтягувати автоматично, якщо потрібно
+        if self.instance.pk:
+            self.fields['old_status'].initial = self.instance.old_status
+        # self.fields['oid'].queryset = OID.objects.filter(status__in=['діючий', 'новий'])
+
+
 #  нові поля. додати АА, відправку документів до частини
 class AttestationRegistrationForm(forms.ModelForm):
     class Meta:
@@ -138,51 +148,6 @@ class TripResultForUnitForm(forms.ModelForm):
             'oids': Select2MultipleWidget,
             'documents': Select2MultipleWidget,
         }
-
-
-# # Вибір військових частин
-# class UnitWidget(ModelSelect2MultipleWidget):
-#     model = Unit
-#     search_fields = ["name__icontains"]
-
-
-# # Вибір ОІД, фільтрація по обраних частинах
-# class OIDWidget(ModelSelect2MultipleWidget):
-#     model = OID
-#     search_fields = ["name__icontains"]
-
-#     dependent_fields = {"units": "Unit"}
-
-
-# # Вибір Документів, фільтрація по обраних ОІД
-# class DocumentWidget(ModelSelect2MultipleWidget):
-#     model = Document
-#     search_fields = ["document_number__icontains"]
-
-#     dependent_fields = {"oids": "oid"}
-
-
-# class AttestationRegistrationForm(forms.ModelForm):
-#     class Meta:
-#         model = AttestationRegistration
-#         fields = "__all__"
-#         widgets = {
-#             "units": UnitWidget,
-#             "oids": OIDWidget,
-#         }
-
-
-# class TripResultForUnitForm(forms.ModelForm):
-#     class Meta:
-#         model = TripResultForUnit
-#         fields = "__all__"
-#         widgets = {
-#             "units": UnitWidget,
-#             "oids": OIDWidget,
-#             "documents": DocumentWidget,
-#         }
-
-
 
 # Технічне завдання
 class TechnicalTaskForm(forms.ModelForm):

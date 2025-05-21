@@ -1,0 +1,46 @@
+{% block content %}
+<h2>Зміна статусу ОІД</h2>
+
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Змінити статус</button>
+</form>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+$(function() {
+    $('#id_unit').change(function() {
+        const unitId = $(this).val();
+        $.ajax({
+            url: "{% url 'ajax_load_oids_for_unit' %}",
+            data: {'unit': unitId},
+            success: function(data) {
+                const $oidSelect = $('#id_oid');
+                $oidSelect.empty();
+                $oidSelect.append('<option value="">---------</option>');
+                data.forEach(function(oid) {
+                    $oidSelect.append($('<option>', {
+                        value: oid.id,
+                        text: oid.name
+                    }));
+                });
+            }
+        });
+    });
+
+    $('#id_oid').change(function() {
+        const oidId = $(this).val();
+        if (!oidId) return;
+
+        $.ajax({
+            url: "{% url 'ajax_get_oid_status' %}",
+            data: {'oid_id': oidId},
+            success: function(data) {
+                $('#id_old_status').val(data.status);
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

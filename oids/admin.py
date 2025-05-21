@@ -1,6 +1,6 @@
 from django.contrib import admin
-from .models import Unit, OID, Document, Trip, Person, WorkRequest, DocumentType, AttestationItem,  AttestationRegistration, TripResultForUnit, TechnicalTask 
-from .forms import TripResultForUnitForm
+from .models import Unit, OID, Document, Trip, Person, WorkRequest, DocumentType, AttestationItem,  AttestationRegistration, TripResultForUnit, TechnicalTask, OIDStatusChange, AttestationResponse
+from .forms import TripResultForUnitForm, TechnicalTaskForm, OIDStatusChangeForm
 
 
 
@@ -66,6 +66,12 @@ class AttestationRegistrationAdmin(admin.ModelAdmin):
     get_units.short_description = "Військові частини"
 
     from django.contrib import admin
+
+@admin.register(OIDStatusChange)
+class OIDStatusChangeAdmin(admin.ModelAdmin):
+    list_display = ('unit', 'oid', 'old_status', 'new_status', 'changed_by', 'changed_at')
+    list_filter = ('new_status', 'changed_at')
+    search_fields = ('oid__name', 'changed_by')
 
 @admin.register(TripResultForUnit)
 class TripResultForUnitAdmin(admin.ModelAdmin):

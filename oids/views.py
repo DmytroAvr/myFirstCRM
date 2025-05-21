@@ -1,7 +1,7 @@
 # C:\myFirstCRM\oids\views.py
 from django.shortcuts import render, redirect
 from .models import Document, Unit, OID, WorkRequest, DocumentType, WorkRequestItem
-from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet, requestItemFormSet, requestItemForm, OidCreateForm, AttestationRegistrationForm, TripResultForUnitForm, TechnicalTaskForm
+from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet, requestItemFormSet, requestItemForm, OidCreateForm, AttestationRegistrationForm, TripResultForUnitForm, TechnicalTaskForm, OIDStatusChangeForm
 from django.http import JsonResponse
 import traceback        #check
 from django.contrib import messages
@@ -35,6 +35,14 @@ def load_oids_for_units(request):
     oids = OID.objects.filter(unit__id__in=unit_ids).exclude(status="скасовано").order_by('name')
     return JsonResponse(list(oids.values('id', 'name')), safe=False)
 
+def get_oid_status(request):
+    oid_id = request.GET.get('oid_id')
+    try:
+        oid = OID.objects.get(id=oid_id)
+        return JsonResponse({'status': oid.status})
+    except OID.DoesNotExist:
+        return JsonResponse({'status': ''})
+    
 
 def load_documents_for_oids(request):
     oid_ids = request.GET.getlist('oids[]')
@@ -183,3 +191,21 @@ def create_oid(request):
     else:
         form = OIDForm()
     return render(request, 'oids/oid_form.html', {'form': form})
+
+def change_oid_status(request):
+    if request.method == 'POST':
+        form = OIDStatusChangeForm(request.POST)
+        if form.is_valid():
+            oid = form.cleaned_data['oid']
+            instance = form.save(commit=False)
+            instance.old_status = oid.status  # автоматично вставляємо поточний статус
+            instance.save()
+
+            # оновлюємо сам OID
+            oid.status = form.cleaned_data['new_status']
+            oid.save()
+
+            return redirect('oid_status_change')
+    else:
+        form = OIDStatusChangeForm()
+    return render(request, 'oids/oid_status_change_form.html', {'form': form})
