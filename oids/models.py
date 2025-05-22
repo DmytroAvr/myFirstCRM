@@ -149,17 +149,13 @@ class Document(models.Model):
 
 class Trip(models.Model):  # Відрядження
     units = models.ManyToManyField(Unit, verbose_name="Військові частини")
-    oid = models.ManyToManyField(OID, verbose_name="Які ОІД")
-    # oid = models.ForeignKey(OID, on_delete=models.CASCADE, verbose_name="Об'єкт")
+    # oid = models.ManyToManyField(OID, verbose_name="Які ОІД")
+    oid = models.ForeignKey(OID, on_delete=models.CASCADE, verbose_name="Об'єкт")
     start_date = models.DateField(verbose_name="Дата початку")
     end_date = models.DateField(verbose_name="Дата завершення")
     persons = models.ManyToManyField(Person, verbose_name="Відряджаються")
     # persons = models.CharField(max_length=255, verbose_name="Відряджаються")
     purpose = models.TextField(blank=True, null=True, verbose_name="Примітка", )
-
-    # def __str__(self):
-    #     return f"Виїзд на {self.oid.name} ({self.start_date} - {self.end_date})"
-    #  дав помилку бо це про один обєкт
 
     def __str__(self):
         unitss = ", ".join([obj.name for obj in self.units.all()])

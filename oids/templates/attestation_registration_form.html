@@ -34,17 +34,33 @@
     {% endblock %}
 
 
+
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-success">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            document.querySelectorAll("form").forEach(form => {
+                form.setAttribute("autocomplete", "off");
+            });
+        });
+    </script>
+
     <script>
         $(document).ready(function() {
             $('select').select2();
         });
     </script> 
-
-
-
 <script>
+    // script for select2 with search
     $(document).ready(function() {
     $('select').select2();
         $('#id_units').on('change', function() {

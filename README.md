@@ -91,3 +91,5 @@ myFirstCRM\oids\templates\trip\_result\_form.html,  - є завершенням 
 http://127.0.0.1:8000/oids/technical_tasks/create/
 виправити оновлення форми після створення ОІД
 
+http://127.0.0.1:8000/oids/attestation/new/
+додати можливість додавати ОІД. Якщо реєструють ОІД створений самотужки

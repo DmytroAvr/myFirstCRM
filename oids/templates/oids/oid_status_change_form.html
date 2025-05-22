@@ -46,3 +46,10 @@ $(function() {
 });
 </script>
 {% endblock %}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        document.querySelectorAll("form").forEach(form => {
+            form.setAttribute("autocomplete", "off");
+        });
+    });
+</script>

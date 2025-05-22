@@ -1,5 +1,6 @@
 
 <!-- alert - "Дані збережено" для id="my-form" -->
+<!-- for js form -->
 <script>
     document.getElementById("my-form").addEventListener("submit", function(e) {
         e.preventDefault();  // зупиняє стандартне відправлення
@@ -99,3 +100,51 @@ class TechnicalTaskForm(forms.ModelForm):
                     item.save() 
             
             messages.success(request, "Заявка успішно збережена!")
+
+
+
+
+<!-- select2 -->
+<script>
+    $(document).ready(function() {
+        $('select').select2();
+    });
+</script> 
+<script>
+    // script for select2 with search
+    $(document).ready(function() {
+    $('select').select2();
+        $('#id_units').on('change', function() {
+            const unitIds = $(this).val();
+            if (!unitIds.length) return;
+
+            $.ajax({
+                url: "{% url 'ajax_load_oids_for_units' %}",
+                data: {
+                    'units[]': unitIds
+                },
+                success: function(data) {
+                    const $oidSelect = $('#id_oids');
+                    $oidSelect.empty();
+                    data.forEach(function(oid) {
+                        $oidSelect.append($('<option>', {
+                            value: oid.id,
+                            text: oid.name
+                        }));
+                    });
+                    $oidSelect.trigger('change');
+                }
+            });
+        });
+    });
+</script>
+
+
+<!-- autocomplete off -->
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        document.querySelectorAll("form").forEach(form => {
+            form.setAttribute("autocomplete", "off");
+        });
+    });
+</script>

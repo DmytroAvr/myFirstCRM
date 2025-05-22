@@ -10,7 +10,6 @@ from django.views.decorators.http import require_POST
 def home_view(request):
     return render(request, 'home.html')
 
-
 def load_oids(request):
     try:
         unit_id = request.GET.get('unit')
@@ -28,7 +27,6 @@ def load_oids_for_unit(request):
     oids = OID.objects.filter(unit_id=unit_id).exclude(status='скасовано').order_by('name')
     return JsonResponse(list(oids.values('id', 'name')), safe=False)
 
-
 def load_oids_for_units(request):
     unit_ids = request.GET.getlist('units[]')
     oids = OID.objects.filter(unit__id__in=unit_ids).exclude(status="скасовано").order_by('name')
@@ -42,21 +40,16 @@ def get_oid_status(request):
     except OID.DoesNotExist:
         return JsonResponse({'status': ''})
     
-
 def load_documents_for_oids(request):
     oid_ids = request.GET.getlist('oids[]')
     documents = Document.objects.filter(oid__id__in=oid_ids).order_by('document_type__name', 'document_number')
     return JsonResponse(list(documents.values('id', 'document_type__name', 'document_number')), safe=False)
-
 
 def get_oids_by_unit(request):
     unit_id = request.GET.get('unit_id')
     oids = OID.objects.filter(unit__id=unit_id, status__in=['діючий', 'новий'])
     data = [{'id': oid.id, 'name': str(oid)} for oid in oids]
     return JsonResponse(data, safe=False)
-
-
-
 
 # C:\myFirstCRM\oids\views.py
 def document_done(request):
@@ -144,7 +137,6 @@ def create_oid_ajax(request):
     
 # додавання документів
 
-
 def create_attestation_registration(request):
     if request.method == 'POST':
         form = AttestationRegistrationForm(request.POST, request.FILES)
@@ -155,6 +147,7 @@ def create_attestation_registration(request):
     else:
         form = AttestationRegistrationForm()
     return render(request, 'attestation_registration_form.html', {'form': form})
+#    
 
 def create_trip_result(request):
     if request.method == 'POST':
@@ -172,7 +165,6 @@ def trip_result_list(request):
     results = TripResult.objects.all()
     return render(request, 'oids/trip_result_list.html', {'results': results})
 
-
 # Технічне завдання
 def technical_task_create(request):
     if request.method == 'POST':
@@ -183,7 +175,6 @@ def technical_task_create(request):
     else:
         form = TechnicalTaskForm()
     return render(request, 'oids/technical_task_form.html', {'form': form})
-
 
 def create_oid(request):
     if request.method == 'POST':
