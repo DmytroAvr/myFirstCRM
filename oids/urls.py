@@ -12,7 +12,11 @@ urlpatterns = [
     path('ajax/get-oid-status/', views.get_oid_status, name='ajax_get_oid_status'),
 
     path('documents/done/', views.document_done, name='document_done'),
-    path('documents/request/', views.document_request, name='document_request'),
+
+
+    path('work/request/', views.work_request, name='work_request'),
+    path('work_requests/', views.work_request_list, name='work_request_list'),
+
 
     path('attestation/new/', views.create_attestation_registration, name='attestation_new'),
 
@@ -21,6 +25,7 @@ urlpatterns = [
 
     path('trip_result/new/', views.create_trip_result, name='trip_result_new'),
     path('technical_tasks/create/', views.technical_task_create, name='technical_task_create'),
+    path('technical_tasks_list/', views.technical_task_list, name='technical_task_list'),
 
     path('oids/create/', views.create_oid, name='oid_create'),
     path('oids/status-change/', views.change_oid_status, name='oid_status_change'),

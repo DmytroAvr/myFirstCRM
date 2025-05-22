@@ -1,7 +1,7 @@
 # C:\myFirstCRM\oids\views.py
 from django.shortcuts import render, redirect
 from .models import Document, Unit, OID, WorkRequest, DocumentType, WorkRequestItem, Trip
-from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet, requestItemFormSet, requestItemForm, OidCreateForm, AttestationRegistrationForm, TripResultForUnitForm, TechnicalTaskForm, OIDStatusChangeForm, TripForm
+from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet, requestItemFormSet, requestItemForm, OidCreateForm, AttestationRegistrationForm, TripResultForUnitForm, TechnicalTaskForm, TechnicalTask, OIDStatusChangeForm, TripForm
 from django.http import JsonResponse
 import traceback        #check
 from django.contrib import messages
@@ -90,7 +90,7 @@ def document_done(request):
     })
 
 # C:\myFirstCRM\oids\views.py
-def document_request(request):
+def work_request(request):
     if request.method == 'POST':
         header_form = requestHeaderForm(request.POST)
         formset = requestItemFormSet(request.POST)
@@ -105,15 +105,20 @@ def document_request(request):
                     item.save() 
             
             messages.success(request, "Заявка успішно збережена!")
-            return redirect('document_request')  # або інша сторінка
+            return redirect('work_request')  # або інша сторінка
     else:
         header_form = requestHeaderForm()
         formset = requestItemFormSet(queryset=WorkRequestItem.objects.none())
 
-    return render(request, 'oids/document_request.html', {
+    return render(request, 'oids/work_request.html', {
         'header_form': header_form,
         'formset': formset
     })
+
+def work_request_list(request):
+    work_requests = WorkRequest.objects.prefetch_related('items__oid', 'unit').all()
+    return render(request, 'oids/work_request_list.html', {'work_requests': work_requests})
+
 
 # aside for request 
 @require_POST
@@ -176,6 +181,10 @@ def technical_task_create(request):
     else:
         form = TechnicalTaskForm()
     return render(request, 'oids/technical_task_form.html', {'form': form})
+
+def technical_task_list(request):
+    technical_tasks = TechnicalTask.objects.select_related('oid').all()
+    return render(request, 'technical_task_list.html', {'technical_tasks': technical_tasks})
 
 def create_oid(request):
     if request.method == 'POST':

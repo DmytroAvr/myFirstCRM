@@ -1,0 +1,37 @@
+
+{% block content %}
+<h2>Список заявок</h2>
+<table class="table-auto w-full border border-gray-300 text-sm">
+  <thead class="bg-gray-100">
+    <tr>
+      <th class="border px-2 py-1">Вхідний номер</th>
+      <th class="border px-2 py-1">Дата заявки</th>
+      <th class="border px-2 py-1">Військова частина</th>
+      <th class="border px-2 py-1">Тип роботи (загальний)</th>
+      <th class="border px-2 py-1">ОІД та тип роботи</th>
+      <th class="border px-2 py-1">Примітка</th>
+      <th class="border px-2 py-1">Статус</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for request in work_requests %}
+    <tr>
+      <td class="border px-2 py-1">{{ request.incoming_number }}</td>
+      <td class="border px-2 py-1">{{ request.incoming_date }}</td>
+      <td class="border px-2 py-1">{{ request.unit.name }}</td>
+      <td class="border px-2 py-1">{{ request.get_work_type_display }}</td>
+      <td class="border px-2 py-1">
+        <ul class="mb-0 ps-3" style="list-style: none;">
+          
+          {% for item in request.items.all %}
+            <li><strong>{{ item.oid.name }}</strong> — {{ item.get_work_type_display }}</li>
+          {% endfor %}      
+        </ul>
+      </td>
+      <td class="border px-2 py-1">{{ request.note }}</td>
+      <td class="border px-2 py-1">{{ request.get_status_display }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

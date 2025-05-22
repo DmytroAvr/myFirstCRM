@@ -1,0 +1,37 @@
+
+{% block content %}
+  <h2 class="text-xl font-semibold mb-4">Перелік технічних завдань</h2>
+
+  <table class="table-auto w-full border border-gray-300 text-sm">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="border px-2 py-1">#</th>
+        <th class="border px-2 py-1">ОІД</th>
+        <th class="border px-2 py-1">Вхідний номер</th>
+        <th class="border px-2 py-1">Вхідна дата</th>
+        <th class="border px-2 py-1">Ознайомився</th>
+        <th class="border px-2 py-1">Результат розгляду</th>
+        <th class="border px-2 py-1">Примітка</th>
+        <th class="border px-2 py-1">Дата додання</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for task in technical_tasks %}
+        <tr class="hover:bg-gray-50">
+          <td class="border px-2 py-1">{{ forloop.counter }}</td>
+          <td class="border px-2 py-1">{{ task.oid.name }}</td>
+          <td class="border px-2 py-1">{{ task.input_number }}</td>
+          <td class="border px-2 py-1">{{ task.input_date }}</td>
+          <td class="border px-2 py-1">{{ task.reviewed_by }}</td>
+          <td class="border px-2 py-1">{{ task.get_review_result_display }}</td>
+          <td class="border px-2 py-1">{{ task.note }}</td>
+          <td class="border px-2 py-1">{{ task.created_at }}</td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="8" class="text-center border px-2 py-2">Немає записів</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}
