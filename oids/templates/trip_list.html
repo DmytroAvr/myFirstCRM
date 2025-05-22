@@ -26,20 +26,39 @@
       <td>{{ trip.start_date }}</td>
       <td>{{ trip.end_date }}</td>
       <td>
-        {% for unit in trip.units.all %}
-          {{ unit.name }}{% if not forloop.last %}, {% endif %}
-        {% endfor %}
+        <ul style="margin: 0; padding-left: 1.2em; list-style: none;">
+          {% for unit in trip.units.all %}
+          <li>
+            {{ unit.name }}{% if not forloop.last %} {% endif %}<br>
+          </li>
+          {% endfor %}
+        </ul>
       </td>
       <td>
-        {% for oid in trip.oids.all %}
-          {{ oid.name }}{% if not forloop.last %}, {% endif %}
-        {% endfor %}
+        <ul style="margin: 0; padding-left: 1.2em; list-style: none;">
+          {% for oid in trip.oids.all %}
+          <li>
+            {{ oid.name }}{% if not forloop.last %} {% endif %}<br>
+
+          </li>
+          {% endfor %}
+        </ul>
       </td>
-      <td>{{ trip.work_request }}</td>
+<td>
+  <ul style="margin: 0; padding-left: 1.2em; list-style: none;">
+  
+    {% for request in trip.work_requests.all %}
+      <li>{{ request.incoming_number }} ({{ request.incoming_date }}){% if not forloop.last %} {% endif %}</li>
+    {% endfor %}
+  </ul >
+</td>
+
       <td>
-        {% for person in trip.persons.all %}
-          {{ person.name }}{% if not forloop.last %}, {% endif %}
-        {% endfor %}
+         <ul style="margin: 0; padding-left: 1.2em; list-style: none;">
+    {% for request in trip.work_requests.all %}
+      <li>{{ request.incoming_number }} — {{ request.incoming_date }}</li>
+    {% endfor %}
+  </ul>
       </td>
       <td>{{ trip.purpose }}</td>
     </tr>

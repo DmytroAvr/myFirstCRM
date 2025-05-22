@@ -234,7 +234,7 @@ class TechnicalTask(models.Model):
 class Trip(models.Model):
     units = models.ManyToManyField(Unit, verbose_name="Військові частини")
     oids = models.ManyToManyField(OID, verbose_name="Об’єкти інформаційної діяльності")
-    work_request = models.ForeignKey(WorkRequest, on_delete=models.CASCADE, verbose_name="Заявка на проведення робіт")
+    work_requests = models.ManyToManyField(WorkRequest, verbose_name="Заявки на проведення робіт") 
     start_date = models.DateField(verbose_name="Дата початку")
     end_date = models.DateField(verbose_name="Дата завершення")
     persons = models.ManyToManyField(Person, verbose_name="Відряджаються")

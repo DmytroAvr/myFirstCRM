@@ -198,9 +198,13 @@ class TechnicalTaskForm(forms.ModelForm):
 
 class TripForm(forms.ModelForm):
     class Meta:
-        model = Trip
-        fields = '__all__'
-        widgets = {
-            'start_date': forms.DateInput(attrs={'type': 'date'}),
-            'end_date': forms.DateInput(attrs={'type': 'date'}),
-        }
+            model = Trip
+            fields = '__all__'
+            widgets = {
+                'start_date': forms.DateInput(attrs={'type': 'date'}),
+                'end_date': forms.DateInput(attrs={'type': 'date'}),
+                'work_requests': forms.SelectMultiple(),  # ← для підтримки вибору кількох заявок
+            }
+
+
+# 

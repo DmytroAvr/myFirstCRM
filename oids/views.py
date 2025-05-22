@@ -229,3 +229,7 @@ def trip_list(request):
         ).distinct()
 
     return render(request, 'trip_list.html', {'trips': trips})
+
+
+
+# 
