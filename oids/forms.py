@@ -4,7 +4,7 @@ from .models import Document, OID, Unit, Person, WorkRequest, WorkRequestItem, A
 from django.forms import modelformset_factory
 from django_select2.forms import Select2MultipleWidget
 # from django_select2.forms import Select2MultipleWidget, ModelSelect2MultipleWidget
-from .models import OIDStatusChoices, OIDTypeChoices, WorkTypeChoices, ReviewResultChoices, WRequestStatusChoices
+from .models import OIDStatusChoices, OIDTypeChoices, WorkTypeChoices, ReviewResultChoices, WRequestStatusChoices, Trip
 
 
 class DocumentForm(forms.ModelForm):
@@ -193,3 +193,14 @@ class TechnicalTaskForm(forms.ModelForm):
                 pass
         elif self.instance.pk:
             self.fields['oid'].queryset = OID.objects.filter(unit=self.instance.oid.unit)
+
+
+
+class TripForm(forms.ModelForm):
+    class Meta:
+        model = Trip
+        fields = '__all__'
+        widgets = {
+            'start_date': forms.DateInput(attrs={'type': 'date'}),
+            'end_date': forms.DateInput(attrs={'type': 'date'}),
+        }

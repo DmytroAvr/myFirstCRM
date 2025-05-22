@@ -147,23 +147,6 @@ class Document(models.Model):
         return f"{self.document_type.name} / {self.document_number}"
 
 
-class Trip(models.Model):  # Відрядження
-    units = models.ManyToManyField(Unit, verbose_name="Військові частини")
-    # oid = models.ManyToManyField(OID, verbose_name="Які ОІД")
-    oid = models.ForeignKey(OID, on_delete=models.CASCADE, verbose_name="Об'єкт")
-    start_date = models.DateField(verbose_name="Дата початку")
-    end_date = models.DateField(verbose_name="Дата завершення")
-    persons = models.ManyToManyField(Person, verbose_name="Відряджаються")
-    # persons = models.CharField(max_length=255, verbose_name="Відряджаються")
-    purpose = models.TextField(blank=True, null=True, verbose_name="Примітка", )
-
-    def __str__(self):
-        unitss = ", ".join([obj.name for obj in self.units.all()])
-        oids = ", ".join([obj.name for obj in self.oid.all()])
-        start = self.start_date.strftime("%d-%m-%Y")
-        end = self.end_date.strftime("%d-%m-%Y")
-        return f"Виїзд з {start} до {end}  Частини: {unitss} --- ОІД: ({oids})"
-
 # C:\myFirstCRM\oids\models.py
 class WorkRequest(models.Model):  # Заявка на проведення робіт
     unit = models.ForeignKey('Unit', on_delete=models.CASCADE, verbose_name="Військова частина")
@@ -246,3 +229,18 @@ class TechnicalTask(models.Model):
     def __str__(self):
         return f"{self.input_number} / {self.input_date}"
 
+
+
+class Trip(models.Model):
+    units = models.ManyToManyField(Unit, verbose_name="Військові частини")
+    oids = models.ManyToManyField(OID, verbose_name="Об’єкти інформаційної діяльності")
+    work_request = models.ForeignKey(WorkRequest, on_delete=models.CASCADE, verbose_name="Заявка на проведення робіт")
+    start_date = models.DateField(verbose_name="Дата початку")
+    end_date = models.DateField(verbose_name="Дата завершення")
+    persons = models.ManyToManyField(Person, verbose_name="Відряджаються")
+    purpose = models.TextField(blank=True, null=True, verbose_name="Примітка")
+
+    def __str__(self):
+        unit_names = ", ".join(unit.name for unit in self.units.all())
+        oid_names = ", ".join(oid.name for oid in self.oids.all())
+        return f"Виїзд: {self.start_date} — {self.end_date} | Частини: {unit_names} | ОІД: {oid_names}"

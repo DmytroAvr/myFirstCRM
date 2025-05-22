@@ -1,0 +1,60 @@
+{% block content %}
+              {% if messages %}
+                  {% for message in messages %}
+                      <div class="alert alert-success">{{ message }}</div>
+                  {% endfor %}
+              {% endif %}
+  <h2>Планування відрядження</h2>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Зберегти</button>
+  </form>
+{% endblock %}
+
+
+
+<!-- select2 -->
+<script>
+    $(document).ready(function() {
+        $('select').select2();
+    });
+</script> 
+<script>
+    // script for select2 with search
+    $(document).ready(function() {
+    $('select').select2();
+        $('#id_units').on('change', function() {
+            const unitIds = $(this).val();
+            if (!unitIds.length) return;
+
+            $.ajax({
+                url: "{% url 'ajax_load_oids_for_units' %}",
+                data: {
+                    'units[]': unitIds
+                },
+                success: function(data) {
+                    const $oidSelect = $('#id_oids');
+                    $oidSelect.empty();
+                    data.forEach(function(oid) {
+                        $oidSelect.append($('<option>', {
+                            value: oid.id,
+                            text: oid.name
+                        }));
+                    });
+                    $oidSelect.trigger('change');
+                }
+            });
+        });
+    });
+</script>
+
+
+<!-- autocomplete off -->
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        document.querySelectorAll("form").forEach(form => {
+            form.setAttribute("autocomplete", "off");
+        });
+    });
+</script>

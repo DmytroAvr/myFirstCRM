@@ -1,11 +1,12 @@
 # C:\myFirstCRM\oids\views.py
 from django.shortcuts import render, redirect
-from .models import Document, Unit, OID, WorkRequest, DocumentType, WorkRequestItem
-from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet, requestItemFormSet, requestItemForm, OidCreateForm, AttestationRegistrationForm, TripResultForUnitForm, TechnicalTaskForm, OIDStatusChangeForm
+from .models import Document, Unit, OID, WorkRequest, DocumentType, WorkRequestItem, Trip
+from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet, requestItemFormSet, requestItemForm, OidCreateForm, AttestationRegistrationForm, TripResultForUnitForm, TechnicalTaskForm, OIDStatusChangeForm, TripForm
 from django.http import JsonResponse
 import traceback        #check
 from django.contrib import messages
 from django.views.decorators.http import require_POST
+from django.db.models import Q
 
 def home_view(request):
     return render(request, 'home.html')
@@ -203,3 +204,28 @@ def change_oid_status(request):
     else:
         form = OIDStatusChangeForm()
     return render(request, 'oids/oid_status_change_form.html', {'form': form})
+
+def trip_create_view(request):
+    if request.method == 'POST':
+        form = TripForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Відрядження успішно створено!")
+            return redirect('trip-create')  # або на іншу сторінку
+    else:
+        form = TripForm()
+    return render(request, 'trip_create.html', {'form': form})
+
+
+def trip_list(request):
+    query = request.GET.get("q", "")
+    trips = Trip.objects.all()
+
+    if query:
+        trips = trips.filter(
+            Q(purpose__icontains=query) |
+            Q(units__name__icontains=query) |
+            Q(oids__name__icontains=query)
+        ).distinct()
+
+    return render(request, 'trip_list.html', {'trips': trips})

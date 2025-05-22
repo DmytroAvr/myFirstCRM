@@ -15,6 +15,10 @@ urlpatterns = [
     path('documents/request/', views.document_request, name='document_request'),
 
     path('attestation/new/', views.create_attestation_registration, name='attestation_new'),
+
+    path('trip_create/', views.trip_create_view, name='trip-create'),
+    path('trip_list/', views.trip_list, name='trip-list'),
+
     path('trip_result/new/', views.create_trip_result, name='trip_result_new'),
     path('technical_tasks/create/', views.technical_task_create, name='technical_task_create'),
 

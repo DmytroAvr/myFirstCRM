@@ -1,0 +1,53 @@
+
+{% load static %}
+
+{% block content %}
+<h2>Список відряджень</h2>
+
+<form method="get" class="mb-3">
+  <input type="text" name="q" placeholder="Пошук..." value="{{ request.GET.q }}" class="form-control" />
+</form>
+
+<table class="table table-striped table-bordered">
+  <thead class="thead-dark">
+    <tr>
+      <th>Дата початку</th>
+      <th>Дата завершення</th>
+      <th>Військові частини</th>
+      <th>ОІД</th>
+      <th>Заявка</th>
+      <th>Відряджаються</th>
+      <th>Примітка</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for trip in trips %}
+    <tr>
+      <td>{{ trip.start_date }}</td>
+      <td>{{ trip.end_date }}</td>
+      <td>
+        {% for unit in trip.units.all %}
+          {{ unit.name }}{% if not forloop.last %}, {% endif %}
+        {% endfor %}
+      </td>
+      <td>
+        {% for oid in trip.oids.all %}
+          {{ oid.name }}{% if not forloop.last %}, {% endif %}
+        {% endfor %}
+      </td>
+      <td>{{ trip.work_request }}</td>
+      <td>
+        {% for person in trip.persons.all %}
+          {{ person.name }}{% if not forloop.last %}, {% endif %}
+        {% endfor %}
+      </td>
+      <td>{{ trip.purpose }}</td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="7" class="text-center">Немає записів</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
