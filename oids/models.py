@@ -35,6 +35,7 @@ class ReviewResultChoices(models.TextChoices):
     # work_type = models.CharField(max_length=20, choices=WorkTypeChoices.choices, default=WorkTypeChoices.IK, verbose_name="Тип роботи")
     # status = models.CharField(max_length=30, choices=OIDStatusChoices.choices, default=OIDStatusChoices.NEW, verbose_name="Поточний стан ОІД")
     # review_result = models.CharField(max_length=30, choices=ReviewResultChoices.choices, default=ReviewResultChoices.REVIEWED, verbose_name="Результат розгляду")
+
 class Unit(models.Model):  # Військова частина
     MANAGEMENT_UNIT_CHOICES = [
         ('ПівнічнеТУ', 'ПівнічнеТУ'),
@@ -54,7 +55,6 @@ class Unit(models.Model):  # Військова частина
 
 
 class OID(models.Model):  # Об'єкт інформаційної діяльності
-
     name = models.CharField(max_length=255, verbose_name="Назва")
     unit = models.ForeignKey(Unit, on_delete=models.CASCADE, verbose_name="Військова частина")
     room = models.CharField(max_length=255, verbose_name="Приміщення №")  # address -> room
@@ -164,11 +164,11 @@ class WorkRequestItem(models.Model):
     request = models.ForeignKey(WorkRequest, on_delete=models.CASCADE, related_name="items")
     oid = models.ForeignKey('OID', on_delete=models.CASCADE)
     work_type = models.CharField(max_length=20, choices=WorkTypeChoices.choices, default=WorkTypeChoices.IK, verbose_name="Тип роботи")
+    status = models.CharField(max_length=30, choices=WRequestStatusChoices.choices, default=WRequestStatusChoices.NEW, verbose_name="Статус опрацювання ОІД")
 
     def __str__(self):
-        return f"{self.oid} — {self.work_type}"
-
-
+        return f"{self.oid} — {self.work_type} — {self.get_status_display()}"
+    
 # нові процесси
 class AttestationRegistration(models.Model):
     units = models.ManyToManyField("Unit", verbose_name="Військові частини")

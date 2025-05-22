@@ -24,7 +24,7 @@
         <ul class="mb-0 ps-3" style="list-style: none;">
           
           {% for item in request.items.all %}
-            <li><strong>{{ item.oid.name }}</strong> — {{ item.get_work_type_display }}</li>
+            <li><strong>{{ item.oid.name }}</strong> — {{ item.get_work_type_display }}  <strong>{{ item.get_status_display }}</strong></li>
           {% endfor %}      
         </ul>
       </td>
