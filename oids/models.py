@@ -2,6 +2,8 @@
 from django.db import models
 from multiselectfield import MultiSelectField
 from django.utils import timezone
+from django.db.models import Q
+
 
 
 class OIDStatusChoices(models.TextChoices):
@@ -13,8 +15,8 @@ class OIDStatusChoices(models.TextChoices):
 
 class WRequestStatusChoices(models.TextChoices):
     NEW = 'нова заявка', 'Нова заявка'
-    INWORK = 'Заявка в роботі', 'Заявка в роботі'
-    DONE = 'Заявка виконана', 'Заявка виконана'
+    IN_PROGRESS = 'Заявка в роботі', 'Заявка в роботі'
+    COMPLETED = 'Заявка виконана', 'Заявка виконана'
     CANCELED = 'Заявка скасована', 'Заявка скасована'
 
 class OIDTypeChoices(models.TextChoices):
@@ -160,15 +162,39 @@ class WorkRequest(models.Model):  # Заявка на проведення ро�
     def __str__(self):
         return f"{self.incoming_number} — {self.get_status_display()}"
 
+
+    
 class WorkRequestItem(models.Model):
     request = models.ForeignKey(WorkRequest, on_delete=models.CASCADE, related_name="items")
     oid = models.ForeignKey('OID', on_delete=models.CASCADE)
     work_type = models.CharField(max_length=20, choices=WorkTypeChoices.choices, default=WorkTypeChoices.IK, verbose_name="Тип роботи")
     status = models.CharField(max_length=30, choices=WRequestStatusChoices.choices, default=WRequestStatusChoices.NEW, verbose_name="Статус опрацювання ОІД")
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.update_request_status()
+
+    def update_request_status(self):
+        all_items = self.request.items.all()
+
+        # Якщо всі елементи — виконано
+        if all_items.filter(~Q(status=WRequestStatusChoices.COMPLETED) & ~Q(status=WRequestStatusChoices.CANCELED)).exists():
+            # Є ще невиконані — не оновлюємо
+            return
+
+        # Визначаємо тип завершення: виконано чи скасовано
+        if all_items.filter(status=WRequestStatusChoices.COMPLETED).exists():
+            self.request.status = WRequestStatusChoices.COMPLETED
+        else:
+            self.request.status = WRequestStatusChoices.CANCELED
+
+        self.request.save()
+
     def __str__(self):
         return f"{self.oid} — {self.work_type} — {self.get_status_display()}"
-    
+
+
+
 # нові процесси
 class AttestationRegistration(models.Model):
     units = models.ManyToManyField("Unit", verbose_name="Військові частини")

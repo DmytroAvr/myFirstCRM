@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Unit, OID, Document, Trip, Person, WorkRequest, DocumentType, AttestationItem,  AttestationRegistration, TripResultForUnit, TechnicalTask, OIDStatusChange, AttestationResponse
+from .models import Unit, OID, Document, Trip, Person, WorkRequest, WorkRequestItem, DocumentType, AttestationItem,  AttestationRegistration, TripResultForUnit, TechnicalTask, OIDStatusChange, AttestationResponse
 from .forms import TripResultForUnitForm, TechnicalTaskForm, OIDStatusChangeForm
 
 
@@ -28,6 +28,13 @@ class WorkRequestAdmin(admin.ModelAdmin):
     def get_oids(self, obj):
         oids = obj.items.values_list('oid__name', flat=True).distinct()
         return ", ".join(oids)
+    
+
+@admin.register(WorkRequestItem)
+class WorkRequestItemAdmin(admin.ModelAdmin):
+    list_display = ('request', 'oid', 'work_type', 'status')
+    list_filter = ('request', 'oid', 'work_type', 'status')
+
 
 @admin.register(Trip)
 class WorkRequestAdmin(admin.ModelAdmin):
