@@ -148,3 +148,17 @@ class TechnicalTaskForm(forms.ModelForm):
         });
     });
 </script>
+
+
+    input[type="checkbox"][name$="-DELETE"] {
+        display: none;
+    }
+    label[for$="-DELETE"] {
+        display: none;
+    }   
+    .alert-success {
+        color: rgb(69, 143, 9);
+        text-align: center;
+        font-size: 30;
+        font-weight: 700;
+    }   

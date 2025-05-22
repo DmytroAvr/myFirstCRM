@@ -1,5 +1,115 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Список відряджень</title>
+  <style>
+    :root {
+      --bg-light: #ffffff;
+      --bg-dark: #1a1a1a;
+      --text-light: #1a1a1a;
+      --text-dark: #f0f0f0;
+      --border-light: #ccc;
+      --border-dark: #444;
+      --header-bg-light: #f2f2f2;
+      --header-bg-dark: #2b2b2b;
+      --hover-light: #f9f9f9;
+      --hover-dark: #2c2c2c;
+    }
 
-{% load static %}
+    body {
+      margin: 20px;
+      font-family: sans-serif;
+      background-color: var(--bg-light);
+      color: var(--text-light);
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .dark-theme {
+      background-color: var(--bg-dark);
+      color: var(--text-dark);
+    }
+
+    .theme-toggle {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background-color: transparent;
+      color: inherit;
+      border: 1px solid currentColor;
+      padding: 5px 10px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      border-radius: 5px;
+    }
+
+    h2 {
+      margin-bottom: 20px;
+    }
+
+    input.form-control {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid var(--border-light);
+      background-color: var(--bg-light);
+      color: var(--text-light);
+      border-radius: 4px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .dark-theme input.form-control {
+      background-color: var(--bg-dark);
+      color: var(--text-dark);
+      border: 1px solid var(--border-dark);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    thead {
+      background-color: var(--header-bg-light);
+    }
+
+    .dark-theme thead {
+      background-color: var(--header-bg-dark);
+    }
+
+    th, td {
+      border: 1px solid var(--border-light);
+      padding: 8px;
+      vertical-align: top;
+    }
+
+    .dark-theme th,
+    .dark-theme td {
+      border: 1px solid var(--border-dark);
+    }
+
+    tr:hover {
+      background-color: var(--hover-light);
+    }
+
+    .dark-theme tr:hover {
+      background-color: var(--hover-dark);
+    }
+
+    .text-center {
+      text-align: center;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 1.2em;
+      list-style: none;
+    }
+  </style>
+</head>
+<body>
+
+<button class="theme-toggle" onclick="toggleTheme()">Змінити тему</button>
 
 {% block content %}
 <h2>Список відряджень</h2>
@@ -26,39 +136,32 @@
       <td>{{ trip.start_date }}</td>
       <td>{{ trip.end_date }}</td>
       <td>
-        <ul style="margin: 0; padding-left: 1.2em; list-style: none;">
+        <ul>
           {% for unit in trip.units.all %}
-          <li>
-            {{ unit.name }}{% if not forloop.last %} {% endif %}<br>
-          </li>
+            <li>{{ unit.name }}<br></li>
           {% endfor %}
         </ul>
       </td>
       <td>
-        <ul style="margin: 0; padding-left: 1.2em; list-style: none;">
+        <ul>
           {% for oid in trip.oids.all %}
-          <li>
-            {{ oid.name }}{% if not forloop.last %} {% endif %}<br>
-
-          </li>
+            <li>{{ oid.name }}<br></li>
           {% endfor %}
         </ul>
       </td>
-<td>
-  <ul style="margin: 0; padding-left: 1.2em; list-style: none;">
-  
-    {% for request in trip.work_requests.all %}
-      <li>{{ request.incoming_number }} ({{ request.incoming_date }}){% if not forloop.last %} {% endif %}</li>
-    {% endfor %}
-  </ul >
-</td>
-
       <td>
-         <ul style="margin: 0; padding-left: 1.2em; list-style: none;">
-    {% for request in trip.work_requests.all %}
-      <li>{{ request.incoming_number }} — {{ request.incoming_date }}</li>
-    {% endfor %}
-  </ul>
+        <ul>
+          {% for request in trip.work_requests.all %}
+            <li>{{ request.incoming_number }} ({{ request.incoming_date }})</li>
+          {% endfor %}
+        </ul>
+      </td>
+      <td>
+        <ul>
+          {% for request in trip.work_requests.all %}
+            <li>{{ request.incoming_number }} — {{ request.incoming_date }}</li>
+          {% endfor %}
+        </ul>
       </td>
       <td>{{ trip.purpose }}</td>
     </tr>
@@ -70,3 +173,12 @@
   </tbody>
 </table>
 {% endblock %}
+
+<script>
+  function toggleTheme() {
+    document.body.classList.toggle('dark-theme');
+  }
+</script>
+
+</body>
+</html>

@@ -1,37 +1,146 @@
 <!-- C:\myFirstCRM\oids\templates\oids\document_done.html -->
 
-<style>
-    body {
-        font-family: 'Times New Roman', Times, serif;
-        margin: auto;
-        padding: 20px;
-        max-width: 80%;
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Додати опрацьовані документи</title>
+  <style>
+    :root {
+      --bg-light: #ffffff;
+      --bg-dark: #1a1a1a;
+      --text-light: #1a1a1a;
+      --text-dark: #f0f0f0;
+      --input-bg-light: #f9f9f9;
+      --input-bg-dark: #2c2c2c;
+      --border-light: #cccccc;
+      --border-dark: #444444;
+      --btn-bg-light: #f0f0f0;
+      --btn-bg-dark: #444;
+      --btn-text-light: #000;
+      --btn-text-dark: #fff;
     }
+
+    body {
+      margin: 20px;
+      font-family: sans-serif;
+      background-color: var(--bg-light);
+      color: var(--text-light);
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .dark-theme {
+      background-color: var(--bg-dark);
+      color: var(--text-dark);
+    }
+
+    .theme-toggle {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background-color: transparent;
+      color: inherit;
+      border: 1px solid currentColor;
+      padding: 5px 10px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      border-radius: 5px;
+    }
+
+    h2, h3 {
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    form {
+      max-width: 900px;
+      margin: auto;
+    }
+
+    p {
+      margin-bottom: 1rem;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid var(--border-light);
+      background-color: var(--input-bg-light);
+      color: var(--text-light);
+      transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+    }
+    textarea {
+      height: 20px;
+    }
+
+    .dark-theme input,
+    .dark-theme select,
+    .dark-theme textarea {
+      background-color: var(--input-bg-dark);
+      color: var(--text-dark);
+      border: 1px solid var(--border-dark);
+    }
+
+    .document-form {
+      border: 1px solid var(--border-light);
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 5px;
+      background-color: var(--input-bg-light);
+      transition: background-color 0.3s, border-color 0.3s;
+    }
+
+    .dark-theme .document-form {
+      background-color: var(--input-bg-dark);
+      border: 1px solid var(--border-dark);
+    }
+
+    button {
+      padding: 8px 14px;
+      margin-top: 10px;
+      font-size: 0.95rem;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+      background-color: var(--btn-bg-light);
+      color: var(--btn-text-light);
+      border: 1px solid var(--border-light);
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .dark-theme button {
+      background-color: var(--btn-bg-dark);
+      color: var(--btn-text-dark);
+      border: 1px solid var(--border-dark);
+    }
+
+    .remove-form {
+      background-color: #e74c3c;
+      color: white;
+      margin-top: 10px;
+    }
+
+    .dark-theme .remove-form {
+      background-color: #c0392b;
+    }
+
     input[type="checkbox"][name$="-DELETE"] {
         display: none;
     }
     label[for$="-DELETE"] {
         display: none;
     }
-    textarea {
-        rows:4;
-        cols:50;
-    }
-    p textarea {
-    vertical-align: top; /* Вирівнювання тексту по верху */
-    height: 30px; /* Початкова висота */
-    width: 400px; /* Ширина */
-    min-height: 20px; /* Мінімальна висота */
-}
-    .alert-success {
-        color: rgb(69, 143, 9);
-        text-align: center;
-        font-size: 30;
-        font-weight: 700;
-    }
-</style>
-
+  </style>
+</head>
 <body>
+
+<button class="theme-toggle" onclick="toggleTheme()">Змінити тему</button>
+
         {% if messages %}
             {% for message in messages %}
                 <div class="alert alert-success">{{ message }}</div>
@@ -141,4 +250,8 @@
             form.setAttribute("autocomplete", "off");
         });
     });
+
+    function toggleTheme() {
+    document.body.classList.toggle('dark-theme');
+    }
 </script>

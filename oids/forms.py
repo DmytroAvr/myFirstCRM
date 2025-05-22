@@ -74,7 +74,7 @@ class requestHeaderForm(forms.ModelForm):
 
         # Спочатку створюємо список статусів, які потрібно виключити
         exclude_statuses = [
-            WRequestStatusChoices.DONE,
+            WRequestStatusChoices.COMPLETED, 
             WRequestStatusChoices.CANCELED,
         ]
         

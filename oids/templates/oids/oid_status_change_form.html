@@ -1,5 +1,103 @@
 <!-- D:\myFirstCRM\oids\templates\oids\oid_status_change_form.html -->
+
+<head>
+  <meta charset="UTF-8">
+  <title>Форма зміни статусу</title>
+  <style>
+    :root {
+      --bg-light: #ffffff;
+      --bg-dark: #1a1a1a;
+      --text-light: #1a1a1a;
+      --text-dark: #f0f0f0;
+      --input-bg-light: #f9f9f9;
+      --input-bg-dark: #2a2a2a;
+      --border-light: #cccccc;
+      --border-dark: #555555;
+      --btn-bg-light: #eeeeee;
+      --btn-bg-dark: #444444;
+      --btn-text-light: #000;
+      --btn-text-dark: #fff;
+    }
+
+    body {
+      margin: 20px;
+      font-family: sans-serif;
+      background-color: var(--bg-light);
+      color: var(--text-light);
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .dark-theme {
+      background-color: var(--bg-dark);
+      color: var(--text-dark);
+    }
+
+    .theme-toggle {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background-color: transparent;
+      color: inherit;
+      border: 1px solid currentColor;
+      padding: 5px 10px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      border-radius: 5px;
+    }
+
+    form {
+      max-width: 600px;
+      margin: auto;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 16px;
+      border: 1px solid var(--border-light);
+      background-color: var(--input-bg-light);
+      color: var(--text-light);
+      transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+    }
+
+    .dark-theme input,
+    .dark-theme select,
+    .dark-theme textarea {
+      background-color: var(--input-bg-dark);
+      color: var(--text-dark);
+      border: 1px solid var(--border-dark);
+    }
+
+    button[type="submit"] {
+      padding: 8px 16px;
+      background-color: var(--btn-bg-light);
+      color: var(--btn-text-light);
+      border: 1px solid var(--border-light);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .dark-theme button[type="submit"] {
+      background-color: var(--btn-bg-dark);
+      color: var(--btn-text-dark);
+      border: 1px solid var(--border-dark);
+    }
+
+  </style>
+</head>
+<body>
+    
+
 {% block content %}
+
+<button class="theme-toggle" onclick="toggleTheme()">Змінити тему</button>
+
 <h2>Зміна статусу ОІД</h2>
 
 <form method="post">
@@ -53,3 +151,10 @@ $(function() {
         });
     });
 </script>
+<script>
+    function toggleTheme() {
+        document.body.classList.toggle('dark-theme');
+    }
+</script>
+
+  </body>

@@ -1,3 +1,110 @@
+
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Відрядження</title>
+  <style>
+    :root {
+      --bg-light: #ffffff;
+      --bg-dark: #1a1a1a;
+      --text-light: #1a1a1a;
+      --text-dark: #f0f0f0;
+      --input-bg-light: #f9f9f9;
+      --input-bg-dark: #2c2c2c;
+      --border-light: #cccccc;
+      --border-dark: #444444;
+      --btn-bg-light: #e0e0e0;
+      --btn-bg-dark: #333333;
+      --btn-text-light: #000;
+      --btn-text-dark: #fff;
+    }
+
+    body {
+      margin: 20px;
+      font-family: sans-serif;
+      background-color: var(--bg-light);
+      color: var(--text-light);
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .dark-theme {
+      background-color: var(--bg-dark);
+      color: var(--text-dark);
+    }
+
+    .theme-toggle {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background-color: transparent;
+      color: inherit;
+      border: 1px solid currentColor;
+      padding: 5px 10px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      border-radius: 5px;
+    }
+
+    form {
+      max-width: 800px;
+      margin: auto;
+    }
+
+    label {
+      display: block;
+      margin-top: 1rem;
+      margin-bottom: 0.3rem;
+    }
+
+    select,
+    input[type="date"],
+    textarea {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid var(--border-light);
+      background-color: var(--input-bg-light);
+      color: var(--text-light);
+      transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+    }
+
+    .dark-theme select,
+    .dark-theme input[type="date"],
+    .dark-theme textarea {
+      background-color: var(--input-bg-dark);
+      color: var(--text-dark);
+      border: 1px solid var(--border-dark);
+    }
+
+    button[type="submit"] {
+      margin-top: 20px;
+      padding: 10px 18px;
+      font-size: 1rem;
+      border-radius: 5px;
+      cursor: pointer;
+      border: 1px solid var(--border-light);
+      background-color: var(--btn-bg-light);
+      color: var(--btn-text-light);
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .dark-theme button[type="submit"] {
+      background-color: var(--btn-bg-dark);
+      color: var(--btn-text-dark);
+      border: 1px solid var(--border-dark);
+    }
+  </style>
+</head>
+<body>
+
+<button class="theme-toggle" onclick="toggleTheme()">Змінити тему</button>
+<script>
+
+     function toggleTheme() {
+    document.body.classList.toggle('dark-theme');
+  }
+</script>
+
 {% block content %}
               {% if messages %}
                   {% for message in messages %}
@@ -58,3 +165,5 @@
         });
     });
 </script>
+
+</body>
