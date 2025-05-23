@@ -160,6 +160,8 @@
 <table class="table-auto w-full border border-gray-300 mb-6">
   <tr><th class="border px-4 py-2 bg-gray-100">Тип</th><td class="border px-4 py-2">{{ oid.get_oid_type_display }}</td></tr>
   <tr><th class="border px-4 py-2 bg-gray-100">Військова частина</th><td class="border px-4 py-2">{{ oid.unit.name }}</td></tr>
+  <tr><th class="border px-4 py-2 bg-gray-100">Назва ОІД</th><td class="border px-4 py-2">{{ oid.name }}</td></tr>
+  <tr><th class="border px-4 py-2 bg-gray-100">Приміщення</th><td class="border px-4 py-2">{{ oid.room }}</td></tr>
   <tr><th class="border px-4 py-2 bg-gray-100">Статус</th><td class="border px-4 py-2">{{ oid.get_status_display }}</td></tr>
   <tr><th class="border px-4 py-2 bg-gray-100">Опис</th><td class="border px-4 py-2">{{ oid.description|default:"—" }}</td></tr>
   <tr><th class="border px-4 py-2 bg-gray-100">Дата створення</th><td class="border px-4 py-2">{{ oid.created_at }}</td></tr>
