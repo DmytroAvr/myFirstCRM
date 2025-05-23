@@ -127,7 +127,7 @@ class OIDStatusChangeForm(forms.ModelForm):
 
         # new_status only two choices
         self.fields['new_status'].widget = forms.Select(choices=[
-            ('обробка припинено', 'обробка припинено'),
+            ('обробка призупинено', 'обробка призупинено'),
             ('скасовано', 'скасовано'),
             ('діючий', 'діючий'),
         ])

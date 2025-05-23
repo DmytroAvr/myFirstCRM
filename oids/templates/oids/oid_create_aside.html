@@ -1,0 +1,40 @@
+
+<!-- Окремий блок Aside для створення ОІД -->
+<aside id="oid-aside">
+  <h4>Додати новий ОІД до в/ч <span id="insert_unit"></span></h4>
+  <form id="oid-create-form">
+    {% csrf_token %}
+    <label for="id_name">Назва ОІД:</label>
+    <input type="text" name="name" id="id_name" required>
+
+    <label for="id_sec_level">Гриф:</label>
+    <select name="sec_level" id="id_sec_level">
+      <option value="Т">Т</option>
+      <option value="ЦТ">ЦТ</option>
+    </select>
+
+    <label for="id_room">Приміщення:</label>
+    <input type="text" name="room" id="id_room">
+
+    <label for="id_oid_type">Тип ОІД:</label>
+    <select name="oid_type" id="id_oid_type">
+      <option value="ПЕМІН">ПЕМІН</option>
+      <option value="МОВНА">МОВНА</option>
+    </select>
+
+    <label for="id_status">Статус:</label>
+    <select name="status" id="id_status">
+      <option value="створюється">Створюється</option>
+      <option value="діючий">Діючий</option>
+    </select>
+
+    <label for="id_note">Примітка:</label>
+    <textarea name="note" id="id_note" rows="4"></textarea>
+
+    <button type="submit">➕ Додати ОІД</button>
+    <button type="button" id="oid-aside-close">✖ Закрити</button>
+  </form>
+</aside>
+
+<!-- Overlay -->
+<div id="overlay"></div>
