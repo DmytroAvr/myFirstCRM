@@ -103,9 +103,10 @@ requestItemFormSet = modelformset_factory(
 class OidCreateForm(forms.ModelForm):
     class Meta:
         model = OID
-        fields = ['name', 'room', 'note', 'oid_type', 'status']  # без 'unit'
+        fields = ['name', 'sec_level', 'room', 'note', 'oid_type', 'status']  # без 'unit'
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'sec_level': forms.Select(attrs={'class': 'form-control'}),
             'room': forms.TextInput(attrs={'class': 'form-control'}),
             'note': forms.Textarea(attrs={'class': 'form-control'}),
             'oid_type': forms.Select(attrs={'class': 'form-control'}),

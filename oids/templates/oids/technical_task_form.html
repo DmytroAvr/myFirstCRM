@@ -249,10 +249,6 @@
                 const currentUnitId = unitSelect.value;
                 formData.append('unit_id', currentUnitId);
 
-                // запускає 
-                // # D:\myFirstCRM\oids\urls.py
-                // path('ajax/create/', views.create_oid_ajax, name='create_oid_ajax'),
-
                 fetch("{% url 'create_oid_ajax' %}", {
                     method: "POST",
                     body: formData,
@@ -297,6 +293,12 @@
             {% csrf_token %}
             <label for="id_name">Назва ОІД:</label>
             <input type="text" name="name" id="id_name" required><br>
+
+            <label for="id_sec_level">Гриф:</label>
+            <select name="sec_level" id="id_sec_level">
+                <option value="Т">Т</option>
+                <option value="Цілком Т">ЦТ</option>
+            </select><br>
 
             <label for="id_room">Приміщення:</label>
             <input type="text" name="room" id="id_room"><br>

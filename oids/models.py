@@ -6,6 +6,12 @@ from django.db.models import Q
 
 
 
+class SecLevelChoices(models.TextChoices):
+    S = 'Т', 'Т'
+    TS = 'Цілком Т', 'Цілком Т'
+    DSK = 'ДСК', 'ДСК'
+  
+
 class OIDStatusChoices(models.TextChoices):
     NEW = 'створюється', 'Створюється'
     ATTESTED = 'атестована', 'Атестована'
@@ -59,6 +65,7 @@ class Unit(models.Model):  # Військова частина
 class OID(models.Model):  # Об'єкт інформаційної діяльності
     name = models.CharField(max_length=255, verbose_name="Назва")
     unit = models.ForeignKey(Unit, on_delete=models.CASCADE, verbose_name="Військова частина")
+    sec_level = models.CharField(max_length=10, choices=SecLevelChoices.choices, default=SecLevelChoices.S, verbose_name="Гриф ОІД")
     room = models.CharField(max_length=255, verbose_name="Приміщення №")  # address -> room
     note = models.TextField(verbose_name="Примітка", blank=True, null=True)  # purpose -> note
     oid_type = models.CharField(max_length=10, choices=OIDTypeChoices.choices, default=OIDTypeChoices.PC, verbose_name="Тип ОІД")
