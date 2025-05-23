@@ -27,6 +27,9 @@ urlpatterns = [
     path('technical_tasks/create/', views.technical_task_create, name='technical_task_create'),
     path('technical_tasks_list/', views.technical_task_list, name='technical_task_list'),
 
-    path('oids/create/', views.create_oid, name='oid_create'),
-    path('oids/status-change/', views.change_oid_status, name='oid_status_change'),
+    # path('oids/create/', веде до посилання http://127.0.0.1:8000/oids/oids/oid_******
+    path('create/', views.create_oid, name='oid_create'),
+    path('status-change/', views.change_oid_status, name='oid_status_change'),
+    path('unit_overview/', views.unit_overview, name='unit_overview'),
+    path('<int:oid_id>/', views.oid_details, name='oid_details'),
 ]

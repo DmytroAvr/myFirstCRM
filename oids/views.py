@@ -1,12 +1,13 @@
 # C:\myFirstCRM\oids\views.py
-from django.shortcuts import render, redirect
-from .models import Document, Unit, OID, WorkRequest, DocumentType, WorkRequestItem, Trip
+from django.shortcuts import render, redirect, get_object_or_404
+from .models import Document, Unit, OID, OIDStatusChange, WorkRequest, DocumentType, WorkRequestItem, Trip
 from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet, requestItemFormSet, requestItemForm, OidCreateForm, AttestationRegistrationForm, TripResultForUnitForm, TechnicalTaskForm, TechnicalTask, OIDStatusChangeForm, TripForm
 from django.http import JsonResponse
 import traceback        #check
 from django.contrib import messages
 from django.views.decorators.http import require_POST
 from django.db.models import Q
+
 
 def home_view(request):
     return render(request, 'home.html')
@@ -240,5 +241,35 @@ def trip_list(request):
     return render(request, 'trip_list.html', {'trips': trips})
 
 
+def unit_overview(request):
+    selected_unit_id = request.GET.get('unit')
+    units = Unit.objects.all()
+    
+    if selected_unit_id:
+        oids = OID.objects.filter(unit__id=selected_unit_id).order_by('name')
+    else:
+        oids = OID.objects.all().order_by('unit', 'name')
+
+    return render(request, 'oids/unit_overview.html', {
+        'oids': oids,
+        'units': units,
+        'selected_unit_id': selected_unit_id
+    })
+
+def oid_details(request, oid_id):
+    oid = get_object_or_404(OID, pk=oid_id)
+
+    status_changes = OIDStatusChange.objects.filter(oid=oid).order_by('-changed_at')
+    work_items = WorkRequestItem.objects.filter(oid=oid).select_related('request')
+    tech_tasks = TechnicalTask.objects.filter(oid=oid)
+    documents = Document.objects.filter(oid=oid).distinct()
+
+    return render(request, 'oids/oid_details.html', {
+        'oid': oid,
+        'status_changes': status_changes,
+        'work_items': work_items,
+        'tech_tasks': tech_tasks,
+        'documents': documents,
+    })
 
 # 
