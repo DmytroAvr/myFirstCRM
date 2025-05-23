@@ -1,169 +1,63 @@
 
-<!DOCTYPE html>
-<html lang="uk">
-<head>
-  <meta charset="UTF-8">
-  <title>Відрядження</title>
-  <style>
-    :root {
-      --bg-light: #ffffff;
-      --bg-dark: #1a1a1a;
-      --text-light: #1a1a1a;
-      --text-dark: #f0f0f0;
-      --input-bg-light: #f9f9f9;
-      --input-bg-dark: #2c2c2c;
-      --border-light: #cccccc;
-      --border-dark: #444444;
-      --btn-bg-light: #e0e0e0;
-      --btn-bg-dark: #333333;
-      --btn-text-light: #000;
-      --btn-text-dark: #fff;
-    }
+{% extends 'base.html' %}
+{% load static %}
 
-    body {
-      margin: 20px;
-      font-family: sans-serif;
-      background-color: var(--bg-light);
-      color: var(--text-light);
-      transition: background-color 0.3s, color 0.3s;
-    }
 
-    .dark-theme {
-      background-color: var(--bg-dark);
-      color: var(--text-dark);
-    }
 
-    .theme-toggle {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      background-color: transparent;
-      color: inherit;
-      border: 1px solid currentColor;
-      padding: 5px 10px;
-      cursor: pointer;
-      font-size: 0.9rem;
-      border-radius: 5px;
-    }
 
-    form {
-      max-width: 800px;
-      margin: auto;
-    }
+{% block title %}Планування відрядження{% endblock %}
 
-    label {
-      display: block;
-      margin-top: 1rem;
-      margin-bottom: 0.3rem;
-    }
-
-    select,
-    input[type="date"],
-    textarea {
-      width: 100%;
-      padding: 8px;
-      border: 1px solid var(--border-light);
-      background-color: var(--input-bg-light);
-      color: var(--text-light);
-      transition: background-color 0.3s, color 0.3s, border-color 0.3s;
-    }
-
-    .dark-theme select,
-    .dark-theme input[type="date"],
-    .dark-theme textarea {
-      background-color: var(--input-bg-dark);
-      color: var(--text-dark);
-      border: 1px solid var(--border-dark);
-    }
-
-    button[type="submit"] {
-      margin-top: 20px;
-      padding: 10px 18px;
-      font-size: 1rem;
-      border-radius: 5px;
-      cursor: pointer;
-      border: 1px solid var(--border-light);
-      background-color: var(--btn-bg-light);
-      color: var(--btn-text-light);
-      transition: background-color 0.3s, color 0.3s;
-    }
-
-    .dark-theme button[type="submit"] {
-      background-color: var(--btn-bg-dark);
-      color: var(--btn-text-dark);
-      border: 1px solid var(--border-dark);
-    }
-  </style>
-</head>
-<body>
-
-<button class="theme-toggle" onclick="toggleTheme()">Змінити тему</button>
-<script>
-
-     function toggleTheme() {
-    document.body.classList.toggle('dark-theme');
-  }
-</script>
-
-{% block content %}
-              {% if messages %}
-                  {% for message in messages %}
-                      <div class="alert alert-success">{{ message }}</div>
-                  {% endfor %}
-              {% endif %}
-  <h2>Планування відрядження</h2>
-  <form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Зберегти</button>
-  </form>
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'oids\css\select2_many_to_many.css' %}">
 {% endblock %}
 
+{% block content %}
 
 
-<!-- select2 -->
-<script>
-    $(document).ready(function() {
-        $('select').select2();
-    });
-</script> 
-<script>
-    // script for select2 with search
-    $(document).ready(function() {
-    $('select').select2();
-        $('#id_units').on('change', function() {
-            const unitIds = $(this).val();
-            if (!unitIds.length) return;
 
-            $.ajax({
-                url: "{% url 'ajax_load_oids_for_units' %}",
-                data: {
-                    'units[]': unitIds
-                },
-                success: function(data) {
-                    const $oidSelect = $('#id_oids');
-                    $oidSelect.empty();
-                    data.forEach(function(oid) {
-                        $oidSelect.append($('<option>', {
-                            value: oid.id,
-                            text: oid.name
-                        }));
-                    });
-                    $oidSelect.trigger('change');
-                }
-            });
-        });
-    });
-</script>
+  <h2>Форма планування відрядження</h2>
+
+<form method="post" autocomplete="off">
+  {% csrf_token %}
+
+<select id="id_units" multiple class="select2">
+  {% for unit in units %}
+    <option value="{{ unit.id }}">{{ unit.name }}</option>
+  {% endfor %}
+</select>
+
+<select id="id_oids" multiple class="select2" disabled>
+  <option>-- оберіть частини --</option>
+</select>
+
+<select id="id_work_requests" multiple class="select2" disabled>
+  <option>-- оберіть ОІД --</option>
+</select>
 
 
-<!-- autocomplete off -->
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        document.querySelectorAll("form").forEach(form => {
-            form.setAttribute("autocomplete", "off");
-        });
-    });
-</script>
 
-</body>
+  <label for="id_start_date">Дата початку:</label>
+  <input type="date" name="start_date" id="id_start_date" value="{{ start_date }}">
+
+  <label for="id_end_date">Дата завершення:</label>
+  <input type="date" name="end_date" id="id_end_date" value="{{ end_date }}">
+
+  <label for="id_persons">Відряджаються:</label>
+  <select name="persons" id="id_persons" multiple class="select2">
+    {% for person in persons %}
+      <option value="{{ person.id }}" {% if person.id in selected_persons %}selected{% endif %}>
+        {{ person.name }}
+      </option>
+    {% endfor %}
+  </select>
+
+  <label for="id_purpose">Примітка:</label>
+  <textarea name="purpose" id="id_purpose" rows="4">{{ purpose }}</textarea>
+
+  <button type="submit">💾 Зберегти</button>
+</form>
+
+
+<script src="{% static 'oids/js/select2_html_many_for_many.js' %}"></script>
+
+{% endblock %}

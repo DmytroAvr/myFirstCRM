@@ -1,6 +1,7 @@
 # D:\myFirstCRM\oids\urls.py
-from django.urls import path
+from django.urls import path, include
 from . import views
+
 
 urlpatterns = [
     path('ajax/load-oids/', views.load_oids, name='ajax_load_oids'),
@@ -10,6 +11,12 @@ urlpatterns = [
     path('ajax/load-oids-for-unit/', views.load_oids_for_unit, name='ajax_load_oids_for_unit'),
     path('ajax/load-documents-for-oids/', views.load_documents_for_oids, name='ajax_load_documents_for_oids'),
     path('ajax/get-oid-status/', views.get_oid_status, name='ajax_get_oid_status'),
+    
+    # path('api/oids/', views.get_oids_by_unit, name='get_oids_by_unit'),
+    # path('api/requests/', views.get_requests_by_oid, name='get_requests_by_oid'),
+    
+    path('api/oids/', views.get_oids_by_units, name='get_oids_by_units'),
+    path('api/requests/', views.get_requests_by_oids, name='get_requests_by_oids'),
 
     path('documents/done/', views.document_done, name='document_done'),
 

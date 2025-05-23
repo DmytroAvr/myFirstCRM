@@ -1,6 +1,6 @@
 # C:\myFirstCRM\oids\views.py
 from django.shortcuts import render, redirect, get_object_or_404
-from .models import Document, Unit, OID, OIDStatusChange, WorkRequest, DocumentType, WorkRequestItem, Trip
+from .models import Document, Unit, OID, OIDStatusChange, WorkRequest, DocumentType, WorkRequestItem, Trip, Person
 from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet, requestItemFormSet, requestItemForm, OidCreateForm, AttestationRegistrationForm, TripResultForUnitForm, TechnicalTaskForm, TechnicalTask, OIDStatusChangeForm, TripForm
 from django.http import JsonResponse
 import traceback        #check
@@ -47,11 +47,68 @@ def load_documents_for_oids(request):
     documents = Document.objects.filter(oid__id__in=oid_ids).order_by('document_type__name', 'document_number')
     return JsonResponse(list(documents.values('id', 'document_type__name', 'document_number')), safe=False)
 
+# один unit дає багато ОІД
 def get_oids_by_unit(request):
     unit_id = request.GET.get('unit_id')
-    oids = OID.objects.filter(unit__id=unit_id, status__in=['діючий', 'новий'])
-    data = [{'id': oid.id, 'name': str(oid)} for oid in oids]
+    if not unit_id:
+        return JsonResponse([], safe=False)
+
+    try:
+        unit_id = int(unit_id)
+    except ValueError:
+        return JsonResponse([], safe=False)
+
+    oids = OID.objects.filter(unit_id=unit_id).values('id', 'name')
+    return JsonResponse(list(oids), safe=False)
+
+# багато units дає багато ОІДs
+def get_oids_by_units(request):
+    unit_ids = request.GET.get('unit_ids')  # приклад: "1,2,3"
+
+    if not unit_ids:
+        return JsonResponse([], safe=False)
+
+    ids = [int(i) for i in unit_ids.split(',') if i.isdigit()]
+    oids = OID.objects.filter(unit_id__in=ids).values('id', 'name')
+    return JsonResponse(list(oids), safe=False)
+
+# всі заявки на 1 ОІД
+def get_requests_by_oid(request):
+    oid_id = request.GET.get('oid_id')
+    if not oid_id:
+        return JsonResponse([], safe=False)
+
+    # Знаходимо заявки, пов'язані з OID
+    work_requests = WorkRequest.objects.filter(items__oid_id=oid_id).distinct()
+    data = [
+        {
+            'id': wr.id,
+            'incoming_number': wr.incoming_number,
+            'incoming_date': wr.incoming_date.strftime('%Y-%m-%d')
+        }
+        for wr in work_requests
+    ]
     return JsonResponse(data, safe=False)
+
+# всі заявки на БАГАТо ОІД
+def get_requests_by_oids(request):
+    oid_ids = request.GET.get('oid_ids')
+
+    if not oid_ids:
+        return JsonResponse([], safe=False)
+
+    ids = [int(i) for i in oid_ids.split(',') if i.isdigit()]
+    work_requests = WorkRequest.objects.filter(items__oid_id__in=ids).distinct()
+    data = [
+        {
+            'id': wr.id,
+            'incoming_number': wr.incoming_number,
+            'incoming_date': wr.incoming_date.strftime('%Y-%m-%d')
+        }
+        for wr in work_requests
+    ]
+    return JsonResponse(data, safe=False)
+
 
 # C:\myFirstCRM\oids\views.py
 def document_done(request):
@@ -215,16 +272,38 @@ def change_oid_status(request):
         form = OIDStatusChangeForm()
     return render(request, 'oids/oid_status_change_form.html', {'form': form})
 
+
 def trip_create_view(request):
+    units = Unit.objects.all()
+    oids = OID.objects.all()
+    work_requests = WorkRequest.objects.all()
+    persons = Person.objects.all()
+
     if request.method == 'POST':
         form = TripForm(request.POST)
         if form.is_valid():
             form.save()
             messages.success(request, "Відрядження успішно створено!")
             return redirect('trip-create')  # або на іншу сторінку
-    else:
-        form = TripForm()
-    return render(request, 'trip_create.html', {'form': form})
+        else:
+            form = TripForm()
+
+    return render(request, 'trip_create.html', {
+        'units': units,
+        'oids': oids,
+        'work_requests': work_requests,
+        'persons': persons,
+        'selected_units': [],  # при редагуванні — передай відповідні ID
+        'selected_oids': [],
+        'selected_work_requests': [],
+        'selected_persons': [],
+        'start_date': '',
+        'end_date': '',
+        'purpose': '',
+    })
+
+
+
 
 
 def trip_list(request):
