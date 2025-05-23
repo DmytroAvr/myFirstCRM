@@ -13,10 +13,17 @@ function toggleTheme() {
   }
 
 // створити фільтр в календарі. початок та кінець 
-document.getElementById('id_start_date').addEventListener('change', function() {
-  document.getElementById('id_end_date').setAttribute('min', this.value);
-});
+document.addEventListener("DOMContentLoaded", function () {
+  const startDateInput = document.getElementById("id_start_date");
+  const endDateInput = document.getElementById("id_end_date");
 
-document.getElementById('id_end_date').addEventListener('change', function() {
-  document.getElementById('id_start_date').setAttribute('max', this.value);
+  if (startDateInput && endDateInput) {
+    startDateInput.addEventListener("change", function () {
+      endDateInput.setAttribute("min", this.value);
+    });
+
+    endDateInput.addEventListener("change", function () {
+      startDateInput.setAttribute("max", this.value);
+    });
+  }
 });
