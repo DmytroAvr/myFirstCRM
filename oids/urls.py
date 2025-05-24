@@ -29,11 +29,9 @@ urlpatterns = [
     path('work/request/', views.work_request, name='work_request'),
 
 
-    path('attestation/new/', views.create_attestation_registration, name='attestation_new'),
 
     path('trip_create/', views.trip_create_view, name='trip-create'),
 
-    path('trip_result/new/', views.create_trip_result, name='trip_result_new'),
     path('technical_tasks/create/', views.technical_task_create, name='technical_task_create'),
     path('technical_tasks_list/', views.technical_task_list, name='technical_task_list'),
 
@@ -41,6 +39,8 @@ urlpatterns = [
     path('create/', views.create_oid, name='oid_create'),
     path('status-change/', views.change_oid_status, name='oid_status_change'),
 
+    path('send_doc/cip', views.send_doc_cip, name='send_doc_cip'),
+    path('send_doc/unit/', views.send_doc_unit, name='send_doc_unit'),
 
 
     path('<int:oid_id>/', views.oid_details, name='oid_details'),

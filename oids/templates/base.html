@@ -23,7 +23,15 @@
     {% block content %}
     
                         
-                        {% if messages %}
+                       
+
+    {% endblock %}
+  </div>
+  <!-- 
+  <button type="button" class="add-oid-button" style="margin-right: 30px;">➕ Додати ОІД</button> 
+-->
+
+                    {% if messages %}
                       <div id="messages" style="margin-bottom: 1em;">
                         {% for message in messages %}
                           <div class="alert {{ message.tags }}" style="
@@ -45,14 +53,6 @@
                         {% endfor %}
                       </div>
                     {% endif %}
-
-    {% endblock %}
-  </div>
-  <!-- 
-  <button type="button" class="add-oid-button" style="margin-right: 30px;">➕ Додати ОІД</button> 
--->
-
-
 
 {% include 'static/oid_create_aside.html' %}
 <script src="{% static 'oids/js/oid_create_aside.js' %}"></script>
