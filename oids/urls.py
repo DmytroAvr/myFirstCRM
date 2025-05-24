@@ -27,13 +27,11 @@ urlpatterns = [
 
 
     path('work/request/', views.work_request, name='work_request'),
-    path('work_requests/', views.work_request_list, name='work_request_list'),
 
 
     path('attestation/new/', views.create_attestation_registration, name='attestation_new'),
 
     path('trip_create/', views.trip_create_view, name='trip-create'),
-    path('trip_list/', views.trip_list, name='trip-list'),
 
     path('trip_result/new/', views.create_trip_result, name='trip_result_new'),
     path('technical_tasks/create/', views.technical_task_create, name='technical_task_create'),
@@ -42,6 +40,11 @@ urlpatterns = [
     # path('oids/create/', веде до посилання http://127.0.0.1:8000/oids/oids/oid_******
     path('create/', views.create_oid, name='oid_create'),
     path('status-change/', views.change_oid_status, name='oid_status_change'),
-    path('unit_overview/', views.unit_overview, name='unit_overview'),
+
+
+
     path('<int:oid_id>/', views.oid_details, name='oid_details'),
+    path('unit_overview/', views.unit_overview, name='unit_overview'),
+    path('work_requests/', views.work_request_list, name='work_request_list'),
+    path('trip_list/', views.trip_list, name='trip-list'),
 ]

@@ -1,7 +1,7 @@
 <!-- C:\myFirstCRM\oids\templates\oids\technical_task_form.html -->
 {% extends 'base.html' %}
 {% load static %}
-
+ 
 {% block content %}
 <h2>Додати технічне завдання</h2>
 
@@ -30,33 +30,6 @@
   <button type="submit">Зберегти</button>
 </form>
 
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script>
-  document.addEventListener("DOMContentLoaded", function () {
-    const unitSelect = document.querySelector("#id_unit");
-    const oidSelect = document.querySelector("#id_oid");
-
-    unitSelect.addEventListener("change", function () {
-      const unitId = unitSelect.value;
-      oidSelect.innerHTML = '<option value="">Завантаження...</option>';
-
-      fetch(`/oids/ajax/load-oids-for-unit/?unit=${unitId}`)
-        .then(response => response.json())
-        .then(data => {
-          oidSelect.innerHTML = '<option value="">---------</option>';
-          if (data.length > 0) {
-            data.forEach(oid => {
-              const option = new Option(oid.name, oid.id);
-              oidSelect.appendChild(option);
-            });
-          } else {
-            const option = new Option("ОІД не знайдено. Створіть новий", "");
-            oidSelect.appendChild(option);
-          }
-        });
-    });
-  });
-</script>
 
 <script>
   document.getElementById("my-form").addEventListener("submit", function(e) {
@@ -94,10 +67,14 @@
     }
     return cookieValue;
   }
+
+  
 </script>
 
 {% include 'oids/oid_create_aside.html' %}
 <script src="{% static 'oids/js/oid_create_aside.js' %}"></script>
+<script src="{% static 'oids/js/filtering_dynamic.js' %}"></script>
 <script>attachOidAside();</script>
 
 {% endblock %}
+

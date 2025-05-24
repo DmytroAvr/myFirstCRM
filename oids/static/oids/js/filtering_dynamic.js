@@ -1,5 +1,30 @@
-// filtering_dynamic.js
-// Універсальний модуль фільтрації за принципом select2 + AJAX
+// document.addEventListener('DOMContentLoaded', function () {
+//   const unitSelect = document.querySelector('#id_unit');
+//   const taskFieldsBlock = document.getElementById('task-form-fields');
+
+//   if (unitSelect && taskFieldsBlock) {
+//     unitSelect.addEventListener('change', function () {
+//       if (this.value) {
+//         taskFieldsBlock.style.display = 'block';
+//       } else {
+//         taskFieldsBlock.style.display = 'none';
+//       }
+//     });
+
+//     // Початковий стан на reload
+//     if (unitSelect.value) {
+//       taskFieldsBlock.style.display = 'block';
+//     }
+//   }
+// });
+  /* 
+  <div id="task-form-fields" style="display: none;">
+  ...
+  {{ form.input_number.label_tag }} {{ form.input_number }}
+
+  </div> */
+
+
 
 $(document).ready(function () {
   $('.select2').select2();
@@ -11,7 +36,6 @@ $(document).ready(function () {
       url,
       paramName,
       placeholder,
-      dependsOn = [],
       transformItem = item => ({ value: item.id, label: item.name })
     } = config;
 
@@ -45,9 +69,42 @@ $(document).ready(function () {
     });
   }
 
-  // 🔽 Приклади використання:
+  function setupDynamicFormsetFilter(config) {
+    const {
+      sourceSelectId,
+      formSelector = '.document-form',
+      fieldPrefix = 'form',
+      fieldName = 'oid',
+      url,
+      paramName,
+      placeholder,
+      transformItem = item => ({ value: item.id, label: item.name })
+    } = config;
 
-  // 1. Один unit → багато oid
+    $(sourceSelectId).on('change', function () {
+      const unitId = $(this).val();
+      if (!unitId) return;
+
+      $.getJSON(`${url}?${paramName}=${unitId}`, function (data) {
+        $(formSelector).each(function (index) {
+          const fieldId = `#id_${fieldPrefix}-${index}-${fieldName}`;
+          const $select = $(this).find(fieldId);
+
+          if (!$select.length) return;
+
+          $select.prop('disabled', true).empty().append(`<option>${placeholder.loading}</option>`);
+
+          $select.prop('disabled', false).empty().append(`<option value="">${placeholder.default}</option>`);
+          data.forEach(item => {
+            const option = transformItem(item);
+            $select.append(`<option value="${option.value}">${option.label}</option>`);
+          });
+        });
+      });
+    });
+  }
+
+  // 🔽 Статичні фільтри
   setupDynamicFilter({
     sourceSelectId: '#id_unit',
     targetSelectId: '#id_oid',
@@ -56,7 +113,6 @@ $(document).ready(function () {
     placeholder: { default: 'Оберіть ОІД', loading: 'Завантаження ОІД...' }
   });
 
-  // 2. Багато unit → багато oid
   setupDynamicFilter({
     sourceSelectId: '#id_units',
     targetSelectId: '#id_oids',
@@ -65,7 +121,6 @@ $(document).ready(function () {
     placeholder: { default: 'Оберіть ОІД', loading: 'Завантаження ОІД...' }
   });
 
-  // 3. Багато oid → заявки
   setupDynamicFilter({
     sourceSelectId: '#id_oids',
     targetSelectId: '#id_work_requests',
@@ -75,7 +130,6 @@ $(document).ready(function () {
     transformItem: item => ({ value: item.id, label: `${item.incoming_number} — ${item.incoming_date}` })
   });
 
-  // 4. Один oid → заявки
   setupDynamicFilter({
     sourceSelectId: '#id_oid',
     targetSelectId: '#id_work_requests',
@@ -84,8 +138,18 @@ $(document).ready(function () {
     placeholder: { default: 'Оберіть заявку', loading: 'Завантаження заявок...' },
     transformItem: item => ({ value: item.id, label: `${item.incoming_number} — ${item.incoming_date}` })
   });
-});
 
+  // 🔁 Для formset'ів (всі OID у заявці)
+  setupDynamicFormsetFilter({
+    sourceSelectId: '#id_unit',
+    formSelector: '.document-form',
+    fieldPrefix: 'form',
+    fieldName: 'oid',
+    url: '/oids/ajax/load-oids-for-unit/',
+    paramName: 'unit',
+    placeholder: { default: 'Оберіть ОІД', loading: 'Оновлення ОІД...' }
+  });
+});
 
 
 /* <select id="id_units" class="select2" multiple></select>
