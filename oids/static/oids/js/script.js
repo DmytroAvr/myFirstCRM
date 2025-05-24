@@ -27,3 +27,8 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 });
+
+
+
+// для сторінки обліку заявок
+

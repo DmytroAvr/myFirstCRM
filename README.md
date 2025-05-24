@@ -11,7 +11,7 @@ py -m ensurepip --default-pip
 
 
 
-py -m venv <DIR>
+py -m venv myApp
 <DIR>\Scripts\activate
 
 
@@ -35,6 +35,8 @@ https://www.w3schools.com/django/django_install_django.php
 python -m pip install Django
 pip install django-multiselectfield
 pip install django-select2
+pip install django-widget-tweaks
+
 
 <!-- 
  -->
@@ -92,4 +94,4 @@ http://127.0.0.1:8000/oids/technical_tasks/create/
 виправити оновлення форми після створення ОІД
 
 http://127.0.0.1:8000/oids/attestation/new/
-додати можливість додавати ОІД. Якщо реєструють ОІД створений самотужки
+додати можливість додавати ОІД. Якщо реєструють ОІД створений самотужкиі

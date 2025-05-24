@@ -1,29 +1,17 @@
 <!-- C:\myFirstCRM\oids\templates\attestation_registration_form.html -->
-<!DOCTYPE html>
-<html>
-    <head>
-        <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-    </head>
-    <style>
-        .select2 {
-            width: 300px !important;
-        }
-        .alert-success {
-            color: rgb(69, 143, 9);
-            text-align: center;
-            font-size: 30;
-            font-weight: 700;
-        }
-        </style>
-<body>
-    {% load static %}
-{% if messages %}
-            {% for message in messages %}
-                <div class="alert alert-success">{{ message }}</div>
-            {% endfor %}
-        {% endif %}
+{% extends 'base.html' %}
+{% block title %}Page Title{% endblock %}
+
+{% load static %}
+{% block extra_css %}{% endblock %}
+
+
 
     {% block content %}
+
+
+<!-- insert page content -->
+
     <h2>Нова відправка Акту Атестації</h2>
     <form method="post" enctype="multipart/form-data">
       {% csrf_token %}
@@ -31,63 +19,10 @@
 
       <button type="submit" class="btn btn-primary">Зберегти</button>
     </form>
-    {% endblock %}
 
 
 
 
-        {% if messages %}
-            {% for message in messages %}
-                <div class="alert alert-success">{{ message }}</div>
-            {% endfor %}
-        {% endif %}
 
-
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            document.querySelectorAll("form").forEach(form => {
-                form.setAttribute("autocomplete", "off");
-            });
-        });
-    </script>
-
-    <script>
-        $(document).ready(function() {
-            $('select').select2();
-        });
-    </script> 
-<script>
-    // script for select2 with search
-    $(document).ready(function() {
-    $('select').select2();
-        $('#id_units').on('change', function() {
-            const unitIds = $(this).val();
-            if (!unitIds.length) return;
-
-            $.ajax({
-                url: "{% url 'ajax_load_oids_for_units' %}",
-                data: {
-                    'units[]': unitIds
-                },
-                success: function(data) {
-                    const $oidSelect = $('#id_oids');
-                    $oidSelect.empty();
-                    data.forEach(function(oid) {
-                        $oidSelect.append($('<option>', {
-                            value: oid.id,
-                            text: oid.name
-                        }));
-                    });
-                    $oidSelect.trigger('change');
-                }
-            });
-        });
-    });
-</script>
-
-
-</body>
-</html>
+{% block extra_js %}{% endblock %}
+{% endblock %}

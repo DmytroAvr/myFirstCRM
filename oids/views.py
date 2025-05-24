@@ -1,7 +1,7 @@
 # C:\myFirstCRM\oids\views.py
 from django.shortcuts import render, redirect, get_object_or_404
 from .models import Document, Unit, OID, OIDStatusChange, WorkRequest, DocumentType, WorkRequestItem, Trip, Person
-from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet, requestItemFormSet, requestItemForm, OidCreateForm, AttestationRegistrationForm, TripResultForUnitForm, TechnicalTaskForm, TechnicalTask, OIDStatusChangeForm, TripForm
+from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet, requestItemFormSet, requestItemForm, OidCreateForm, AttestationRegistrationForm, TripResultForUnitForm, TechnicalTaskForm, TechnicalTask, OIDStatusChangeForm, TripForm, modelformset_factory
 from django.http import JsonResponse
 import traceback        #check
 from django.contrib import messages
@@ -176,6 +176,33 @@ def work_request(request):
 def work_request_list(request):
     work_requests = WorkRequest.objects.prefetch_related('items__oid', 'unit').all()
     return render(request, 'views/work_request_list.html', {'work_requests': work_requests})
+
+def work_request_create(request):
+    OIDFormSet = modelformset_factory(OIDDocument, form=OIDForm, extra=0, can_delete=True)
+
+    if request.method == 'POST':
+        header_form = HeaderForm(request.POST)
+        formset = OIDFormSet(request.POST)
+        if header_form.is_valid() and formset.is_valid():
+            header = header_form.save()
+            for form in formset:
+                document = form.save(commit=False)
+                document.header = header
+                document.save()
+            return redirect('success_page')
+    else:
+        header_form = HeaderForm()
+        # ❗ Генеруємо 2 форми вручну
+        formset = OIDFormSet(queryset=OIDDocument.objects.none())
+        for _ in range(2):
+            formset.forms.append(formset.empty_form)
+
+    return render(request, 'oids/work_request.html', {
+        'header_form': header_form,
+        'formset': formset,
+        'empty_form': formset.empty_form,
+    })
+
 
 
 # aside for request 

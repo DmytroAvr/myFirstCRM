@@ -1,30 +1,9 @@
+// C:\myFirstCRM\oids\static\oids\js\oid_create_aside.js
 let targetSelect = null;
 
 function attachOidAside(unitSelectId = 'id_unit') {
   const unitSelect = document.getElementById(unitSelectId);
-
-  // Відкрити aside
-  document.querySelectorAll('.add-oid-button').forEach(button => {
-    if (!button.dataset.bound) {
-      button.addEventListener('click', function (e) {
-        const unitId = unitSelect.value;
-        if (!unitId) {
-          alert("⚠️ Спершу оберіть військову частину у формі зверху.");
-          return;
-        }
-
-        const formDiv = e.target.closest('.document-form') || e.target.closest('form');
-        targetSelect = formDiv.querySelector('select[name$="-oid"], select[name="oid"]');
-
-        document.getElementById('insert_unit').innerText = unitSelect.options[unitSelect.selectedIndex].text;
-        document.getElementById('oid-aside').style.display = "block";
-        document.getElementById('overlay').style.display = "block";
-      });
-
-      button.dataset.bound = 'true';
-    }
-  });
-
+ 
   document.getElementById('oid-aside-close').addEventListener('click', function () {
     document.getElementById('oid-aside').style.display = "none";
     document.getElementById('overlay').style.display = "none";

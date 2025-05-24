@@ -1,6 +1,5 @@
 
-<!-- extends 'base.html' -->
-
+<!-- C:\myFirstCRM\oids\templates\base.html -->
 <!DOCTYPE html>
 <html lang="uk">
 <head>
@@ -15,8 +14,6 @@
   {% block extra_css %}{% endblock %}
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 </head>
@@ -30,10 +27,6 @@
 
     {% endblock %}
   </div>
-  <!-- 
-  <button type="button" class="add-oid-button" style="margin-right: 30px;">➕ Додати ОІД</button> 
--->
-
                     {% if messages %}
                       <div id="messages" style="margin-bottom: 1em;">
                         {% for message in messages %}
@@ -72,4 +65,4 @@
 
 {% block extra_js %} {% endblock %}
 </body>
-</html>
+</html> 

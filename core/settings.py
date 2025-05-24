@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django_select2',
     'oids', 
+    'widget_tweaks',
     # 'core',
     # 'requests',
     # 'missions',

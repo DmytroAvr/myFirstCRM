@@ -1,16 +1,10 @@
 <!-- C:\myFirstCRM\oids\templates\oids\document_done.html -->
 
 {% extends 'base.html' %}
-{% block title %}enter title{% endblock %}
+{% block title %}Виконані документи{% endblock %}
 {% load static %}
 
 {% block content %}  
-<!-- % endblock % -->
-        {% if messages %}
-            {% for message in messages %}
-                <div class="alert alert-success">{{ message }}</div>
-            {% endfor %}
-        {% endif %}
 
     <form method="post">
         {% csrf_token %}
@@ -37,77 +31,5 @@
     </form>
 
 </body>
-
-<script>
-    document.querySelector('#id_unit').addEventListener('change', function () {
-        const unitId = this.value;
-        const oidSelect = document.querySelector('#id_oid');
-        fetch(`/oids/ajax/load-oids/?unit=${unitId}`)
-            .then(response => response.json())
-            .then(data => {
-                oidSelect.innerHTML = '';
-                data.forEach(oid => {
-                    const option = new Option(oid.name, oid.id);
-                    oidSelect.add(option);
-                });
-            });
-    });
-
-    // button to add new form
-    document.addEventListener('DOMContentLoaded', function () {
-        const formset = document.getElementById('formset');
-        const addFormBtn = document.getElementById('add-form');
-        const totalForms = document.querySelector('#id_form-TOTAL_FORMS');
-
-        function updateDeleteButtons() {
-            document.querySelectorAll('.remove-form').forEach(btn => {
-                btn.removeEventListener('click', removeForm);
-                btn.addEventListener('click', removeForm);
-            });
-        }
-
-        function removeForm(event) {
-            const formDiv = event.target.closest('.document-form');
-            formDiv.remove();
-            // Оновити лічильник форм
-            const forms = document.querySelectorAll('.document-form');
-            totalForms.value = forms.length;
-
-            // Перенумерація інпутів
-            forms.forEach((form, index) => {
-                form.querySelectorAll('input, select, textarea, label').forEach(el => {
-                    if (el.name) el.name = el.name.replace(/form-\d+-/, `form-${index}-`);
-                    if (el.id) el.id = el.id.replace(/form-\d+-/, `form-${index}-`);
-                    if (el.htmlFor) el.htmlFor = el.htmlFor.replace(/form-\d+-/, `form-${index}-`);
-                });
-            });
-        }
-
-        addFormBtn.addEventListener('click', function () {
-            const forms = document.querySelectorAll('.document-form');
-            const newForm = forms[0].cloneNode(true);
-            const newIndex = forms.length;
-
-            // Очистити поля
-            newForm.querySelectorAll('input, select, textarea').forEach(el => {
-                if (el.type !== 'hidden') el.value = '';
-            });
-
-            // Змінити name/id на новий індекс
-            newForm.querySelectorAll('input, select, textarea, label').forEach(el => {
-                if (el.name) el.name = el.name.replace(/form-\d+-/, `form-${newIndex}-`);
-                if (el.id) el.id = el.id.replace(/form-\d+-/, `form-${newIndex}-`);
-                if (el.htmlFor) el.htmlFor = el.htmlFor.replace(/form-\d+-/, `form-${newIndex}-`);
-            });
-
-            formset.appendChild(newForm);
-            totalForms.value = newIndex + 1;
-            updateDeleteButtons();
-        });
-
-        updateDeleteButtons();
-    });
-    
-</script>
 
 {% endblock %}
