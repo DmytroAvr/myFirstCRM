@@ -5,7 +5,11 @@
 {% block title %}Планування відрядження{% endblock %}
 {% load static %}
 
-{% block content %}
+{% block content %} 
+
+<!-- % block extra_js % -->
+<!-- % endblock % -->
+<!-- % endblock % -->
 
     <form method="post">
         {% csrf_token %}
@@ -47,11 +51,5 @@
         <button type="submit" style="background-color: #ddf5a5;">💾 Зберегти всі документи</button>
     </form>
 
-
-
-{% include 'oids/oid_create_aside.html' %}
-<script src="{% static 'oids/js/oid_create_aside.js' %}"></script>
-<script src="{% static 'oids/js/filtering_dynamic.js' %}"></script>
-<script src="{% static 'oids/js/add_oid_form.js' %}"></script>
 
 {% endblock %}
