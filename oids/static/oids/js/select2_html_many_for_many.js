@@ -1,4 +1,4 @@
-
+// C:\myFirstCRM\oids\static\oids\js\select2_html_many_for_many.js
 $(document).ready(function() {
   $('.select2').select2();
 

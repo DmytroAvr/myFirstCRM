@@ -1,24 +1,5 @@
 
-//  <label for="id_units">Військові частини:</label>
-//     <select id="id_units" class="select2">
-//       <option value="">-- Оберіть в/ч --</option>
-//           {% for unit in units %}
-//           <option value="{{ unit.id }}">{{ unit.name }}</option>
-//           {% endfor %}
-//     </select>
-
-//   <label for="id_oids">ОІД:</label>
-//     <select id="id_oids" class="select2" disabled>
-//       <option value="">-- Спочатку оберіть в/ч --</option>
-//     </select>
-
-//   <label for="id_work_requests">Заявки:</label>
-//     <select id="id_work_requests" class="select2" disabled>
-//       <option value="">-- Спочатку оберіть ОІД --</option>
-//     </select>
-
-
-
+// C:\myFirstCRM\oids\static\oids\js\select2_html_one_give_many.js
 $(document).ready(function() {
   $('.select2').select2();
 

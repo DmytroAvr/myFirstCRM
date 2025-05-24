@@ -1,20 +1,15 @@
 
 {% extends 'base.html' %}
-{% load static %}
-
-
-
-
 {% block title %}Планування відрядження{% endblock %}
 
+
+
+{% load static %}
+
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'oids\css\select2_many_to_many.css' %}">
 {% endblock %}
 
 {% block content %}
-
-
-
   <h2>Форма планування відрядження</h2>
 
 <form method="post" autocomplete="off">
@@ -58,6 +53,11 @@
 </form>
 
 
-<script src="{% static 'oids/js/select2_html_many_for_many.js' %}"></script>
 
+
+
+
+{% block extra_js %}
+  <script src="{% static 'oids/js/select2_html_many_for_many.js' %}"></script>
+{% endblock %}
 {% endblock %}

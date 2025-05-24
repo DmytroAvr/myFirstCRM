@@ -7,11 +7,16 @@ urlpatterns = [
     path('ajax/load-oids/', views.load_oids, name='ajax_load_oids'),
     path('ajax/get-oids/', views.get_oids_by_unit, name='get_oids_by_unit'),
     path('ajax/create/', views.create_oid_ajax, name='create_oid_ajax'),
-    path('ajax/load-oids-for-units/', views.load_oids_for_units, name='ajax_load_oids_for_units'),
-    path('ajax/load-oids-for-unit/', views.load_oids_for_unit, name='ajax_load_oids_for_unit'),
     path('ajax/load-documents-for-oids/', views.load_documents_for_oids, name='ajax_load_documents_for_oids'),
     path('ajax/get-oid-status/', views.get_oid_status, name='ajax_get_oid_status'),
     
+
+    path('ajax/load-oids-for-units/', views.load_oids_for_units, name='ajax_load_oids_for_units'),
+    path('ajax/load-oids-for-unit/', views.load_oids_for_unit, name='ajax_load_oids_for_unit'),
+
+    path('ajax/get-requests-by-oid/', views.get_requests_by_oid, name='get_requests_by_oid'),
+    path('ajax/get-requests-by-oids/', views.get_requests_by_oids, name='get_requests_by_oids'),
+
     # path('api/oids/', views.get_oids_by_unit, name='get_oids_by_unit'),
     # path('api/requests/', views.get_requests_by_oid, name='get_requests_by_oid'),
     

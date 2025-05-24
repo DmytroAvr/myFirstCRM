@@ -7,14 +7,17 @@
   <meta charset="UTF-8">
   <title>{% block title %}Система обліку{% endblock %}</title>
   {% block head %}{% endblock %}
-  {% load static %}
 
+
+  {% load static %}
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="{% static 'oids/css/base.css' %}">
   {% block extra_css %}{% endblock %}
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 </head>
 <body>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    
   <button class="theme-toggle" onclick="toggleTheme()">Змінити тему</button>
   <div class="container">
     {% block content %}
@@ -49,7 +52,8 @@
   <button type="button" class="add-oid-button" style="margin-right: 30px;">➕ Додати ОІД</button> 
 -->
 
-{% load static %}
+
+
 {% include 'oids/oid_create_aside.html' %}
 <script src="{% static 'oids/js/oid_create_aside.js' %}"></script>
 <script src="{% static 'oids/js/script.js' %}"></script>
@@ -59,5 +63,7 @@
     attachOidAside();  // або attachOidAside('custom_unit_id') якщо інший id
   });
 </script>
+<script src="{% static 'oids/js/filtering_dynamic.js' %}"></script>
+{% block extra_js %} {% endblock %}
 </body>
 </html>
