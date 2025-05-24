@@ -162,9 +162,3 @@ class TechnicalTaskForm(forms.ModelForm):
         font-size: 30;
         font-weight: 700;
     }   
-
-
-
-{% block extra_css %}
-<!-- <link rel="stylesheet" href="{% static 'oids\css\select2_many_to_many.css' %}"> -->
-{% endblock %}

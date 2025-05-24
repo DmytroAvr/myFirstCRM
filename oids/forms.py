@@ -44,6 +44,11 @@ class requestForm(forms.ModelForm):
         fields = ['oids', 'work_type','status']
         # fields = ['Unit', 'work_type', 'oids', 'incoming_number', 'incoming_date', 'status']
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['oid'].widget.attrs.update({'id': 'id_oid'})
+    
+
 # test field
 class requestHeaderForm(forms.ModelForm):
     class Meta:

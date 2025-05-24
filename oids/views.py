@@ -175,7 +175,7 @@ def work_request(request):
 
 def work_request_list(request):
     work_requests = WorkRequest.objects.prefetch_related('items__oid', 'unit').all()
-    return render(request, 'oids/work_request_list.html', {'work_requests': work_requests})
+    return render(request, 'views/work_request_list.html', {'work_requests': work_requests})
 
 
 # aside for request 
@@ -201,33 +201,33 @@ def create_oid_ajax(request):
     
 # додавання документів
 
-def create_attestation_registration(request):
+def send_doc_cip(request):
     if request.method == 'POST':
         form = AttestationRegistrationForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
             messages.success(request, "Інформація успішно збережена!")
-            return redirect('attestation_new')  # або інша сторінка
+            return redirect('send_doc_cip')  # або інша сторінка
     else:
         form = AttestationRegistrationForm()
-    return render(request, 'attestation_registration_form.html', {'form': form})
+    return render(request, 'send_doc_cip.html', {'form': form})
 #    
 
-def create_trip_result(request):
+def send_doc_unit(request):
     if request.method == 'POST':
         form = TripResultForUnitForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
             messages.success(request, "Інформація успішно збережена!")
-            return redirect('trip_result_new')  # або інша сторінка
+            return redirect('send_doc_unit')  # або інша сторінка
             # return redirect('trip_result_list')  # або інша сторінка
     else:
-        form = TripResultForUnitForm()
-    return render(request, 'trip_result_form.html', {'form': form})
+        form = TripResultForUnitForm() 
+    return render(request, 'send_doc_unit.html', {'form': form})
 
-def trip_result_list(request):
-    results = TripResult.objects.all()
-    return render(request, 'oids/trip_result_list.html', {'results': results})
+# def trip_result_list(request):
+#     results = TripResult.objects.all()
+#     return render(request, 'oids/trip_result_list.html', {'results': results})
 
 # Технічне завдання
 def technical_task_create(request):
@@ -240,9 +240,6 @@ def technical_task_create(request):
         form = TechnicalTaskForm()
     return render(request, 'oids/technical_task_form.html', {'form': form})
 
-def technical_task_list(request):
-    technical_tasks = TechnicalTask.objects.select_related('oid').all()
-    return render(request, 'technical_task_list.html', {'technical_tasks': technical_tasks})
 
 def create_oid(request):
     if request.method == 'POST':
@@ -305,6 +302,11 @@ def trip_create_view(request):
 
 
 
+# views pages
+
+def technical_task_list(request):
+    technical_tasks = TechnicalTask.objects.select_related('oid').all()
+    return render(request, 'views/technical_task_list.html', {'technical_tasks': technical_tasks})
 
 def trip_list(request):
     query = request.GET.get("q", "")
@@ -317,8 +319,7 @@ def trip_list(request):
             Q(oids__name__icontains=query)
         ).distinct()
 
-    return render(request, 'trip_list.html', {'trips': trips})
-
+    return render(request, 'views/trip_list.html', {'trips': trips})
 
 def unit_overview(request):
     selected_unit_id = request.GET.get('unit')
@@ -329,7 +330,7 @@ def unit_overview(request):
     else:
         oids = OID.objects.all().order_by('unit', 'name')
 
-    return render(request, 'oids/unit_overview.html', {
+    return render(request, 'views/unit_overview.html', {
         'oids': oids,
         'units': units,
         'selected_unit_id': selected_unit_id
@@ -343,7 +344,7 @@ def oid_details(request, oid_id):
     tech_tasks = TechnicalTask.objects.filter(oid=oid)
     documents = Document.objects.filter(oid=oid).distinct()
 
-    return render(request, 'oids/oid_details.html', {
+    return render(request, 'views/oid_details.html', {
         'oid': oid,
         'status_changes': status_changes,
         'work_items': work_items,
