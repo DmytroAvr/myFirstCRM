@@ -1,31 +1,3 @@
-// document.addEventListener('DOMContentLoaded', function () {
-//   const unitSelect = document.querySelector('#id_unit');
-//   const taskFieldsBlock = document.getElementById('task-form-fields');
-
-//   if (unitSelect && taskFieldsBlock) {
-//     unitSelect.addEventListener('change', function () {
-//       if (this.value) {
-//         taskFieldsBlock.style.display = 'block';
-//       } else {
-//         taskFieldsBlock.style.display = 'none';
-//       }
-//     });
-
-//     // Початковий стан на reload
-//     if (unitSelect.value) {
-//       taskFieldsBlock.style.display = 'block';
-//     }
-//   }
-// });
-  /* 
-  <div id="task-form-fields" style="display: none;">
-  ...
-  {{ form.input_number.label_tag }} {{ form.input_number }}
-
-  </div> */
-
-
-
 $(document).ready(function () {
   $('.select2').select2();
 
@@ -68,6 +40,23 @@ $(document).ready(function () {
       loadOptions(value);
     });
   }
+  // Ініціалізація динамічних фільтрів з конфігурації
+  if (window.dynamicFilterConfig && window.dynamicFilterConfig.filters) {
+    window.dynamicFilterConfig.filters.forEach(config => {
+      try {
+        setupDynamicFilter({
+          sourceSelectId: config.source,
+          targetSelectId: config.target,
+          url: config.url,
+          paramName: config.param,
+          placeholder: config.placeholder,
+          transformItem: config.transform || (item => ({ value: item.id, label: item.name }))
+        });
+      } catch (e) {
+        console.warn(`⚠️ Помилка під час ініціалізації фільтра між ${config.source} → ${config.target}`, e);
+      }
+    });
+  }
 
   function setupDynamicFormsetFilter(config) {
     const {
@@ -104,51 +93,19 @@ $(document).ready(function () {
     });
   }
 
-  // 🔽 Статичні фільтри
-  setupDynamicFilter({
-    sourceSelectId: '#id_unit',
-    targetSelectId: '#id_oid',
-    url: '/oids/ajax/load-oids-for-unit/',
-    paramName: 'unit',
-    placeholder: { default: 'Оберіть ОІД', loading: 'Завантаження ОІД...' }
+  if (window.dynamicFilterConfig?.filters) {
+  window.dynamicFilterConfig.filters.forEach(cfg => {
+    setupDynamicFilter({
+      sourceSelectId: cfg.source,
+      targetSelectId: cfg.target,
+      url: cfg.url,
+      paramName: cfg.param,
+      placeholder: cfg.placeholder,
+      transformItem: cfg.transform
+    });
   });
+}
 
-  setupDynamicFilter({
-    sourceSelectId: '#id_units',
-    targetSelectId: '#id_oids',
-    url: '/oids/ajax/load-oids-for-units/',
-    paramName: 'units[]',
-    placeholder: { default: 'Оберіть ОІД', loading: 'Завантаження ОІД...' }
-  });
-
-  setupDynamicFilter({
-    sourceSelectId: '#id_oids',
-    targetSelectId: '#id_work_requests',
-    url: '/oids/ajax/get-requests-by-oids/',
-    paramName: 'oid_ids',
-    placeholder: { default: 'Оберіть заявку', loading: 'Завантаження заявок...' },
-    transformItem: item => ({ value: item.id, label: `${item.incoming_number} — ${item.incoming_date}` })
-  });
-
-  setupDynamicFilter({
-    sourceSelectId: '#id_oid',
-    targetSelectId: '#id_work_requests',
-    url: '/oids/ajax/get-requests-by-oid/',
-    paramName: 'oid_id',
-    placeholder: { default: 'Оберіть заявку', loading: 'Завантаження заявок...' },
-    transformItem: item => ({ value: item.id, label: `${item.incoming_number} — ${item.incoming_date}` })
-  });
-
-  // 🔁 Для formset'ів (всі OID у заявці)
-  setupDynamicFormsetFilter({
-    sourceSelectId: '#id_unit',
-    formSelector: '.document-form',
-    fieldPrefix: 'form',
-    fieldName: 'oid',
-    url: '/oids/ajax/load-oids-for-unit/',
-    paramName: 'unit',
-    placeholder: { default: 'Оберіть ОІД', loading: 'Оновлення ОІД...' }
-  });
 });
 
 

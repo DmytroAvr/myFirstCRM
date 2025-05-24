@@ -14,7 +14,7 @@
 
   <fieldset>
     <legend>Військові частини</legend>
-    <select id="id_units" name="units" class="select2" multiple>
+    <select id="id_units" name="units" class="select2">
       {% for unit in form.fields.units.queryset %}
         <option value="{{ unit.id }}">{{ unit.name }}</option>
       {% endfor %}
@@ -62,39 +62,6 @@
 
   <button type="submit">Відправити</button>
 </form>
-<!-- 
-<script>
-  // Після завантаження сторінки викликаємо налаштування
-  $(document).ready(function () {
-    attachOidAside(); // якщо є
-
-    setupDynamicFilter({
-      sourceSelectId: '#id_units',
-      targetSelectId: '#id_oids',
-      url: '/oids/ajax/get-oids-by-units/',
-      paramName: 'units[]',
-      placeholder: { default: 'Оберіть ОІД', loading: 'Завантаження ОІД...' }
-    });
-
-    setupDynamicFilter({
-      sourceSelectId: '#id_oids',
-      targetSelectId: '#id_related_request',
-      url: '/oids/ajax/get-requests-by-oids/',
-      paramName: 'oid_ids',
-      placeholder: { default: 'Оберіть заявку', loading: 'Завантаження заявок...' },
-      transformItem: item => ({ value: item.id, label: `${item.incoming_number} — ${item.incoming_date}` })
-    });
-
-    setupDynamicFilter({
-      sourceSelectId: '#id_oids',
-      targetSelectId: '#id_documents',
-      url: '/oids/ajax/load-documents-for-oids/',
-      paramName: 'oids[]',
-      placeholder: { default: 'Оберіть документи', loading: 'Завантаження документів...' },
-      transformItem: item => ({ value: item.id, label: `${item.document_type__name} / ${item.document_number}` })
-    });
-  });
-</script> -->
 
 
 {% block extra_js %}{% endblock %}
