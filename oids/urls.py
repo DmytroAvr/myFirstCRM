@@ -9,7 +9,10 @@ urlpatterns = [
     path('ajax/create/', views.create_oid_ajax, name='create_oid_ajax'),
     path('ajax/load-documents-for-oids/', views.load_documents_for_oids, name='ajax_load_documents_for_oids'),
     path('ajax/get-oid-status/', views.get_oid_status, name='ajax_get_oid_status'),
-    
+
+    path('ajax/get-work-request-details/', views.get_work_request_details, name='get_work_request_details'),
+    path('ajax/load-technical-tasks-for-oid/', views.load_technical_tasks_for_oid, name='load_technical_tasks_for_oid'),
+
 
     path('ajax/load-oids-for-units/', views.load_oids_for_units, name='ajax_load_oids_for_units'),
     path('ajax/load-oids-for-unit/', views.load_oids_for_unit, name='ajax_load_oids_for_unit'),

@@ -7,9 +7,21 @@
 {% block content %}
 <h2>Додати технічне завдання</h2>
 
+{% csrf_token %}
 <form id="my-form" method="post">
-  {% csrf_token %}
-  {{ form.unit.label_tag }} {{ form.unit }}<br>
+  <form method="GET"> <div class="form-group">
+    <label for="id_unit">Військова частина (Unit):</label>
+    <select name="unit" id="id_unit" class="form-control">
+        <option value="">---------</option>
+        {% for unit_obj in all_units %} <option value="{{ unit_obj.id }}">{{ unit_obj.name }}</option>
+        {% endfor %}
+    </select>
+</div>
+  
+  
+  
+  
+  <!-- {{ form.unit.label_tag }} {{ form.unit }}<br> -->
 
   {{ form.oid.label_tag }}
   <select name="oid" id="id_oid">

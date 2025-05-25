@@ -1,7 +1,7 @@
 # C:\myFirstCRM\oids\views.py
 from django.shortcuts import render, redirect, get_object_or_404
-from .models import Document, Unit, OID, OIDStatusChange, WorkRequest, DocumentType, WorkRequestItem, Trip, Person
-from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet, requestItemFormSet, requestItemForm, OidCreateForm, AttestationRegistrationForm, TripResultForUnitForm, TechnicalTaskForm, TechnicalTask, OIDStatusChangeForm, TripForm
+from .models import Document, Unit, OID, OIDStatusChange, WorkRequest, DocumentType, WorkRequestItem, Trip, Person, TechnicalTask
+from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet, requestItemFormSet, requestItemForm, OidCreateForm, AttestationRegistrationForm, TripResultForUnitForm, TechnicalTaskForm, OIDStatusChangeForm, TripForm
 from django.http import JsonResponse
 import traceback        #check
 from django.contrib import messages
@@ -84,7 +84,7 @@ def get_requests_by_oid(request):
         {
             'id': wr.id,
             'incoming_number': wr.incoming_number,
-            'incoming_date': wr.incoming_date.strftime('%Y-%m-%d')
+            'incoming_date': wr.incoming_date.strftime('%Y-%m-%d') if wr.incoming_date else None # Додав перевірку на None
         }
         for wr in work_requests
     ]
@@ -92,21 +92,53 @@ def get_requests_by_oid(request):
 
 # всі заявки на БАГАТо ОІД
 def get_requests_by_oids(request):
-    oid_ids = request.GET.get('oid_ids')
+    oid_ids_list = request.GET.getlist('oid_ids') # Використовуйте getlist для отримання всіх значень
 
-    if not oid_ids:
+    if not oid_ids_list:
         return JsonResponse([], safe=False)
 
-    ids = [int(i) for i in oid_ids.split(',') if i.isdigit()]
+    ids = [int(i) for i in oid_ids_list if i.isdigit()] # Тепер ids буде списком ID
     work_requests = WorkRequest.objects.filter(items__oid_id__in=ids).distinct()
     data = [
         {
             'id': wr.id,
             'incoming_number': wr.incoming_number,
-            'incoming_date': wr.incoming_date.strftime('%Y-%m-%d')
+            'incoming_date': wr.incoming_date.strftime('%Y-%m-%d') if wr.incoming_date else None # Додав перевірку на None
         }
         for wr in work_requests
     ]
+    return JsonResponse(data, safe=False)
+
+# додав gemeni
+def get_work_request_details(request):
+    request_id = request.GET.get('request_id')
+    if not request_id:
+        return JsonResponse({'error': 'Request ID is required'}, status=400)
+    try:
+        work_request = WorkRequest.objects.get(pk=request_id)
+        # Припускаємо, що WorkRequest пов'язаний з одним OID (наприклад, через ForeignKey)
+        # або ви обираєте перший OID, якщо WorkRequest має ManyToMany з OID.
+        oid_id = None
+        if hasattr(work_request, 'oid') and work_request.oid: # Якщо WorkRequest має ForeignKey до OID
+            oid_id = work_request.oid.id
+        elif work_request.oids.exists(): # Якщо WorkRequest має ManyToMany до OID
+            oid_id = work_request.oids.first().id # Візьмемо перший OID, якщо їх кілька
+
+        unit_id = None
+        if oid_id:
+            oid = OID.objects.get(pk=oid_id)
+            unit_id = oid.unit.id
+
+        return JsonResponse({'oid_id': oid_id, 'unit_id': unit_id})
+    except WorkRequest.DoesNotExist:
+        return JsonResponse({'error': 'Work Request not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+def load_technical_tasks_for_oid(request):
+    oid_id = request.GET.get('oid_id')
+    tasks = TechnicalTask.objects.filter(oid_id=oid_id).order_by('input_date')
+    data = [{'id': task.id, 'input_number': task.input_number, 'input_date': task.input_date.strftime('%Y-%m-%d')} for task in tasks]
     return JsonResponse(data, safe=False)
 
 

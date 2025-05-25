@@ -1,0 +1,101 @@
+
+
+<p>
+    Зразки HTML для фільтрів:
+    Ось приклади HTML-розмітки для select-полів, які використовуються у ваших фільтрах. ID та імена полів повинні відповідати тим, що використовуються у Django формах та FILTER_SELECTORS у filtering_dynamic.js.
+    Загальна структура для Django форми (приклад):
+</p>
+
+<form method="GET"> <div class="form-group">
+    <label for="id_unit">Військова частина (Unit):</label>
+    <select name="unit" id="id_unit" class="form-control">
+        <option value="">---------</option>
+        {% for unit_obj in all_units %} <option value="{{ unit_obj.id }}">{{ unit_obj.name }}</option>
+        {% endfor %}
+    </select>
+</div>
+
+<div class="form-group">
+    <label for="id_oid">ОІД (OID):</label>
+    <select name="oid" id="id_oid" class="form-control">
+        <option value="">Оберіть ОІД</option>
+        </select>
+</div>
+
+<div class="form-group">
+    <label for="id_units">Військові частини (Units MultiSelect):</label>
+    <select name="units" id="id_units" multiple class="form-control">
+        {% for unit_obj in all_units %}
+            <option value="{{ unit_obj.id }}">{{ unit_obj.name }}</option>
+        {% endfor %}
+    </select>
+</div>
+
+<div class="form-group">
+    <label for="id_oids">ОІД (OIDs MultiSelect):</label>
+    <select name="oids" id="id_oids" multiple class="form-control">
+        <option value="">Оберіть ОІД(и)</option>
+        </select>
+</div>
+
+<div class="form-group">
+    <label for="id_work_requests">Заявка на роботи (WorkRequest):</label>
+    <select name="work_requests" id="id_work_requests" class="form-control">
+        <option value="">Оберіть заявку</option>
+        </select>
+</div>
+
+<div class="form-group">
+    <label for="id_technical_tasks">Технічне завдання (TechnicalTask):</label>
+    <select name="technical_tasks" id="id_technical_tasks" class="form-control"> <option value="">Оберіть технічне завдання</option>
+        </select>
+</div>
+
+</form>
+
+<h2>
+    Для формсету (фільтр F5: Unit -> OID у формсеті):
+</h2>
+<p>
+Припустимо, у вас є формсет для DocumentForm, і кожен документ пов'язаний з OID.
+Файл filtering_dynamic.js використовує FILTER_SELECTORS.DOCUMENT_FORM_CLASS (за замовчуванням .document-form) та targetSelectBaseName: 'oid' для F5.
+Django рендерить поля формсету з префіксом, наприклад form-0-oid, form-1-oid.
+</p>
+<div class="form-group">
+    <label for="id_unit">Військова частина (Unit):</label>
+    <select name="unit" id="id_unit" class="form-control">
+        <option value="">---------</option>
+        {% for unit_obj in units_for_header_form %}
+            <option value="{{ unit_obj.id }}">{{ unit_obj.name }}</option>
+        {% endfor %}
+    </select>
+</div>
+
+<hr>
+
+<div id="formset"> {{ formset.management_form }}
+    {% for form_in_formset in formset %}
+        <div class="document-form" data-form-index="{{ forloop.counter0 }}"> <h4>Документ #{{ forloop.counter }}</h4>
+            {{ form_in_formset.id }} {% if form_in_formset.instance.pk %}
+                {{ form_in_formset.DELETE }}
+            {% endif %}
+
+            <div class="form-group">
+                <label for="id_{{ form_in_formset.prefix }}-oid">ОІД:</label>
+                {{ form_in_formset.oid }}
+                </div>
+            </div>
+        <hr>
+    {% endfor %}
+</div>
+<button type="button" id="add-form">Додати документ</button> ```
+
+<p>
+    
+**Важливо для HTML:**
+* Переконайтеся, що `id` ваших select-елементів точно відповідають тим, що вказані у `FILTER_SELECTORS` у вашому `filtering_dynamic.js` (`#id_unit`, `#id_oid`, `#id_units`, `#id_oids`, `#id_work_requests`, `#id_technical_tasks`).
+* Для полів у формсетах, які є цільовими для фільтрації (наприклад, `oid` у фільтрі F5), їх `name` та `id` будуть генеруватися Django з префіксом (наприклад, `form-0-oid`). Ваш JavaScript (`setupDynamicFilter`) вже має логіку для обробки `targetSelectBaseName: 'oid'` та `formPrefix`.
+* Для полів, що ініціалізуються за допомогою Select2, переконайтеся, що Select2 ініціалізується *після* того, як скрипт `filtering_dynamic.js` мав можливість підв'язати обробники подій `change`.
+
+Сподіваюся, це допоможе вам знайти та виправити проблему! Почніть з виправлення у `get_requests_by_oids` та ретельного тестування з консоллю розробника.
+</p>
