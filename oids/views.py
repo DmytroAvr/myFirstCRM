@@ -8,8 +8,8 @@ from datetime import timedelta
 # Імпортуємо наші моделі та форми
 from .models import (
     TerritorialManagement, Unit, OID, WorkRequest, WorkRequestItem,
-    Document, DocumentType, Trip, Person, OIDStatusChoices, WorkRequestStatusChoices,
-    WorkTypeChoices, TechnicalTask
+    Document, DocumentType, Trip, Person, OIDStatusChoices, OIDStatusChange, WorkRequestStatusChoices,
+    WorkTypeChoices, TechnicalTask, AttestationRegistration, 
 )
 from .forms import WorkRequestForm, TripForm, DocumentForm
 
