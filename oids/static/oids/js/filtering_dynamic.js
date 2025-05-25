@@ -141,114 +141,72 @@ function updateOidListsOnDashboard(data, selectors) {
 function setupDynamicFilter(config) {
     const {
         sourceSelectSelector,
-        targetSelectSelector,
-        url,
+        // targetSelectSelector, // Не використовується для dashboard config
         paramName,
-        placeholder,
-        transformItem,
+        // placeholder, // Плейсхолдери для списків обробляються окремо
         customListUpdater,
-        customListUpdaterSelectors,
         clearTargetsSelectors = []
     } = config;
 
     const $sourceSelect = $(sourceSelectSelector);
+
+    // URL тепер передається напряму в config з initializeDynamicFilters
+    const ajaxUrl = config.url; 
+
     if (!$sourceSelect.length) {
-        console.warn(`Вихідний елемент фільтра не знайдено: ${sourceSelectSelector}`);
+        // console.warn(`Вихідний елемент фільтра не знайдено: ${sourceSelectSelector}`);
+        return;
+    }
+    if (!ajaxUrl) { // Ця перевірка тепер має бути в initializeDynamicFilters
+        console.error(`КРИТИЧНО: URL не передано в setupDynamicFilter для ${sourceSelectSelector}`);
         return;
     }
 
-    // Функція для очищення залежних полів
-    function clearTargets() {
-        clearTargetsSelectors.forEach(selector => {
-            const $target = $(selector);
-            if ($target.is('select')) {
-                $target.empty()
-                       .append($('<option></option>').val('').prop('disabled', true).prop('selected', true).text((placeholder && placeholder.default) || 'Оберіть значення...'))
-                       .prop('disabled', true) // Деактивуємо, поки не завантажені нові дані
-                       .trigger('change');
-            } else { // Якщо це не select, а, наприклад, ul для списків ОІД
-                $target.html('<li>Оберіть значення вище.</li>');
-            }
-        });
-    }
-    
-    // Якщо URL не передано через data-атрибут, і він містить Django тег, попереджаємо.
-    let ajaxUrl = $sourceSelect.data('ajax-url') || url; // Пріоритет data-атрибуту
-    if (typeof ajaxUrl === 'string' && ajaxUrl.includes("{% url")) {
-        console.warn(`URL для AJAX (${ajaxUrl}) для ${sourceSelectSelector} містить Django тег і не буде оброблений правильно в статичному JS файлі. Передайте URL через data-ajax-url атрибут.`);
-        // Не будемо навішувати обробник, якщо URL некоректний
-        return;
-    }
+    // ... (решта коду setupDynamicFilter як у попередній відповіді, 
+    //      використовуючи 'ajaxUrl' замість '$sourceSelect.data('ajax-url')' або 'url' з config)
+    //      Наприклад, $.ajax({ url: ajaxUrl, ... });
+    //      Важливо: $sourceSelect.on('change', function () { ... });
+    //      І початковий тригер: if ($sourceSelect.val() && $sourceSelect.val() !== '') { ... $sourceSelect.trigger('change'); ... }
+}
 
 
-    $sourceSelect.on('change', function () {
-        const sourceValue = $(this).val();
-        const $loadingIndicator = $(FILTER_SELECTORS.OIDS_LOADING_INDICATOR); // Припускаємо, що є індикатор
-        const $selectedUnitDisplay = $(FILTER_SELECTORS.SELECTED_UNIT_DISPLAY_SPAN);
+function initializeDynamicFilters() {
+    console.log("Ініціалізація jQuery динамічних фільтрів (DEBUG URL)...");
 
-        clearTargets(); // Очищаємо всі залежні поля
-
-        if ($selectedUnitDisplay.length) {
-            const selectedUnitText = $(this).find('option:selected').text().replace(/ \(.*/, '').trim();
-             if (sourceValue) {
-                $selectedUnitDisplay.text(`(для ВЧ: ${selectedUnitText})`);
-            } else {
-                $selectedUnitDisplay.text('(Оберіть ВЧ для відображення ОІД)');
-            }
+    const filterConfigurations = [
+        {
+            sourceSelectSelector: FILTER_SELECTORS.UNIT_FILTER_MAIN_DASHBOARD, // '#id_unit_filter'
+            paramName: 'unit_id',
+            customListUpdater: updateOidListsOnDashboard,
+            // URL буде додано нижче з data-атрибута
+            clearTargetsSelectors: [
+                FILTER_SELECTORS.OIDS_CREATING_LIST_CONTAINER,
+                FILTER_SELECTORS.OIDS_ACTIVE_LIST_CONTAINER,
+                FILTER_SELECTORS.OIDS_CANCELLED_LIST_CONTAINER
+            ]
         }
+        // ... інші твої конфігурації для форм, якщо є ...
+    ];
 
+    filterConfigurations.forEach(config => {
+        const $sourceElement = $(config.sourceSelectSelector);
+        if ($sourceElement.length) {
+            const ajaxUrlFromDataAttr = $sourceElement.data('ajax-url');
+            console.log(`Для селектора "<span class="math-inline">\{config\.sourceSelectSelector\}", знайдено data\-ajax\-url\: "</span>{ajaxUrlFromDataAttr}"`);
 
-        if (!sourceValue || (Array.isArray(sourceValue) && sourceValue.length === 0)) {
-            if ($loadingIndicator.length) $loadingIndicator.hide();
-            // Якщо вихідне поле очищено, цільові вже очищені через clearTargets()
-            return;
-        }
+            if (!ajaxUrlFromDataAttr) {
+                console.warn(`!!! НЕ ЗНАЙДЕНО data-ajax-url для "${config.sourceSelectSelector}". Фільтр НЕ буде налаштовано для цього елемента.`);
+                return; // Пропускаємо цю конфігурацію, якщо URL не знайдено
+            }
 
-        if ($loadingIndicator.length) $loadingIndicator.show();
+            config.url = ajaxUrlFromDataAttr; // Встановлюємо URL в об'єкт конфігурації
 
-        const params = new URLSearchParams();
-        if (Array.isArray(sourceValue)) {
-            sourceValue.forEach(val => params.append(paramName, val));
+            console.log(`Налаштовую фільтр для: "<span class="math-inline">\{config\.sourceSelectSelector\}" з URL\: "</span>{config.url}"`);
+            setupDynamicFilter(config); // Передаємо оновлений config
         } else {
-            params.append(paramName, sourceValue);
+            // console.warn(`Вихідний елемент фільтра не знайдено: ${config.sourceSelectSelector}`);
         }
-        
-        const currentAjaxUrl = $sourceSelect.data('ajax-url') || url; // Отримуємо URL з data-атрибута або конфігурації
-
-        $.getJSON(currentAjaxUrl + '?' + params.toString(), function (data) {
-            if (customListUpdater && typeof customListUpdater === 'function') {
-                customListUpdater(data, customListUpdaterSelectors || FILTER_SELECTORS);
-            } else if (targetSelectSelector) {
-                const $target = $(targetSelectSelector);
-                if ($target.length) {
-                    loadSingleSelectOptions($target, sourceValue, { url: currentAjaxUrl, paramName, placeholder, transformItem });
-                } else {
-                    console.warn(`Цільовий select елемент не знайдено: ${targetSelectSelector}`);
-                }
-            }
-        }).fail(function() {
-            console.error(`Помилка завантаження даних з ${currentAjaxUrl}`);
-            if (targetSelectSelector) {
-                 $(targetSelectSelector).prop('disabled', false).empty()
-                    .append($('<option></option>').val('').text((placeholder && placeholder.error) || 'Помилка завантаження.'))
-                    .trigger('change');
-            } else if (customListUpdaterSelectors) { // Очистка для кастомних списків при помилці
-                $(customListUpdaterSelectors.OIDS_CREATING_LIST_CONTAINER).html('<li>Помилка завантаження.</li>');
-                $(customListUpdaterSelectors.OIDS_ACTIVE_LIST_CONTAINER).html('<li>Помилка завантаження.</li>');
-                $(customListUpdaterSelectors.OIDS_CANCELLED_LIST_CONTAINER).html('<li>Помилка завантаження.</li>');
-            }
-        }).always(function() {
-            if ($loadingIndicator.length) $loadingIndicator.hide();
-        });
     });
-
-    // Тригернути 'change' при завантаженні сторінки, якщо є початкове значення
-    if ($sourceSelect.val() && $sourceSelect.val() !== '') {
-         // Невелика затримка, щоб Select2 встиг ініціалізуватися, якщо він є
-        setTimeout(function() {
-            $sourceSelect.trigger('change');
-        }, 100);
-    }
 }
 
 

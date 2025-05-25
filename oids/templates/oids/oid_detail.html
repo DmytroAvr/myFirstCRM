@@ -5,14 +5,15 @@
 {% block page_title %}Деталі ОІД: {{ oid.cipher }} ({{ oid.full_name|default:"Без назви" }}){% endblock %}
 
 {% block content %}
-<p><a href="{% url 'main_dashboard' %}">← Повернутися до панелі керування</a></p>
+<p><a href="{% url 'oids:main_dashboard' %}?unit={{ oid.unit.id }}">← Повернутися до списку ОІД частини {{ oid.unit.code }}</a></p>
+<p><a href="{% url 'oids:main_dashboard' %}">← Повернутися на головну панель</a></p>
 
 <h2>Основна інформація про ОІД</h2>
 <ul>
     <li><strong>Шифр:</strong> {{ oid.cipher }}</li>
     <li><strong>Повна назва:</strong> {{ oid.full_name|default:"Не вказано" }}</li>
     <li><strong>Тип ОІД:</strong> {{ oid.get_oid_type_display }}</li>
-    <li><strong>Військова частина:</strong> <a href="{% url 'main_dashboard' %}?unit={{ oid.unit.id }}">{{ oid.unit.code }} - {{ oid.unit.name|default:oid.unit.city }}</a></li>
+    <li><strong>Військова частина:</strong> <a href="{% url 'oids:main_dashboard' %}?unit={{ oid.unit.id }}">{{ oid.unit.code }} - {{ oid.unit.name|default:oid.unit.city }}</a></li>
     <li><strong>Територіальне управління:</strong> {{ oid.unit.territorial_management.name|default:"Не вказано" }}</li>
     <li><strong>Приміщення:</strong> {{ oid.room }}</li>
     <li><strong>Поточний стан:</strong> {{ oid.get_status_display }}</li>
@@ -24,6 +25,9 @@
     {% if last_ik_expiration %}
         <li><strong>ІК дійсний до:</strong> {{ last_ik_expiration|date:"d.m.Y" }}</li>
     {% endif %}
+    {% if last_prescription_expiration %}
+        <li><strong>Припис дійсний до:</strong> {{ last_prescription_expiration|date:"d.m.Y" }}</li>
+    {% endif %}
 </ul>
 
 <h3>Історія змін статусу</h3>
@@ -31,32 +35,23 @@
     <table>
         <thead>
             <tr>
-                <th>Дата зміни</th>
-                <th>Попередній статус</th>
-                <th>Новий статус</th>
-                <th>Причина</th>
-                <th>Хто змінив</th>
-                <th>Документ-ініціатор</th>
+                <th>Дата зміни</th><th>Попередній статус</th><th>Новий статус</th><th>Причина</th><th>Хто змінив</th><th>Документ-ініціатор</th>
             </tr>
         </thead>
         <tbody>
             {% for change in status_changes %}
-                <tr>
-                    <td>{{ change.changed_at|date:"d.m.Y H:i" }}</td>
-                    <td>{{ change.old_status }}</td>
-                    <td>{{ change.new_status }}</td>
-                    <td>{{ change.reason|default:"-" }}</td>
-                    <td>{{ change.changed_by.full_name|default:"Невідомо" }}</td>
-                    <td>
-                        {% if change.initiating_document %}
-                            <a href="{% url 'oid_detail' oid.id %}#doc-{{ change.initiating_document.id }}">
-                                {{ change.initiating_document.document_type.name }} №{{ change.initiating_document.document_number }}
-                            </a>
-                        {% else %}
-                            -
-                        {% endif %}
-                    </td>
-                </tr>
+            <tr>
+                <td>{{ change.changed_at|date:"d.m.Y H:i" }}</td>
+                <td>{{ change.old_status }}</td>
+                <td>{{ change.new_status }}</td>
+                <td>{{ change.reason|default:"-" }}</td>
+                <td>{{ change.changed_by.full_name|default:"Невідомо" }}</td>
+                <td>
+                    {% if change.initiating_document %}
+                        Док. №{{ change.initiating_document.document_number }} ({{change.initiating_document.document_type.name}})
+                    {% else %}-{% endif %}
+                </td>
+            </tr>
             {% endfor %}
         </tbody>
     </table>
@@ -64,202 +59,55 @@
     <p>Історія змін статусу відсутня.</p>
 {% endif %}
 
-<h3>Пов'язані заявки</h3>
+<h3>Пов'язані заявки на проведення робіт</h3>
 {% if work_requests_for_oid %}
     <table>
-        <thead>
-            <tr>
-                <th>Вхідний номер заявки</th>
-                <th>Дата заявки</th>
-                <th>Статус заявки</th>
-                <th>ОІД в заявці (тип роботи, статус)</th>
-            </tr>
-        </thead>
+        <thead><tr><th>Номер заявки</th><th>Дата заявки</th><th>Статус</th><th>Тип робіт в заявці для цього ОІД</th></tr></thead>
         <tbody>
-            {% for request_obj in work_requests_for_oid %}
-                <tr>
-                    <td>{{ request_obj.incoming_number }}</td>
-                    <td>{{ request_obj.incoming_date|date:"d.m.Y" }}</td>
-                    <td>{{ request_obj.get_status_display }}</td>
-                    <td>
-                        <ul>
-                        {% for item in request_obj.items.all %}
-                            {% if item.oid == oid %} {# Перевіряємо, чи це елемент для поточного ОІД #}
-                                <li>{{ item.oid.cipher }} ({{ item.get_work_type_display }}, {{ item.get_status_display }})</li>
-                            {% endif %}
-                        {% endfor %}
-                        </ul>
-                    </td>
-                </tr>
-            {% endfor %}
+        {% for req in work_requests_for_oid %}
+            <tr>
+                <td>{{ req.incoming_number }}</td>
+                <td>{{ req.incoming_date|date:"d.m.Y" }}</td>
+                <td>{{ req.get_status_display }}</td>
+                <td>
+                    <ul>
+                    {% for item in req.items.all %}
+                        {% if item.oid_id == oid.id %} {# Показуємо тільки тип роботи для поточного ОІД #}
+                            <li>{{ item.get_work_type_display }} (статус по ОІД: {{item.get_status_display}})</li>
+                        {% endif %}
+                    {% endfor %}
+                    </ul>
+                </td>
+            </tr>
+        {% endfor %}
         </tbody>
     </table>
 {% else %}
-    <p>Заявки на проведення робіт для цього ОІД відсутні.</p>
-{% endif %}
-
-<h3>Технічні завдання</h3>
-{% if technical_tasks %}
-    <table>
-        <thead>
-            <tr>
-                <th>Вхідний номер</th>
-                <th>Вхідна дата</th>
-                <th>Результат розгляду</th>
-                <th>Хто ознайомився</th>
-                <th>Примітки</th>
-                <th>Дата додання</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for tt in technical_tasks %}
-                <tr>
-                    <td>{{ tt.input_number }}</td>
-                    <td>{{ tt.input_date|date:"d.m.Y" }}</td>
-                    <td>{{ tt.get_review_result_display }}</td>
-                    <td>{{ tt.reviewed_by.full_name|default:"-" }}</td>
-                    <td>{{ tt.note|default:"-" }}</td>
-                    <td>{{ tt.created_at|date:"d.m.Y H:i" }}</td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-{% else %}
-    <p>Технічні завдання для цього ОІД відсутні.</p>
+    <p>Заявки відсутні.</p>
 {% endif %}
 
 <h3>Опрацьовані документи</h3>
 {% if documents %}
     <table>
-        <thead>
-            <tr>
-                <th>Тип документа</th>
-                <th>Номер</th>
-                <th>Дата опрацювання</th>
-                <th>Дата робіт</th>
-                <th>Термін дії</th>
-                <th>Автор</th>
-                <th>Заявка</th>
-                <th>Примітки</th>
-            </tr>
-        </thead>
+        <thead><tr><th>Тип</th><th>Номер</th><th>Дата опрац.</th><th>Дата робіт</th><th>Термін дії</th><th>Автор</th><th>Примітки</th></tr></thead>
         <tbody>
-            {% for doc in documents %}
-                <tr id="doc-{{ doc.id }}">
-                    <td>{{ doc.document_type.name }}</td>
-                    <td>{{ doc.document_number }}</td>
-                    <td>{{ doc.process_date|date:"d.m.Y" }}</td>
-                    <td>{{ doc.work_date|date:"d.m.Y" }}</td>
-                    <td>
-                        {% if doc.expiration_date %}
-                            {{ doc.expiration_date|date:"d.m.Y" }}
-                        {% else %}
-                            Безстроково
-                        {% endif %}
-                    </td>
-                    <td>{{ doc.author.full_name|default:"-" }}</td>
-                    <td>
-                        {% if doc.work_request_item %}
-                            <a href="{% url 'oid_detail' oid.id %}#req-{{ doc.work_request_item.request.id }}">
-                                Заявка {{ doc.work_request_item.request.incoming_number }}
-                            </a>
-                        {% else %}
-                            -
-                        {% endif %}
-                    </td>
-                    <td>{{ doc.note|default:"-" }}</td>
-                </tr>
-            {% endfor %}
+        {% for doc in documents %}
+            <tr id="doc-{{ doc.id }}">
+                <td>{{ doc.document_type.name }}</td>
+                <td>{{ doc.document_number }}</td>
+                <td>{{ doc.process_date|date:"d.m.Y" }}</td>
+                <td>{{ doc.work_date|date:"d.m.Y" }}</td>
+                <td>{% if doc.expiration_date %}{{ doc.expiration_date|date:"d.m.Y" }}{% else %}Безстроково{% endif %}</td>
+                <td>{{ doc.author.full_name|default:"-" }}</td>
+                <td>{{ doc.note|default:"-" }}</td>
+            </tr>
+        {% endfor %}
         </tbody>
     </table>
 {% else %}
-    <p>Опрацьовані документи для цього ОІД відсутні.</p>
+    <p>Документи відсутні.</p>
 {% endif %}
 
-<h3>Історія відряджень</h3>
-{% if trips_for_oid %}
-    <table>
-        <thead>
-            <tr>
-                <th>Період</th>
-                <th>Військові частини</th>
-                <th>Особи у відрядженні</th>
-                <th>Мета</th>
-                <th>Пов'язані заявки</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for trip in trips_for_oid %}
-                <tr>
-                    <td>{{ trip.start_date|date:"d.m.Y" }} - {{ trip.end_date|date:"d.m.Y" }}</td>
-                    <td>
-                        <ul>
-                            {% for unit in trip.units.all %}
-                                <li>{{ unit.code }}</li>
-                            {% endfor %}
-                        </ul>
-                    </td>
-                    <td>
-                        <ul>
-                            {% for person in trip.persons.all %}
-                                <li>{{ person.full_name }}</li>
-                            {% endfor %}
-                        </ul>
-                    </td>
-                    <td>{{ trip.purpose|default:"-" }}</td>
-                    <td>
-                        <ul>
-                            {% for req in trip.work_requests.all %}
-                                <li>Заявка {{ req.incoming_number }}</li>
-                            {% endfor %}
-                        </ul>
-                    </td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-{% else %}
-    <p>Відрядження, що стосуються цього ОІД, відсутні.</p>
-{% endif %}
-
-<h3>Реєстрації актів атестації</h3>
-{% if attestation_registrations %}
-    <table>
-        <thead>
-            <tr>
-                <th>Дата відправки на реєстрацію</th>
-                <th>Реєстраційний номер листа</th>
-                <th>Акти атестації (документи)</th>
-                <th>Відповідь ДССЗЗІ</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for reg in attestation_registrations %}
-                <tr>
-                    <td>{{ reg.process_date|date:"d.m.Y" }}</td>
-                    <td>{{ reg.registration_number|default:"-" }}</td>
-                    <td>
-                        <ul>
-                            {% for item in reg.attestation_items.all %}
-                                {% if item.oid == oid %} {# Перевіряємо, чи це елемент для поточного ОІД #}
-                                    <li>Акт: {{ item.document.document_number }} (від {{ item.document.work_date|date:"d.m.Y" }})</li>
-                                {% endif %}
-                            {% endfor %}
-                        </ul>
-                    </td>
-                    <td>
-                        {% if reg.response %}
-                            Зареєстровано №{{ reg.response.registered_number }} від {{ reg.response.registered_date|date:"d.m.Y" }}
-                        {% else %}
-                            Очікується
-                        {% endif %}
-                    </td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-{% else %}
-    <p>Реєстрації актів атестації для цього ОІД відсутні.</p>
-{% endif %}
+{# Додай тут секції для TechnicalTask, Trip, AttestationRegistration, TripResultForUnit аналогічно #}
 
 {% endblock %}

@@ -22,5 +22,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('oids/', include('oids.urls')),  # Все що стосується oids – тут
     path('select2/', include('django_select2.urls')),
-    path('', main_dashboard, name='home'),  # ⬅ Головна сторінка
+    # path('', main_dashboard, name='home'),  # ⬅ Головна сторінка
+    # Якщо головна сторінка має бути коренем сайту:
+    path('', include('oids.urls')), # Тоді в oids.urls.py шлях для main_dashboard буде ''
 ]
+

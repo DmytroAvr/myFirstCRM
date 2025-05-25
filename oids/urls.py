@@ -10,7 +10,7 @@ urlpatterns = [
     
     # AJAX URLs
     path('ajax/load-oids-for-unit/', views.ajax_load_oids_for_unit, name='ajax_load_oids_for_unit'),
-    path('ajax/load-oids-categorized/', views.ajax_load_oids_for_unit_categorized, name='ajax_load_oids_categorized'), # Новий URL
+    path('ajax/load-oids-categorized/', views.ajax_load_oids_for_unit_categorized, name='ajax_load_oids_categorized'),
     
     # URLs для форм (потрібно буде створити відповідні views та форми)
     # path('request/add/', views.add_work_request_view, name='add_work_request_view_name'),

@@ -6,7 +6,12 @@
     <meta charset="UTF-8">
     <title>{% block title %}Управління ОІД{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'oids/css/style.css' %}"> 
-    <link rel="stylesheet" href="{% static 'oids/css/select2.min.css' %}"> 
+    <link rel="stylesheet" href="{% static 'oids/css/select2.min.css' %}">
+    {% comment %}
+        Це коментар у шаблоні Django
+    {% endcomment %}
+ 
+    {# <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>  #}
     <script src="{% static 'oids/js/jquery-3.7.1.min.js' %}"></script>
     <script src="{% static 'oids/js/select2.min.js' %}"></script>
     <script src="{% static 'oids/js/select2-uk.min.js' %}"></script>
@@ -44,6 +49,28 @@
     <script src="{% static 'oids/js/select2-init.js' %}"></script>
     <script src="{% static 'oids/js/filtering_dynamic.js' %}"></script>
     <script src="{% static 'oids/js/main.js' %}"></script> {# Якщо є головний JS файл #}
+    <script>
+        $(document).ready(function() {
+    console.log("Document ready. Initializing Select2...");
+    if (typeof initSelect2Fields === 'function') {
+        initSelect2Fields(document); // Ініціалізуємо всі Select2 на сторінці
+        console.log("Select2 fields should be initialized now.");
+    } else {
+        console.warn("Function initSelect2Fields from select2-init.js not found.");
+    }
+    
+    console.log("Initializing dynamic filters...");
+    if (typeof initializeDynamicFilters === 'function') {
+        // Можливо, додати невелику затримку, щоб Select2 гарантовано завершив усі свої маніпуляції з DOM
+        setTimeout(function() {
+            initializeDynamicFilters();
+            console.log("Dynamic filters initialized.");
+        }, 100); // 100мс зазвичай достатньо
+    } else {
+        console.warn("Function initializeDynamicFilters from filtering_dynamic.js not found.");
+    }
+});
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>
