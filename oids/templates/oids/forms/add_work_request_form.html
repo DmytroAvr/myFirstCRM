@@ -1,0 +1,17 @@
+{% extends "oids/base.html" %}
+
+{% block title %}Додати заявку на проведення робіт{% endblock %}
+
+{% block page_title %}Додати заявку на проведення робіт{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'main_dashboard' %}">← Повернутися до панелі керування</a></p>
+
+<div class="form-container">
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }} {# Виведе форму як параграфи, можна налаштувати вивід вручну #}
+        <button type="submit">Зберегти заявку</button>
+    </form>
+</div>
+{% endblock %}

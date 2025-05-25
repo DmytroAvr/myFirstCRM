@@ -1,0 +1,111 @@
+{% extends "oids/base.html" %}
+
+{% block title %}Головна панель керування ОІД{% endblock %}
+
+{% block content %}
+<div class="dashboard-columns">
+    <div class="column">
+        <h3>Територіальні управління</h3>
+        <ul>
+            <li>
+                <a href="{% url 'main_dashboard' %}" {% if not selected_tm_id %}style="font-weight: bold; color: blue;"{% endif %}>
+                    Всі ТУ
+                </a>
+            </li>
+            {% for tm in territorial_managements %}
+                <li>
+                    <a href="{% url 'main_dashboard' %}?tm={{ tm.id }}" {% if tm.id == selected_tm_id %}style="font-weight: bold; color: blue;"{% endif %}>
+                        {{ tm.name }}
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="column">
+        <h3>Військові частини {% if selected_tm_id %}(для ТУ){% endif %}</h3>
+        <ul>
+            <li>
+                <a href="{% url 'main_dashboard' %}{% if selected_tm_id %}?tm={{ selected_tm_id }}{% endif %}" {% if not selected_unit_id %}style="font-weight: bold; color: blue;"{% endif %}>
+                    Всі ВЧ {% if selected_tm_id %}(цього ТУ){% endif %}
+                </a>
+            </li>
+            {% for unit in units %}
+                <li>
+                    <a href="{% url 'main_dashboard' %}?unit={{ unit.id }}{% if selected_tm_id %}&tm={{ selected_tm_id }}{% endif %}" {% if unit.id == selected_unit_id %}style="font-weight: bold; color: blue;"{% endif %}>
+                        {{ unit.code }} - {{ unit.name|default:unit.city }}
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="column">
+        <h3>ОІД {% if selected_unit_id %}(у ВЧ: {{ units|get_item:selected_unit_id }}){% elif selected_tm_id %}(у ТУ: {{ territorial_managements|get_item:selected_tm_id }}){% endif %}</h3>
+        
+        <div class="oid-list-section">
+            <h4>ОІД, що створюються (наявна заявка)</h4>
+            <ul>
+                {% for oid in oids_creating %}
+                    <li>
+                        <a href="{% url 'oid_detail' oid.id %}">
+                            {{ oid.cipher }} - {{ oid.full_name|default:"Без назви" }} ({{ oid.get_oid_type_display }})
+                        </a>
+                        <span>({{ oid.get_status_display }})</span>
+                    </li>
+                {% empty %}
+                    <li>Немає ОІД у стані створення.</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="oid-list-section">
+            <h4>Діючі ОІД</h4>
+            <ul>
+                {% for oid in oids_active %}
+                    <li class="oid-item">
+                        <a href="{% url 'oid_detail' oid.id %}">
+                            {{ oid.cipher }} - {{ oid.full_name|default:"Без назви" }} ({{ oid.get_oid_type_display }})
+                        </a>
+                        {% if oid.ik_expiration_date %}
+                            <span class="expiration">ІК до: {{ oid.ik_expiration_date|date:"d.m.Y" }}</span>
+                        {% else %}
+                            <span class="expiration">ІК не визначено</span>
+                        {% endif %}
+                    </li>
+                {% empty %}
+                    <li>Немає діючих ОІД.</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="oid-list-section">
+            <h4>Скасовані/Припинені ОІД</h4>
+            <ul>
+                {% for oid in oids_cancelled %}
+                    <li>
+                        <a href="{% url 'oid_detail' oid.id %}">
+                            {{ oid.cipher }} - {{ oid.full_name|default:"Без назви" }} ({{ oid.get_oid_type_display }})
+                        </a>
+                        <span>({{ oid.get_status_display }})</span>
+                    </li>
+                {% empty %}
+                    <li>Немає скасованих ОІД.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+
+{# Допоміжний фільтр для шаблону, щоб отримати об'єкт по ID #}
+{# Це не оптимально для великих наборів даних, але для демонстрації підійде #}
+{% comment %}
+    Це фільтр, який можна використовувати в шаблоні, щоб отримати об'єкт з колекції за ID.
+    Його потрібно зареєструвати як кастомний тег/фільтр у Django.
+    Для production-систем краще передавати вже відфільтровані об'єкти з view.
+{% endcomment %}
+{% if selected_unit_id or selected_tm_id %}
+    {% load my_custom_filters %} {# Припустимо, ви створили `templatetags/my_custom_filters.py` #}
+{% endif %}
+
+{% endblock %}

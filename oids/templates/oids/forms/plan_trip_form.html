@@ -1,0 +1,19 @@
+{% extends "oids/base.html" %}
+
+{% block title %}Запланувати відрядження{% endblock %}
+
+{% block page_title %}Запланувати відрядження{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'main_dashboard' %}">← Повернутися до панелі керування</a></p>
+
+<div class="form-container">
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Запланувати відрядження</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_css %}

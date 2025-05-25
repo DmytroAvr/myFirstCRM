@@ -1,0 +1,56 @@
+
+{% extends "oids/base.html" %}
+
+{% block title %}Додати опрацювання документів{% endblock %}
+
+{% block page_title %}Додати опрацювання документів{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'main_dashboard' %}">← Повернутися до панелі керування</a></p>
+
+<div class="form-container">
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Зберегти документ</button>
+    </form>
+</div>
+
+{# Додавання JavaScript для динамічного заповнення поля document_type_id #}
+{# Це базовий приклад, який може бути розширений для фільтрації за OID_Type та Work_Type #}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const oidSelect = document.getElementById('id_oid');
+    const documentTypeSelect = document.getElementById('id_document_type_id');
+    const workRequestItemSelect = document.getElementById('id_work_request_item');
+
+    function filterWorkRequestItems(oidId) {
+        if (!oidId) {
+            workRequestItemSelect.innerHTML = '<option value="">---------</option>';
+            return;
+        }
+
+        // Тут потрібно зробити AJAX запит до Django View,
+        // який поверне WorkRequestItem для обраного OID
+        // Для простоти, наразі ми не фільтруємо, але в реальному проекті це критично
+        // Приклад: fetch(`/api/work-request-items/?oid=${oidId}`)
+        //           .then(response => response.json())
+        //           .then(data => { /* заповнити workRequestItemSelect */ });
+    }
+
+    // Початкове завантаження для WorkRequestItems
+    if (oidSelect.value) {
+        filterWorkRequestItems(oidSelect.value);
+    }
+
+    oidSelect.addEventListener('change', function() {
+        filterWorkRequestItems(this.value);
+    });
+
+    // Для динамічного заповнення document_type_id в залежності від OID та WorkRequestItem
+    // Потребує складнішої логіки AJAX або завантаження всіх варіантів на сторінку
+    // та приховування/показування за допомогою JS.
+    // Наразі form.as_p виводить всі варіанти.
+});
+</script>
+{% endblock %}
