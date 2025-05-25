@@ -1,161 +1,190 @@
 # oids/views.py
-from django.shortcuts import render, get_object_or_404, redirect
-from django.db.models import Q, Max
-from django.urls import reverse
-from django.utils import timezone
-from datetime import timedelta
-
-# Імпортуємо наші моделі та форми
-from .models import (
-    TerritorialManagement, Unit, OID, WorkRequest, WorkRequestItem,
-    Document, DocumentType, Trip, Person, OIDStatusChoices, OIDStatusChange, WorkRequestStatusChoices,
-    WorkTypeChoices, TechnicalTask, AttestationRegistration, 
+from django.shortcuts import render, get_object_or_404
+from django.http import JsonResponse
+from .models import (Unit, OID, TerritorialManagement, OIDStatusChoices, WorkTypeChoices, 
+    Document, DocumentType, WorkRequest, WorkRequestItem, Trip
 )
-from .forms import WorkRequestForm, TripForm, DocumentForm
+from .forms import (WorkRequestForm, DocumentForm, TripForm
+)
+# ... (інші імпорти, якщо потрібні)
+# ... (TerritorialManagement, Unit, OID, 
+    # Document, DocumentType, Trip, Person, OIDStatusChoices,
+    # WorkRequestStatusChoices, WorkTypeChoices, TechnicalTask,
+    # AttestationRegistration, AttestationItem, AttestationResponse, TripResultForUnit)
 
-# --- Утиліти та Допоміжні Функції (можна винести в окремий файл, наприклад, utils.py) ---
 
-def get_last_ik_expiration_date(oid):
-    """
-    Повертає дату завершення дії останнього Висновку ІК для ОІД.
-    """
+def ajax_load_oids_for_unit(request):
+    unit_id = request.GET.get('unit') # Назва параметра з твого JS
+    oids_data = []
+    if unit_id:
+        # Фільтруй ОІД за необхідними статусами для випадаючого списку
+        oids = OID.objects.filter(unit__id=unit_id).order_by('cipher') 
+        for oid in oids:
+            # Формуй дані так, як очікує твій transformItem у JS
+            oids_data.append({
+                'id': oid.id, 
+                'name': f"{oid.cipher} ({oid.get_oid_type_display()}) - {oid.full_name or oid.unit.city}"
+            })
+    return JsonResponse(list(oids_data), safe=False) # safe=False для списків
+
+# Твоя допоміжна функція
+def get_last_document_expiration_date(oid, document_name_keyword, work_type_choice=None):
     try:
-        ik_conclusion_doc_type = DocumentType.objects.get(
-            name__icontains='Висновок',
-            work_type=WorkTypeChoices.IK
-        )
-        last_ik_document = Document.objects.filter(
+        doc_type_filters = Q(name__icontains=document_name_keyword)
+        if work_type_choice:
+            doc_type_filters &= Q(work_type=work_type_choice)
+        relevant_doc_type = DocumentType.objects.filter(doc_type_filters).first()
+        if not relevant_doc_type:
+            return None
+        last_document = Document.objects.filter(
             oid=oid,
-            document_type=ik_conclusion_doc_type,
+            document_type=relevant_doc_type,
             expiration_date__isnull=False
-        ).order_by('-work_date').first()
-
-        return last_ik_document.expiration_date if last_ik_document else None
-    except DocumentType.DoesNotExist:
-        return None
+        ).order_by('-work_date', '-process_date').first()
+        return last_document.expiration_date if last_document else None
     except Exception as e:
-        print(f"Помилка при отриманні терміну дії ІК для ОІД {oid.cipher}: {e}")
+        print(f"Помилка get_last_document_expiration_date для ОІД {oid.cipher if oid else 'N/A'}: {e}")
         return None
-
-# --- Представлення (Views) ---
 
 def main_dashboard(request):
-    """
-    Головна сторінка з трьома стовпчиками та кнопками керування.
-    """
-    # Панель керування зверху (посилання на форми)
-    add_request_url = reverse('add_work_request')
-    plan_trip_url = reverse('plan_trip')
-    add_document_processing_url = reverse('add_document_processing')
+    # Кнопки керування
+    add_request_url = '#' # reverse('add_work_request_view_name')
+    plan_trip_url = '#'   # reverse('plan_trip_view_name')
+    add_document_processing_url = '#' # reverse('add_document_processing_view_name')
 
-    # 1. Колонка: Територіальні управління
-    territorial_managements = TerritorialManagement.objects.all().order_by('name')
+    # 1. Стовпчик: Військові частини
+    all_units = Unit.objects.select_related('territorial_management').order_by('name')
     
-    selected_tm_id = request.GET.get('tm')
     selected_unit_id = request.GET.get('unit')
+    selected_unit = None
 
-    # 2. Колонка: Військові частини
-    units = Unit.objects.all().order_by('name')
-    if selected_tm_id:
-        units = units.filter(territorial_management__id=selected_tm_id)
-    
-    # 3. Колонка: ОІД
-    oids_creating = OID.objects.none()
-    oids_active = OID.objects.none()
-    oids_cancelled = OID.objects.none()
-
-    current_oids_queryset = OID.objects.all()
+    oids_creating_list = []
+    oids_active_list = []
+    oids_cancelled_list = []
 
     if selected_unit_id:
-        current_oids_queryset = current_oids_queryset.filter(unit__id=selected_unit_id)
-    elif selected_tm_id:
-        current_oids_queryset = current_oids_queryset.filter(unit__territorial_management__id=selected_tm_id)
-
-    # Фільтруємо ОІД за статусами
-    oids_creating = current_oids_queryset.filter(
-        status__in=[
-            OIDStatusChoices.NEW,
-            OIDStatusChoices.RECEIVED_REQUEST,
-            OIDStatusChoices.RECEIVED_TZ
-        ]
-    ).select_related('unit').prefetch_related('work_request_items__request') # Оптимізація запитів
-
-    oids_active = current_oids_queryset.filter(status=OIDStatusChoices.ACTIVE).select_related('unit')
+        try:
+            selected_unit = Unit.objects.select_related('territorial_management').get(pk=selected_unit_id)
+            # Фільтруємо ОІД для обраної ВЧ
+            oids_for_selected_unit = OID.objects.filter(unit=selected_unit).select_related('unit').order_by('cipher')
+            
+            for oid_instance in oids_for_selected_unit:
+                if oid_instance.status in [OIDStatusChoices.NEW, OIDStatusChoices.RECEIVED_REQUEST, OIDStatusChoices.RECEIVED_TZ]:
+                    oids_creating_list.append(oid_instance)
+                elif oid_instance.status == OIDStatusChoices.ACTIVE:
+                    oid_instance.ik_expiration_date = get_last_document_expiration_date(oid_instance, 'Висновок', WorkTypeChoices.IK)
+                    oid_instance.attestation_expiration_date = get_last_document_expiration_date(oid_instance, 'Акт атестації', WorkTypeChoices.ATTESTATION)
+                    oid_instance.prescription_expiration_date = get_last_document_expiration_date(oid_instance, 'Припис')
+                    oids_active_list.append(oid_instance)
+                elif oid_instance.status in [OIDStatusChoices.CANCELED, OIDStatusChoices.TERMINATED]:
+                    oids_cancelled_list.append(oid_instance)
+        except Unit.DoesNotExist:
+            selected_unit_id = None # Скидаємо, якщо ВЧ не знайдено
+            # Можна додати повідомлення для користувача
     
-    oids_cancelled = current_oids_queryset.filter(
-        status__in=[
-            OIDStatusChoices.CANCELED,
-            OIDStatusChoices.TERMINATED
-        ]
-    ).select_related('unit')
-
-    # Для діючих ОІД потрібно отримати термін дії ІК
-    for oid in oids_active:
-        oid.ik_expiration_date = get_last_ik_expiration_date(oid)
-
     context = {
         'add_request_url': add_request_url,
         'plan_trip_url': plan_trip_url,
         'add_document_processing_url': add_document_processing_url,
-
-        'territorial_managements': territorial_managements,
-        'selected_tm_id': int(selected_tm_id) if selected_tm_id else None,
-        
-        'units': units,
+        'all_units': all_units, # Для випадаючого списку ВЧ
         'selected_unit_id': int(selected_unit_id) if selected_unit_id else None,
-        
-        'oids_creating': oids_creating,
-        'oids_active': oids_active,
-        'oids_cancelled': oids_cancelled,
+        'selected_unit_object': selected_unit, # Передаємо об'єкт обраної ВЧ
+        'oids_creating': oids_creating_list,
+        'oids_active': oids_active_list,
+        'oids_cancelled': oids_cancelled_list,
     }
-
     return render(request, 'oids/main_dashboard.html', context)
 
+# --- AJAX Views (потрібно створити ці view для роботи filtering_dynamic.js) ---
+
+def ajax_load_oids_for_unit(request):
+    unit_id = request.GET.get('unit_id') # Або 'unit', як у твоєму JS F1
+    oids_data = []
+    if unit_id:
+        # Фільтруємо ОІД за статусом "активний" або "створюється",
+        # щоб користувач не міг обрати вже скасований ОІД для нової роботи, наприклад.
+        # Або ж повертати всі, а логіку вибору реалізувати на фронтенді/формах.
+        # Тут повертаємо всі для простоти, але з активним статусом для прикладу
+        oids = OID.objects.filter(
+            unit__id=unit_id, 
+            status__in=[OIDStatusChoices.ACTIVE, OIDStatusChoices.NEW, OIDStatusChoices.RECEIVED_REQUEST, OIDStatusChoices.RECEIVED_TZ]
+        ).order_by('cipher')
+        for oid in oids:
+            # `transformItem: item => ({ value: item.id, label: item.name })` з твого JS
+            # тут name - це поле моделі OID, яке містить зрозумілу назву/шифр
+            oids_data.append({'id': oid.id, 'name': f"{oid.cipher} ({oid.get_oid_type_display()}) - {oid.full_name or oid.unit.city}"}) 
+    return JsonResponse(oids_data, safe=False)
+
+# ... (view oid_detail_view залишається схожим, як ми обговорювали раніше)
+# ... (view-заглушки для форм теж)
 
 def oid_detail_view(request, oid_id):
-    """
-    Відображає детальну інформацію про конкретний ОІД.
-    """
-    oid = get_object_or_404(OID.objects.select_related('unit__territorial_management'), pk=oid_id)
-
-    status_changes = oid.status_changes.select_related('initiating_document', 'changed_by').order_by('-changed_at')
-    work_requests_for_oid = WorkRequest.objects.filter(items__oid=oid).distinct().order_by('-incoming_date')
-    work_request_items = oid.work_request_items.select_related('request').order_by('-request__incoming_date')
-    technical_tasks = oid.technical_tasks.select_related('reviewed_by').order_by('-input_date')
-    documents = oid.documents.select_related('document_type', 'author', 'work_request_item').order_by('-process_date')
-    trips_for_oid = oid.trips.prefetch_related('units', 'persons', 'work_requests').order_by('-start_date')
-    attestation_registrations = AttestationRegistration.objects.filter(attestation_items__oid=oid).distinct().order_by('-process_date')
+    # (Код з попереднього повідомлення, переконайся, що він актуальний з моделями)
+    oid = get_object_or_404(
+        OID.objects.select_related(
+            'unit',
+            'unit__territorial_management'
+        ),
+        pk=oid_id
+    )
+    # ... (решта логіки для збору даних) ...
     
-    last_attestation_expiration = None
-    last_ik_expiration = get_last_ik_expiration_date(oid)
+    status_changes = oid.status_changes.select_related(
+        'initiating_document__document_type',
+        'changed_by'
+    ).order_by('-changed_at')
 
-    try:
-        attestation_doc_type = DocumentType.objects.get(
-            name__icontains='Акт атестації', 
-            work_type=WorkTypeChoices.ATTESTATION
-        )
-        last_attestation_doc = Document.objects.filter(
-            oid=oid,
-            document_type=attestation_doc_type,
-            expiration_date__isnull=False
-        ).order_by('-work_date').first()
-        if last_attestation_doc:
-            last_attestation_expiration = last_attestation_doc.expiration_date
-    except DocumentType.DoesNotExist:
-        pass
+    work_request_items = oid.work_request_items.select_related(
+        'request',
+        'request__unit'
+    ).order_by('-request__incoming_date')
 
+    work_requests_for_oid = WorkRequest.objects.filter(
+        items__oid=oid
+    ).distinct().order_by('-incoming_date')
+
+    technical_tasks = oid.technical_tasks.select_related('reviewed_by').order_by('-input_date')
+
+    documents = oid.documents.select_related(
+        'document_type',
+        'author',
+        'work_request_item__request'
+    ).order_by('-process_date', '-work_date')
+
+    trips_for_oid = oid.trips.prefetch_related(
+        'units',
+        'persons',
+        'work_requests'
+    ).order_by('-start_date')
+    
+    attestation_registrations_for_oid = AttestationRegistration.objects.filter(
+        attestation_items__oid=oid
+    ).prefetch_related(
+        Prefetch('attestation_items', queryset=AttestationItem.objects.filter(oid=oid).select_related('document__document_type')),
+        'response'
+    ).distinct().order_by('-process_date')
+    
+    trip_results_for_oid = TripResultForUnit.objects.filter(
+        oids=oid
+    ).select_related('trip').prefetch_related('units', 'documents__document_type').order_by('-process_date')
+
+    last_attestation_expiration = get_last_document_expiration_date(oid, 'Акт атестації', WorkTypeChoices.ATTESTATION)
+    last_ik_expiration = get_last_document_expiration_date(oid, 'Висновок', WorkTypeChoices.IK)
+    last_prescription_expiration = get_last_document_expiration_date(oid, 'Припис')
 
     context = {
         'oid': oid,
         'status_changes': status_changes,
         'work_requests_for_oid': work_requests_for_oid,
-        'work_request_items': work_request_items,
+        'work_request_items_for_oid': work_request_items,
         'technical_tasks': technical_tasks,
         'documents': documents,
         'trips_for_oid': trips_for_oid,
-        'attestation_registrations': attestation_registrations,
+        'attestation_registrations_for_oid': attestation_registrations_for_oid,
+        'trip_results_for_oid': trip_results_for_oid,
         'last_attestation_expiration': last_attestation_expiration,
         'last_ik_expiration': last_ik_expiration,
+        'last_prescription_expiration': last_prescription_expiration,
     }
     return render(request, 'oids/oid_detail.html', context)
 
