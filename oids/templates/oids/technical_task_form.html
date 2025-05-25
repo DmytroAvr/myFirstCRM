@@ -9,14 +9,27 @@
 
 <form id="my-form" method="post">
   {% csrf_token %}
-  
+
+
+  <div class="form-group">
+    {{ form.unit.label_tag }}
+    {{ form.unit }} </div>
+
 <div class="form-group">
+    {{ form.oid.label_tag }}
+    {{ form.oid }} </div>
+    
+<div class="form-group">
+    {{ form.technical_task.label_tag }}
+    {{ form.technical_task }} </div>
+
+  <!-- <div class="form-group">
     <label for="id_unit">Військова частина (Unit):</label>
     {{ form.unit }} </div>
 
 <div class="form-group">
     <label for="id_oid">оберіть ОІД</label>
-    {{ form.oid }} </div>
+    {{ form.oid }} </div> -->
 
 
   

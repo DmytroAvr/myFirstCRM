@@ -201,7 +201,6 @@ class TechnicalTaskForm(forms.ModelForm):
             self.fields['oid'].queryset = OID.objects.filter(unit=self.instance.oid.unit)
 
 
-
 class TripForm(forms.ModelForm):
     class Meta:
             model = Trip
@@ -213,4 +212,59 @@ class TripForm(forms.ModelForm):
             }
 
 
-# 
+# # Форма фільтрації
+# class myFilterForm(forms.Form):
+#     unit = forms.ModelChoiceField(
+#         queryset=Unit.objects.all(),
+#         required=False, # Може бути True, якщо обов'язкове
+#         label="Військова частина (Unit)",
+#         # exclude="скасовано", # Якщо потрібно виключити певні частини
+#         empty_label="---------", # Це створить першу порожню опцію
+#         widget=forms.Select(attrs={'class': 'form-control'})
+#     )
+ 
+
+class UniversalFilterForm(forms.Form):
+    # Початкові поля, які заповнюються з моделей
+    unit = forms.ModelChoiceField(
+        queryset=Unit.objects.all(),
+        required=False,
+        label="Військова частина",
+        empty_label="--- Оберіть В/Ч ---",
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    oid = forms.ModelChoiceField(
+        queryset=OID.objects.all(),
+        required=False,
+        label="ОІД",
+        empty_label="--- Оберіть ОІД ---",
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    # incoming_number = forms.ModelChoiceField(
+    #     queryset=WorkRequest.objects.all(),
+    #     required=False,
+    #     label="Вхідний НОМЕР заявки",
+    #     empty_label="--- Оберіть вхідний НОМЕР заявки ---",
+    #     widget=forms.Select(attrs={'class': 'form-control'})
+    # )
+    # incoming_date = forms.ModelChoiceField(
+    #     queryset=WorkRequest.objects.all(),
+    #     required=False,
+    #     label="Вхідна ДАТА заявки",
+    #     empty_label="--- Оберіть вхідну ДАТУ заявки ---",
+    #     widget=forms.Select(attrs={'class': 'form-control'})
+    # )
+    # Це поле буде заповнюватися динамічно JS, queryset може бути порожнім
+    universal_select_1 = forms.ChoiceField(
+        choices=[],
+        required=False,
+        label="Динамічне поле 1",
+        widget=forms.Select(attrs={'class': 'form-control', 'data-filter-target': 'true'}) # Додамо data-атрибут
+    )
+    universal_select_2 = forms.ChoiceField(
+        choices=[],
+        required=False,
+        label="Динамічне поле 2",
+        widget=forms.Select(attrs={'class': 'form-control', 'data-filter-target': 'true'})
+    )
+     # ... інші поля, які ви можете захотіти фільтрувати
