@@ -1,410 +1,461 @@
-# C:\myFirstCRM\oids\views.py
-from django.shortcuts import render, redirect, get_object_or_404
-from .models import Document, Unit, OID, OIDStatusChange, WorkRequest, DocumentType, WorkRequestItem, Trip, Person, TechnicalTask
-from .forms import DocumentForm, DocumentHeaderForm, DocumentFormSet, requestForm, requestHeaderForm, requestFormSet, requestItemFormSet, requestItemForm, OidCreateForm, AttestationRegistrationForm, TripResultForUnitForm, TechnicalTaskForm, OIDStatusChangeForm, TripForm
-from django.http import JsonResponse
-import traceback        #check
-from django.contrib import messages
-from django.views.decorators.http import require_POST, require_GET
-from django.db.models import Q
-from django.apps import apps  
+# oids/views.py
+from django.shortcuts import render, get_object_or_404, redirect
+from django.db.models import Q, Max
+from django.urls import reverse
+from django.utils import timezone
+from datetime import timedelta
 
-def home_view(request):
-    return render(request, 'home.html')
+# Імпортуємо наші моделі
+from .models import (
+    TerritorialManagement, Unit, OID, WorkRequest, WorkRequestItem,
+    Document, DocumentType, Trip, Person, OIDStatusChoices, WorkRequestStatusChoices,
+    WorkTypeChoices, TechnicalTask
+)
 
-def load_oids(request):
+# --- Утиліти та Допоміжні Функції (можна винести в окремий файл, наприклад, utils.py) ---
+
+def get_last_ik_expiration_date(oid):
+    """
+    Повертає дату завершення дії останнього Висновку ІК для ОІД.
+    """
     try:
-        unit_id = request.GET.get('unit')
-        oids = OID.objects.filter(unit_id=unit_id).exclude(status='скасовано').order_by('name')
-        data = [{'id': oid.id, 'name': oid.name} for oid in oids]
- 
-        return JsonResponse(list(oids.values('id', 'name')), safe=False)
-        # return JsonResponse(data, safe=False)  #proposition for request
+        # Шукаємо останній документ типу "Висновок ІК" для даного ОІД
+        # Припускаємо, що DocumentType з назвою "Висновок ІК" існує і має work_type='ІК'
+        ik_conclusion_doc_type = DocumentType.objects.get(
+            name__icontains='Висновок', # 'Висновок ІК' або 'Висновок'
+            work_type=WorkTypeChoices.IK
+        )
+        last_ik_document = Document.objects.filter(
+            oid=oid,
+            document_type=ik_conclusion_doc_type,
+            expiration_date__isnull=False # Перевіряємо, що є термін дії
+        ).order_by('-work_date').first() # Беремо найновіший за датою проведення робіт
+
+        return last_ik_document.expiration_date if last_ik_document else None
+    except DocumentType.DoesNotExist:
+        # Якщо тип документа "Висновок ІК" не знайдено в базі даних, повертаємо None
+        return None
     except Exception as e:
-        traceback.print_exc()  # ← виведе помилку у консоль VSCode
-        return JsonResponse({'error': str(e)}, status=500)
+        print(f"Помилка при отриманні терміну дії ІК для ОІД {oid.cipher}: {e}")
+        return None
 
-def load_oids_for_unit(request):
-    unit_id = request.GET.get('unit')
-    oids = OID.objects.filter(unit_id=unit_id).exclude(status='скасовано').order_by('name')
-    return JsonResponse(list(oids.values('id', 'name')), safe=False)
+# --- Представлення (Views) ---
 
-def load_oids_for_units(request):
-    unit_ids = request.GET.getlist('units[]')
-    oids = OID.objects.filter(unit__id__in=unit_ids).exclude(status="скасовано").order_by('name')
-    return JsonResponse(list(oids.values('id', 'name')), safe=False)
+def main_dashboard(request):
+    """
+    Головна сторінка з трьома стовпчиками та кнопками керування.
+    """
+    # Панель керування зверху (посилання на форми)
+    add_request_url = reverse('add_work_request') # Потрібно буде створити URL
+    plan_trip_url = reverse('plan_trip')         # Потрібно буде створити URL
+    add_document_processing_url = reverse('add_document_processing') # Потрібно буде створити URL
 
-def get_oid_status(request):
-    oid_id = request.GET.get('oid_id')
-    try:
-        oid = OID.objects.get(id=oid_id)
-        return JsonResponse({'status': oid.status})
-    except OID.DoesNotExist:
-        return JsonResponse({'status': ''})
+    # 1. Колонка: Територіальні управління
+    territorial_managements = TerritorialManagement.objects.all().order_by('name')
     
-def load_documents_for_oids(request):
-    oid_ids = request.GET.getlist('oids[]')
-    documents = Document.objects.filter(oid__id__in=oid_ids).order_by('document_type__name', 'document_number')
-    return JsonResponse(list(documents.values('id', 'document_type__name', 'document_number')), safe=False)
+    selected_tm_id = request.GET.get('tm')
+    selected_unit_id = request.GET.get('unit')
 
-# один unit дає багато ОІД
-def get_oids_by_unit(request):
-    unit_id = request.GET.get('unit_id')
-    if not unit_id:
-        return JsonResponse([], safe=False)
+    # 2. Колонка: Військові частини
+    units = Unit.objects.all().order_by('name')
+    if selected_tm_id:
+        # Фільтруємо частини за обраним ТУ
+        units = units.filter(territorial_management__id=selected_tm_id)
+    
+    # 3. Колонка: ОІД
+    oids_creating = OID.objects.none() # ОІД, які створюються
+    oids_active = OID.objects.none()   # Діючі ОІД
+    oids_cancelled = OID.objects.none() # Скасовані ОІД
+
+    if selected_unit_id:
+        current_oids = OID.objects.filter(unit__id=selected_unit_id).order_by('cipher')
+
+        # ОІД, які створюються (наявна заявка)
+        oids_creating = current_oids.filter(
+            status__in=[
+                OIDStatusChoices.NEW,
+                OIDStatusChoices.RECEIVED_REQUEST,
+                OIDStatusChoices.RECEIVED_TZ
+            ]
+        ).prefetch_related('work_request_items__request') # Оптимізація запитів
+
+        # Діючі ОІД
+        oids_active = current_oids.filter(status=OIDStatusChoices.ACTIVE)
+        
+        # Скасовані ОІД
+        oids_cancelled = current_oids.filter(
+            status__in=[
+                OIDStatusChoices.CANCELED,
+                OIDStatusChoices.TERMINATED
+            ]
+        )
+    elif selected_tm_id:
+        # Якщо обрано лише ТУ, показуємо ОІД з усіх частин цього ТУ
+        current_oids = OID.objects.filter(unit__territorial_management__id=selected_tm_id).order_by('cipher')
+        oids_creating = current_oids.filter(
+            status__in=[
+                OIDStatusChoices.NEW,
+                OIDStatusChoices.RECEIVED_REQUEST,
+                OIDStatusChoices.RECEIVED_TZ
+            ]
+        ).prefetch_related('work_request_items__request')
+        oids_active = current_oids.filter(status=OIDStatusChoices.ACTIVE)
+        oids_cancelled = current_oids.filter(
+            status__in=[
+                OIDStatusChoices.CANCELED,
+                OIDStatusChoices.TERMINATED
+            ]
+        )
+    else:
+        # Якщо нічого не обрано, показуємо всі ОІД
+        current_oids = OID.objects.all().order_by('cipher')
+        oids_creating = current_oids.filter(
+            status__in=[
+                OIDStatusChoices.NEW,
+                OIDStatusChoices.RECEIVED_REQUEST,
+                OIDStatusChoices.RECEIVED_TZ
+            ]
+        ).prefetch_related('work_request_items__request')
+        oids_active = current_oids.filter(status=OIDStatusChoices.ACTIVE)
+        oids_cancelled = current_oids.filter(
+            status__in=[
+                OIDStatusChoices.CANCELED,
+                OIDStatusChoices.TERMINATED
+            ]
+        )
+
+    # Для діючих ОІД потрібно отримати термін дії ІК
+    for oid in oids_active:
+        oid.ik_expiration_date = get_last_ik_expiration_date(oid)
+
+
+    context = {
+        'add_request_url': add_request_url,
+        'plan_trip_url': plan_trip_url,
+        'add_document_processing_url': add_document_processing_url,
+
+        'territorial_managements': territorial_managements,
+        'selected_tm_id': int(selected_tm_id) if selected_tm_id else None,
+        
+        'units': units,
+        'selected_unit_id': int(selected_unit_id) if selected_unit_id else None,
+        
+        'oids_creating': oids_creating,
+        'oids_active': oids_active,
+        'oids_cancelled': oids_cancelled,
+    }
+
+    return render(request, 'oids/main_dashboard.html', context)
+
+
+def oid_detail_view(request, oid_id):
+    """
+    Відображає детальну інформацію про конкретний ОІД.
+    """
+    oid = get_object_or_404(OID.objects.select_related('unit__territorial_management'), pk=oid_id)
+
+    # 1. Історія змін статусу
+    status_changes = oid.status_changes.select_related('initiating_document', 'changed_by').order_by('-changed_at')
+
+    # 2. Пов'язані заявки та елементи заявок
+    # Отримуємо всі унікальні заявки, пов'язані з цим ОІД через WorkRequestItem
+    # Якщо WorkRequestItem має related_name='items' для WorkRequest, то:
+    work_requests_for_oid = WorkRequest.objects.filter(items__oid=oid).distinct().order_by('-incoming_date')
+    
+    # Або можна отримати всі WorkRequestItem для даного ОІД:
+    work_request_items = oid.work_request_items.select_related('request').order_by('-request__incoming_date')
+
+    # 3. Технічні завдання
+    technical_tasks = oid.technical_tasks.select_related('reviewed_by').order_by('-input_date')
+
+    # 4. Опрацьовані документи
+    documents = oid.documents.select_related('document_type', 'author', 'work_request_item').order_by('-process_date')
+
+    # 5. Історія відряджень (які включали цей ОІД)
+    trips_for_oid = oid.trips.prefetch_related('units', 'persons', 'work_requests').order_by('-start_date')
+
+    # 6. Реєстрації атестацій (якщо ОІД був частиною зареєстрованого акту атестації)
+    attestation_registrations = AttestationRegistration.objects.filter(attestation_items__oid=oid).distinct().order_by('-process_date')
+    
+    # Можна також додати останній термін дії атестації та ІК тут для швидкого доступу
+    last_attestation_expiration = None
+    last_ik_expiration = get_last_ik_expiration_date(oid)
 
     try:
-        unit_id = int(unit_id)
-    except ValueError:
-        return JsonResponse([], safe=False)
+        attestation_doc_type = DocumentType.objects.get(
+            name__icontains='Акт атестації', 
+            work_type=WorkTypeChoices.ATTESTATION
+        )
+        last_attestation_doc = Document.objects.filter(
+            oid=oid,
+            document_type=attestation_doc_type,
+            expiration_date__isnull=False
+        ).order_by('-work_date').first()
+        if last_attestation_doc:
+            last_attestation_expiration = last_attestation_doc.expiration_date
+    except DocumentType.DoesNotExist:
+        pass
 
-    oids = OID.objects.filter(unit_id=unit_id).values('id', 'name')
-    return JsonResponse(list(oids), safe=False)
 
-# багато units дає багато ОІДs
-def get_oids_by_units(request):
-    unit_ids = request.GET.get('unit_ids')  # приклад: "1,2,3"
+    context = {
+        'oid': oid,
+        'status_changes': status_changes,
+        'work_requests_for_oid': work_requests_for_oid, # Унікальні заявки
+        'work_request_items': work_request_items,       # Елементи заявок
+        'technical_tasks': technical_tasks,
+        'documents': documents,
+        'trips_for_oid': trips_for_oid,
+        'attestation_registrations': attestation_registrations,
+        'last_attestation_expiration': last_attestation_expiration,
+        'last_ik_expiration': last_ik_expiration,
+    }
+    return render(request, 'oids/oid_detail.html', context)
 
-    if not unit_ids:
-        return JsonResponse([], safe=False)
 
-    ids = [int(i) for i in unit_ids.split(',') if i.isdigit()]
-    oids = OID.objects.filter(unit_id__in=ids).values('id', 'name')
-    return JsonResponse(list(oids), safe=False)
+# --- Приклад placeholder-ів для форм ---
+# Ці представлення будуть обробляти POST-запити від форм.
+# Для простоти, тут лише редирект, але в реальному проекті тут буде логіка обробки форм.
 
-# всі заявки на 1 ОІД
-def get_requests_by_oid(request):
-    oid_id = request.GET.get('oid_id')
-    if not oid_id:
-        return JsonResponse([], safe=False)
+def add_work_request(request):
+    if request.method == 'POST':
+        # Логіка обробки форми додавання заявки
+        # ...
+        return redirect('main_dashboard') # Після успішного додавання повертаємося на головну
 
-    # Знаходимо заявки, пов'язані з OID
-    work_requests = WorkRequest.objects.filter(items__oid_id=oid_id).distinct()
-    data = [
-        {
-            'id': wr.id,
-            'incoming_number': wr.incoming_number,
-            'incoming_date': wr.incoming_date.strftime('%Y-%m-%d') if wr.incoming_date else None # Додав перевірку на None
-        }
-        for wr in work_requests
-    ]
-    return JsonResponse(data, safe=False)
+    # Відображення форми
+    return render(request, 'oids/forms/add_work_request_form.html', {})
 
-# всі заявки на БАГАТо ОІД
-def get_requests_by_oids(request):
-    oid_ids_list = request.GET.getlist('oid_ids') # Використовуйте getlist для отримання всіх значень
+def plan_trip(request):
+    if request.method == 'POST':
+        # Логіка обробки форми планування відрядження
+        # ...
+        return redirect('main_dashboard')
 
-    if not oid_ids_list:
-        return JsonResponse([], safe=False)
+    # Відображення форми
+    return render(request, 'oids/forms/plan_trip_form.html', {})
 
-    ids = [int(i) for i in oid_ids_list if i.isdigit()] # Тепер ids буде списком ID
-    work_requests = WorkRequest.objects.filter(items__oid_id__in=ids).distinct()
-    data = [
-        {
-            'id': wr.id,
-            'incoming_number': wr.incoming_number,
-            'incoming_date': wr.incoming_date.strftime('%Y-%m-%d') if wr.incoming_date else None # Додав перевірку на None
-        }
-        for wr in work_requests
-    ]
-    return JsonResponse(data, safe=False)
+def add_document_processing(request):
+    if request.method == 'POST':
+        # Логіка обробки форми додавання опрацювання документів
+        # ...
+        return redirect('main_dashboard')
 
-# додав gemeni
-def get_work_request_details(request):
-    request_id = request.GET.get('request_id')
-    if not request_id:
-        return JsonResponse({'error': 'Request ID is required'}, status=400)
+    # Відображення форми
+    return render(request, 'oids/forms/add_document_processing_form.html', {})
+
+
+# oids/views.py
+from django.shortcuts import render, get_object_or_404, redirect
+from django.db.models import Q, Max
+from django.urls import reverse
+from django.utils import timezone
+from datetime import timedelta
+
+# Імпортуємо наші моделі та форми
+from .models import (
+    TerritorialManagement, Unit, OID, WorkRequest, WorkRequestItem,
+    Document, DocumentType, Trip, Person, OIDStatusChoices, WorkRequestStatusChoices,
+    WorkTypeChoices, TechnicalTask
+)
+from .forms import WorkRequestForm, TripForm, DocumentForm # Імпортуємо форми
+
+# --- Утиліти та Допоміжні Функції (можна винести в окремий файл, наприклад, utils.py) ---
+
+def get_last_ik_expiration_date(oid):
+    """
+    Повертає дату завершення дії останнього Висновку ІК для ОІД.
+    """
     try:
-        work_request = WorkRequest.objects.get(pk=request_id)
-        # Припускаємо, що WorkRequest пов'язаний з одним OID (наприклад, через ForeignKey)
-        # або ви обираєте перший OID, якщо WorkRequest має ManyToMany з OID.
-        oid_id = None
-        if hasattr(work_request, 'oid') and work_request.oid: # Якщо WorkRequest має ForeignKey до OID
-            oid_id = work_request.oid.id
-        elif work_request.oids.exists(): # Якщо WorkRequest має ManyToMany до OID
-            oid_id = work_request.oids.first().id # Візьмемо перший OID, якщо їх кілька
+        ik_conclusion_doc_type = DocumentType.objects.get(
+            name__icontains='Висновок',
+            work_type=WorkTypeChoices.IK
+        )
+        last_ik_document = Document.objects.filter(
+            oid=oid,
+            document_type=ik_conclusion_doc_type,
+            expiration_date__isnull=False
+        ).order_by('-work_date').first()
 
-        unit_id = None
-        if oid_id:
-            oid = OID.objects.get(pk=oid_id)
-            unit_id = oid.unit.id
-
-        return JsonResponse({'oid_id': oid_id, 'unit_id': unit_id})
-    except WorkRequest.DoesNotExist:
-        return JsonResponse({'error': 'Work Request not found'}, status=404)
+        return last_ik_document.expiration_date if last_ik_document else None
+    except DocumentType.DoesNotExist:
+        return None
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        print(f"Помилка при отриманні терміну дії ІК для ОІД {oid.cipher}: {e}")
+        return None
 
-def load_technical_tasks_for_oid(request):
-    oid_id = request.GET.get('oid_id')
-    tasks = TechnicalTask.objects.filter(oid_id=oid_id).order_by('input_date')
-    data = [{'id': task.id, 'input_number': task.input_number, 'input_date': task.input_date.strftime('%Y-%m-%d')} for task in tasks]
-    return JsonResponse(data, safe=False)
+# --- Представлення (Views) ---
 
+def main_dashboard(request):
+    """
+    Головна сторінка з трьома стовпчиками та кнопками керування.
+    """
+    # Панель керування зверху (посилання на форми)
+    add_request_url = reverse('add_work_request')
+    plan_trip_url = reverse('plan_trip')
+    add_document_processing_url = reverse('add_document_processing')
 
-# C:\myFirstCRM\oids\views.py
-def document_done(request):
-    if request.method == 'POST':
-        header_form = DocumentHeaderForm(request.POST)
-        formset = DocumentFormSet(request.POST)
-
-        if header_form.is_valid() and formset.is_valid():
-            unit = header_form.cleaned_data['unit']
-            oid = header_form.cleaned_data['oid']
-            work_type = header_form.cleaned_data['work_type']
-            work_date = header_form.cleaned_data['work_date']
-            author = header_form.cleaned_data['author']
-            process_date = header_form.cleaned_data['process_date']
-            
-            for form in formset:
-                if form.cleaned_data and not form.cleaned_data.get('DELETE', False):
-                    doc = form.save(commit=False)
-                    doc.unit = unit
-                    doc.oid = oid
-                    doc.work_type = work_type
-                    doc.work_date = work_date
-                    doc.author = author
-                    doc.process_date = process_date
-                    doc.save()
-
-
-                messages.success(request, "Документи успішно додано!")
-            return redirect('document_done')
-    else:
-        header_form = DocumentHeaderForm()
-        formset = DocumentFormSet(queryset=Document.objects.none())
-
-    return render(request, 'oids/document_done.html', {
-        'header_form': header_form,
-        'formset': formset
-    })
-
-# C:\myFirstCRM\oids\views.py
-def work_request(request):
-    if request.method == 'POST':
-        header_form = requestHeaderForm(request.POST)
-        formset = requestItemFormSet(request.POST)
-
-        if header_form.is_valid() and formset.is_valid():
-            work_request = header_form.save()
-
-            for form in formset:
-                if form.cleaned_data and not form.cleaned_data.get('DELETE', False):
-                    item = form.save(commit=False)
-                    item.request = work_request
-                    item.save() 
-            
-            messages.success(request, "Заявка успішно збережена!")
-            return redirect('work_request')  # або інша сторінка
-    else:
-        header_form = requestHeaderForm()
-        formset = requestItemFormSet(queryset=WorkRequestItem.objects.none())
-
-    return render(request, 'oids/work_request.html', {
-        'header_form': header_form,
-        'formset': formset
-    })
-
-def work_request_list(request):
-    work_requests = WorkRequest.objects.prefetch_related('items__oid', 'unit').all()
-    return render(request, 'views/work_request_list.html', {'work_requests': work_requests})
-
-
-# aside for request 
-@require_POST
-def create_oid_ajax(request):
-    form = OidCreateForm(request.POST)
-    unit_id = request.POST.get('unit_id')
-
-    if not unit_id:
-        return JsonResponse({'success': False, 'errors': {'unit_id': ['Unit ID не передано']}}, status=400)
-
-    if form.is_valid():
-        oid = form.save(commit=False)
-        try:
-            unit = Unit.objects.get(id=unit_id)
-            oid.unit = unit
-            oid.save()
-            return JsonResponse({'success': True, 'oid': {'id': oid.id, 'name': oid.name}})
-        except Unit.DoesNotExist:
-            return JsonResponse({'success': False, 'errors': {'unit': ['Unit не знайдено']}}, status=400)
-    else:
-        return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+    # 1. Колонка: Територіальні управління
+    territorial_managements = TerritorialManagement.objects.all().order_by('name')
     
-# додавання документів
+    selected_tm_id = request.GET.get('tm')
+    selected_unit_id = request.GET.get('unit')
 
-def send_doc_cip(request):
+    # 2. Колонка: Військові частини
+    units = Unit.objects.all().order_by('name')
+    if selected_tm_id:
+        units = units.filter(territorial_management__id=selected_tm_id)
+    
+    # 3. Колонка: ОІД
+    oids_creating = OID.objects.none()
+    oids_active = OID.objects.none()
+    oids_cancelled = OID.objects.none()
+
+    current_oids_queryset = OID.objects.all()
+
+    if selected_unit_id:
+        current_oids_queryset = current_oids_queryset.filter(unit__id=selected_unit_id)
+    elif selected_tm_id:
+        current_oids_queryset = current_oids_queryset.filter(unit__territorial_management__id=selected_tm_id)
+
+    # Фільтруємо ОІД за статусами
+    oids_creating = current_oids_queryset.filter(
+        status__in=[
+            OIDStatusChoices.NEW,
+            OIDStatusChoices.RECEIVED_REQUEST,
+            OIDStatusChoices.RECEIVED_TZ
+        ]
+    ).select_related('unit').prefetch_related('work_request_items__request') # Оптимізація запитів
+
+    oids_active = current_oids_queryset.filter(status=OIDStatusChoices.ACTIVE).select_related('unit')
+    
+    oids_cancelled = current_oids_queryset.filter(
+        status__in=[
+            OIDStatusChoices.CANCELED,
+            OIDStatusChoices.TERMINATED
+        ]
+    ).select_related('unit')
+
+    # Для діючих ОІД потрібно отримати термін дії ІК
+    for oid in oids_active:
+        oid.ik_expiration_date = get_last_ik_expiration_date(oid)
+
+    context = {
+        'add_request_url': add_request_url,
+        'plan_trip_url': plan_trip_url,
+        'add_document_processing_url': add_document_processing_url,
+
+        'territorial_managements': territorial_managements,
+        'selected_tm_id': int(selected_tm_id) if selected_tm_id else None,
+        
+        'units': units,
+        'selected_unit_id': int(selected_unit_id) if selected_unit_id else None,
+        
+        'oids_creating': oids_creating,
+        'oids_active': oids_active,
+        'oids_cancelled': oids_cancelled,
+    }
+
+    return render(request, 'oids/main_dashboard.html', context)
+
+
+def oid_detail_view(request, oid_id):
+    """
+    Відображає детальну інформацію про конкретний ОІД.
+    """
+    oid = get_object_or_404(OID.objects.select_related('unit__territorial_management'), pk=oid_id)
+
+    status_changes = oid.status_changes.select_related('initiating_document', 'changed_by').order_by('-changed_at')
+    work_requests_for_oid = WorkRequest.objects.filter(items__oid=oid).distinct().order_by('-incoming_date')
+    work_request_items = oid.work_request_items.select_related('request').order_by('-request__incoming_date')
+    technical_tasks = oid.technical_tasks.select_related('reviewed_by').order_by('-input_date')
+    documents = oid.documents.select_related('document_type', 'author', 'work_request_item').order_by('-process_date')
+    trips_for_oid = oid.trips.prefetch_related('units', 'persons', 'work_requests').order_by('-start_date')
+    attestation_registrations = AttestationRegistration.objects.filter(attestation_items__oid=oid).distinct().order_by('-process_date')
+    
+    last_attestation_expiration = None
+    last_ik_expiration = get_last_ik_expiration_date(oid)
+
+    try:
+        attestation_doc_type = DocumentType.objects.get(
+            name__icontains='Акт атестації', 
+            work_type=WorkTypeChoices.ATTESTATION
+        )
+        last_attestation_doc = Document.objects.filter(
+            oid=oid,
+            document_type=attestation_doc_type,
+            expiration_date__isnull=False
+        ).order_by('-work_date').first()
+        if last_attestation_doc:
+            last_attestation_expiration = last_attestation_doc.expiration_date
+    except DocumentType.DoesNotExist:
+        pass
+
+
+    context = {
+        'oid': oid,
+        'status_changes': status_changes,
+        'work_requests_for_oid': work_requests_for_oid,
+        'work_request_items': work_request_items,
+        'technical_tasks': technical_tasks,
+        'documents': documents,
+        'trips_for_oid': trips_for_oid,
+        'attestation_registrations': attestation_registrations,
+        'last_attestation_expiration': last_attestation_expiration,
+        'last_ik_expiration': last_ik_expiration,
+    }
+    return render(request, 'oids/oid_detail.html', context)
+
+
+# --- Представлення для форм ---
+
+def add_work_request(request):
     if request.method == 'POST':
-        form = AttestationRegistrationForm(request.POST, request.FILES)
+        form = WorkRequestForm(request.POST)
         if form.is_valid():
             form.save()
-            messages.success(request, "Інформація успішно збережена!")
-            return redirect('send_doc_cip')  # або інша сторінка
+            return redirect('main_dashboard')
     else:
-        form = AttestationRegistrationForm()
-    return render(request, 'send_doc_cip.html', {'form': form})
-#    
+        form = WorkRequestForm()
+    return render(request, 'oids/forms/add_work_request_form.html', {'form': form})
 
-def send_doc_unit(request):
-    if request.method == 'POST':
-        form = TripResultForUnitForm(request.POST, request.FILES)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Інформація успішно збережена!")
-            return redirect('send_doc_unit')  # або інша сторінка
-            # return redirect('trip_result_list')  # або інша сторінка
-    else:
-        form = TripResultForUnitForm() 
-    return render(request, 'send_doc_unit.html', {'form': form})
-
-# def trip_result_list(request):
-#     results = TripResult.objects.all()
-#     return render(request, 'oids/trip_result_list.html', {'results': results})
-
-# Технічне завдання
-def technical_task_create(request):
-    if request.method == 'POST':
-        form = TechnicalTaskForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect('technical_task_create')  # або інша сторінка
-    else:
-        form = TechnicalTaskForm()
-    return render(request, 'oids/technical_task_form.html', {'form': form})
-
-
-def create_oid(request):
-    if request.method == 'POST':
-        form = OIDForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect('technical_task_form')  # або назад до TechnicalTask
-    else:
-        form = OIDForm()
-    return render(request, 'oids/oid_form.html', {'form': form})
-
-def change_oid_status(request):
-    if request.method == 'POST':
-        form = OIDStatusChangeForm(request.POST)
-        if form.is_valid():
-            oid = form.cleaned_data['oid']
-            instance = form.save(commit=False)
-            instance.old_status = oid.status  # автоматично вставляємо поточний статус
-            instance.save()
-
-            # оновлюємо сам OID
-            oid.status = form.cleaned_data['new_status']
-            oid.save()
-
-            return redirect('oid_status_change')
-    else:
-        form = OIDStatusChangeForm()
-    return render(request, 'oids/oid_status_change_form.html', {'form': form})
-
-
-def trip_create_view(request):
-    units = Unit.objects.all()
-    oids = OID.objects.all()
-    work_requests = WorkRequest.objects.all()
-    persons = Person.objects.all()
-
+def plan_trip(request):
     if request.method == 'POST':
         form = TripForm(request.POST)
         if form.is_valid():
-            form.save()
-            messages.success(request, "Відрядження успішно створено!")
-            return redirect('trip-create')  # або на іншу сторінку
-        else:
-            form = TripForm()
-
-    return render(request, 'trip_create.html', {
-        'units': units,
-        'oids': oids,
-        'work_requests': work_requests,
-        'persons': persons,
-        'selected_units': [],  # при редагуванні — передай відповідні ID
-        'selected_oids': [],
-        'selected_work_requests': [],
-        'selected_persons': [],
-        'start_date': '',
-        'end_date': '',
-        'purpose': '',
-    })
-
-
-
-
-# views pages
-
-def technical_task_list(request):
-    technical_tasks = TechnicalTask.objects.select_related('oid').all()
-    return render(request, 'views/technical_task_list.html', {'technical_tasks': technical_tasks})
-
-def trip_list(request):
-    query = request.GET.get("q", "")
-    trips = Trip.objects.all()
-
-    if query:
-        trips = trips.filter(
-            Q(purpose__icontains=query) |
-            Q(units__name__icontains=query) |
-            Q(oids__name__icontains=query)
-        ).distinct()
-
-    return render(request, 'views/trip_list.html', {'trips': trips})
-
-def unit_overview(request):
-    selected_unit_id = request.GET.get('unit')
-    units = Unit.objects.all()
-    
-    if selected_unit_id:
-        oids = OID.objects.filter(unit__id=selected_unit_id).order_by('name')
+            trip = form.save(commit=False)
+            trip.save() # Зберігаємо Trip спочатку, щоб отримати pk
+            form.save_m2m() # Зберігаємо ManyToMany зв'язки
+            return redirect('main_dashboard')
     else:
-        oids = OID.objects.all().order_by('unit', 'name')
+        form = TripForm()
+    return render(request, 'oids/forms/plan_trip_form.html', {'form': form})
 
-    return render(request, 'views/unit_overview.html', {
-        'oids': oids,
-        'units': units,
-        'selected_unit_id': selected_unit_id
-    })
+def add_document_processing(request):
+    if request.method == 'POST':
+        form = DocumentForm(request.POST)
+        if form.is_valid():
+            form.save()
+            # Оновлення статусу ОІД після додавання документів
+            oid = form.cleaned_data['oid']
+            # Припустимо, що додавання "Акту атестації" змінює статус на "Атестована"
+            # Або "Висновок ІК" може змінювати на "В експлуатації"
+            # Це вже бізнес-логіка, яку потрібно визначити
+            # Для прикладу, змінюємо статус ОІД на "В експлуатації" після додавання документа
+            # Це дуже спрощено, в реальному проекті потрібна складніша логіка
+            if oid.status != OIDStatusChoices.ACTIVE:
+                oid.status = OIDStatusChoices.ACTIVE # Або інший логічний статус
+                oid.save()
+                # Можна також створити запис в OIDStatusChange
+                # OIDStatusChange.objects.create(
+                #     oid=oid,
+                #     old_status=old_status,
+                #     new_status=oid.status,
+                #     reason="Документ опрацьовано",
+                #     changed_by=request.user if request.user.is_authenticated else None, # Припустимо, користувач залогінений
+                #     initiating_document=form.instance
+                # )
 
-def oid_details(request, oid_id):
-    oid = get_object_or_404(OID, pk=oid_id)
-
-    status_changes = OIDStatusChange.objects.filter(oid=oid).order_by('-changed_at')
-    work_items = WorkRequestItem.objects.filter(oid=oid).select_related('request')
-    tech_tasks = TechnicalTask.objects.filter(oid=oid)
-    documents = Document.objects.filter(oid=oid).distinct()
-
-    return render(request, 'views/oid_details.html', {
-        'oid': oid,
-        'status_changes': status_changes,
-        'work_items': work_items,
-        'tech_tasks': tech_tasks,
-        'documents': documents,
-    })
-
-
-from .forms import MainFilterForm
-
-def filters_example(request):
-    form = MainFilterForm(request.GET) # Важливо: ініціалізуємо форму даними з GET-запиту
-
-    # Тут може бути логіка для фільтрації основних даних, які ви виводите на сторінку
-    # на основі значень з `form.cleaned_data` (якщо форма валідна)
-    # Наприклад:
-    # if form.is_valid():
-    #     selected_unit = form.cleaned_data.get('unit')
-    #     selected_oid = form.cleaned_data.get('oid')
-    #     # ... фільтруйте ваш основний QuerySet
-
-    context = {
-        'form': form,
-        # 'some_filtered_data': some_filtered_data, # Додайте, якщо ви показуєте відфільтровані дані
-    }
-    return render(request, 'oids/filters_example.html', context)
-
-# ... (ваш existing get_filtered_options view) ...
-# ... (ваші existing AJAX views like load-oids-for-unit, load-oids-for-units, get-requests-by-oid, etc.) ...
-# ... (ваш existing get-work-request-details view) ...
-# ... (ваш existing load-technical-tasks-for-oid view) ...
+            return redirect('main_dashboard')
+    else:
+        form = DocumentForm()
+    return render(request, 'oids/forms/add_document_processing_form.html', {'form': form})
