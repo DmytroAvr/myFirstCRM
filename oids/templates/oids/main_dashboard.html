@@ -6,83 +6,176 @@
 {% block content %}
 <div class="header">
     <h1>Панель керування Об'єктами Інформаційної Діяльності</h1>
+    <div class="nav-buttons">
+        <a href="{{ add_request_url }}">Додати заявку</a>
+        <a href="{{ plan_trip_url }}">Запланувати відрядження</a>
+        <a href="{{ add_document_processing_url }}">Додати опрацювання документів</a>
+    </div>
 </div>
 
 <div class="dashboard-columns" style="display: flex; gap: 20px;">
     {# Стовпчик 1: Військові частини #}
     <div class="column" style="flex: 1; border: 1px solid #ccc; padding: 10px;">
         <h3>Військові частини</h3>
-        <form method="get" action="{% url 'main_dashboard' %}" id="unitFilterFormMain">
-            <select name="unit" id="id_unit" class="select2" style="width: 100%;" onchange="this.form.submit();">
-                <option value="">--------- Всі ВЧ ---------</option>
-                {% for unit_obj in all_units %}
-                    <option value="{{ unit_obj.id }}" {% if unit_obj.id == selected_unit_id %}selected{% endif %}>
-                        {{ unit_obj.code }} - {{ unit_obj.name|default:unit_obj.city }} 
-                        ({{ unit_obj.territorial_management.name|default:"ТУ не вказано" }})
-                    </option>
-                {% endfor %}
-            </select>
-        </form>
+        {# Цей select буде ініційований Select2 через select2-init.js #}
+        {# Його зміна буде оброблятися filtering_dynamic.js для завантаження ОІДів #}
+        <select name="unit" id="id_unit_filter" class="select2" style="width: 100%;">
+            <option value="">--------- Оберіть ВЧ ---------</option>
+            {% for unit_obj in all_units %}
+                <option value="{{ unit_obj.id }}" {% if unit_obj.id == selected_unit_id %}selected{% endif %}>
+                    {{ unit_obj.code }} - {{ unit_obj.name|default:unit_obj.city }} ({{ unit_obj.territorial_management.name|default:"ТУ не вказано" }})
+                </option>
+            {% endfor %}
+        </select>
     </div>
 
-    {# Стовпчик 2: ОІД #}
-    <div class="column" style="flex: 2; border: 1px solid #ccc; padding: 10px;">
+    {# Стовпчик 2: ОІД - тепер заповнюється через AJAX #}
+    <div class="column column-oids" style="flex: 2; border: 1px solid #ccc; padding: 10px;">
         <h3>
             Об'єкти інформаційної діяльності 
-            {% if selected_unit_object %}
-                (для ВЧ: {{ selected_unit_object.code }} - {{ selected_unit_object.name|default:selected_unit_object.city }})
-            {% else %}
-                (Оберіть ВЧ для відображення ОІД)
-            {% endif %}
+            <span id="selectedUnitForOidDisplay">
+                {% if selected_unit_object %}
+                    (для ВЧ: {{ selected_unit_object.code }} - {{ selected_unit_object.name|default:selected_unit_object.city }})
+                {% else %}
+                    (Оберіть ВЧ для відображення ОІД)
+                {% endif %}
+            </span>
         </h3>
 
-        {% if selected_unit_id %}
-            <div class="oid-list-section">
-                <h4>ОІД, що створюються</h4>
-                <ul>
-                    {% for oid in oids_creating %}
-                        <li>
-                            <a href="{% url 'oid_detail_view_name' oid.id %}">{{ oid.cipher }} - {{ oid.full_name|default_if_none:oid.unit.city }} ({{ oid.get_oid_type_display }})</a>
-                            <span>({{ oid.get_status_display }})</span>
-                        </li>
-                    {% empty %}
-                        <li>Немає.</li>
-                    {% endfor %}
-                </ul>
-            </div>
-            <hr>
-            <div class="oid-list-section">
-                <h4>Діючі ОІД</h4>
-                <ul>
-                    {% for oid in oids_active %}
-                        <li class="oid-item">
-                            <a href="{% url 'oid_detail_view_name' oid.id %}">{{ oid.cipher }} - {{ oid.full_name|default_if_none:oid.unit.city }} ({{ oid.get_oid_type_display }})</a>
-                            <div class="expirations" style="font-size: 0.8em; color: grey;">
-                                {% if oid.ik_expiration_date %}ІК до: {{ oid.ik_expiration_date|date:"d.m.Y" }}{% endif %}
-                                {% if oid.attestation_expiration_date %} / Атестація до: {{ oid.attestation_expiration_date|date:"d.m.Y" }}{% endif %}
-                                {% if oid.prescription_expiration_date %} / Припис до: {{ oid.prescription_expiration_date|date:"d.m.Y" }}{% endif %}
-                            </div>
-                        </li>
-                    {% empty %}
-                        <li>Немає.</li>
-                    {% endfor %}
-                </ul>
-            </div>
-            <hr>
-            <div class="oid-list-section">
-                <h4>Скасовані/Припинені ОІД</h4>
-                <ul>
-                    {% for oid in oids_cancelled %}
-                        <li>
-                            <a href="{% url 'oid_detail_view_name' oid.id %}">{{ oid.cipher }} - {{ oid.full_name|default_if_none:oid.unit.city }} ({{ oid.get_oid_type_display }})</a>
-                            <span>({{ oid.get_status_display }})</span>
-                        </li>
-                    {% empty %}
-                        <li>Немає.</li>
-                    {% endfor %}
-                </ul>
-            </div>
-        {% endif %}
+        <div id="oidsCreatingSection" class="oid-list-section">
+            <h4>ОІД, що створюються</h4>
+            <ul id="oidsCreatingList">
+                {% if not selected_unit_id %}<li>Оберіть ВЧ для завантаження списку.</li>{% endif %}
+                {# Сюди будуть динамічно додані ОІДи #}
+            </ul>
+        </div>
+        <hr>
+        <div id="oidsActiveSection" class="oid-list-section">
+            <h4>Діючі ОІД</h4>
+            <ul id="oidsActiveList">
+                 {% if not selected_unit_id %}<li>Оберіть ВЧ для завантаження списку.</li>{% endif %}
+                {# Сюди будуть динамічно додані ОІДи #}
+            </ul>
+        </div>
+        <hr>
+        <div id="oidsCancelledSection" class="oid-list-section">
+            <h4>Скасовані/Припинені ОІД</h4>
+            <ul id="oidsCancelledList">
+                 {% if not selected_unit_id %}<li>Оберіть ВЧ для завантаження списку.</li>{% endif %}
+                {# Сюди будуть динамічно додані ОІДи #}
+            </ul>
+        </div>
+        <div id="loadingOidsIndicator" style="display: none;">Завантаження ОІД...</div>
     </div>
 </div>
+{% endblock %}
+
+{% block page_specific_js %}
+<script>
+// Цей скрипт тепер буде працювати з filtering_dynamic.js
+// для динамічного завантаження ОІДів
+
+// Переконайтеся, що FILTER_SELECTORS у вашому filtering_dynamic.js
+// вказує на правильний ID для select-а військових частин, наприклад:
+// FILTER_SELECTORS.UNIT_SELECT = '#id_unit_filter'; // (або як ти його назвеш)
+// і що є конфігурація для завантаження ОІДів в ці три списки.
+
+// Приклад, як можна оновити filtering_dynamic.js або додати логіку в main.js
+// для обробки відповіді від ajax_load_oids_for_unit_categorized
+
+function updateOidLists(data) {
+    const lists = {
+        creating: $('#oidsCreatingList'),
+        active: $('#oidsActiveList'),
+        cancelled: $('#oidsCancelledList')
+    };
+
+    // Очищаємо попередні списки
+    for (const key in lists) {
+        lists[key].empty();
+    }
+
+    function populateList(listElement, oids, categoryName) {
+        if (oids.length === 0) {
+            listElement.append('<li>Немає ОІД у цій категорії.</li>');
+            return;
+        }
+        oids.forEach(oid => {
+            let listItemHtml = `<li><a href="${oid.detail_url}">${oid.cipher} - ${oid.full_name} (${oid.oid_type_display})</a> <span>(${oid.status_display})</span>`;
+            if (categoryName === 'active') {
+                listItemHtml += '<div class="expirations" style="font-size: 0.8em; color: grey;">';
+                if (oid.ik_expiration_date) listItemHtml += `ІК до: ${formatDate(oid.ik_expiration_date)}<br>`;
+                if (oid.attestation_expiration_date) listItemHtml += `Атестація до: ${formatDate(oid.attestation_expiration_date)}<br>`;
+                if (oid.prescription_expiration_date) listItemHtml += `Припис до: ${formatDate(oid.prescription_expiration_date)}`;
+                listItemHtml += '</div>';
+            }
+            listItemHtml += '</li>';
+            listElement.append(listItemHtml);
+        });
+    }
+    
+    function formatDate(dateString) {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0'); // Місяці починаються з 0
+        const year = date.getFullYear();
+        return `${day}.${month}.${year}`;
+    }
+
+
+    populateList(lists.creating, data.creating, 'creating');
+    populateList(lists.active, data.active, 'active');
+    populateList(lists.cancelled, data.cancelled, 'cancelled');
+}
+
+$(document).ready(function() {
+    const unitFilterSelect = $('#id_unit_filter');
+    const loadingIndicator = $('#loadingOidsIndicator');
+    const selectedUnitDisplay = $('#selectedUnitForOidDisplay');
+
+    unitFilterSelect.on('change', function() {
+        const unitId = $(this).val();
+        const selectedUnitText = $(this).find('option:selected').text().replace(/ \(.*/, ''); // Отримуємо текст без ТУ
+
+        if (unitId) {
+            selectedUnitDisplay.text(`(для ВЧ: ${selectedUnitText})`);
+            $('#oidsCreatingList').html('<li>Завантаження...</li>'); // Тимчасові повідомлення
+            $('#oidsActiveList').html('<li>Завантаження...</li>');
+            $('#oidsCancelledList').html('<li>Завантаження...</li>');
+            loadingIndicator.show();
+
+            $.ajax({
+                url: "{% url 'oids:ajax_load_oids_categorized' %}", // Використовуємо Django тег url
+                data: {
+                    'unit_id': unitId
+                },
+                dataType: 'json',
+                success: function(data) {
+                    updateOidLists(data);
+                },
+                error: function() {
+                    alert('Помилка завантаження ОІД.');
+                     $('#oidsCreatingList').html('<li>Помилка завантаження.</li>');
+                     $('#oidsActiveList').html('<li>Помилка завантаження.</li>');
+                     $('#oidsCancelledList').html('<li>Помилка завантаження.</li>');
+                },
+                complete: function() {
+                    loadingIndicator.hide();
+                }
+            });
+        } else {
+            selectedUnitDisplay.text('(Оберіть ВЧ для відображення ОІД)');
+            $('#oidsCreatingList').html('<li>Оберіть ВЧ для завантаження списку.</li>');
+            $('#oidsActiveList').html('<li>Оберіть ВЧ для завантаження списку.</li>');
+            $('#oidsCancelledList').html('<li>Оберіть ВЧ для завантаження списку.</li>');
+        }
+    });
+
+    // Якщо є обрана ВЧ при завантаженні сторінки (наприклад, з GET-параметра)
+    if (unitFilterSelect.val()) {
+        unitFilterSelect.trigger('change');
+    }
+});
+</script>
 {% endblock %}

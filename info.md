@@ -58,3 +58,16 @@ related_name	Ім’я для зворотного зв’язку з іншої
 null=True	Дозволяє порожнє значення у БД
 blank=True	Дозволяє залишити поле порожнім у формах
 unique=True	Поле повинно бути унікальним (актуально для One-to-One або ForeignKey в особливих випадках)
+
+
+
+
+Важливо щодо URL в JavaScript:
+Пряме використання {% url 'oids:ajax_load_oids_categorized' %} у зовнішньому .js файлі не спрацює, оскільки Django обробляє ці теги тільки в HTML-шаблонах.
+Рішення:
+
+Передати URL через data- атрибут на HTML-елементі:
+HTML
+
+<select name="unit" id="id_unit_filter" class="select2" data-ajax-url-categorized="{% url 'oids:ajax_load_oids_categorized' %}" style="width: 100%;">
+І в JS зчитувати: url: $(this).data('ajax-url-categorized') або config.url = $sourceElement.data('ajax-url-categorized');.

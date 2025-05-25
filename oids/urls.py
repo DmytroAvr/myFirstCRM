@@ -2,22 +2,18 @@
 from django.urls import path
 from . import views
 
+app_name = 'oids' # Важливо для {% url 'oids:view_name' %}
+
 urlpatterns = [
     path('', views.main_dashboard, name='main_dashboard'),
-    path('oid/<int:oid_id>/', views.oid_detail_view, name='oid_detail'),
+    path('oid/<int:oid_id>/', views.oid_detail_view, name='oid_detail_view_name'), # Дай осмислене ім'я
     
-    # URLs для AJAX запитів
+    # AJAX URLs
     path('ajax/load-oids-for-unit/', views.ajax_load_oids_for_unit, name='ajax_load_oids_for_unit'),
-    # Додай інші AJAX URL-и, якщо вони потрібні з твого filtering_dynamic.js
+    path('ajax/load-oids-categorized/', views.ajax_load_oids_for_unit_categorized, name='ajax_load_oids_categorized'), # Новий URL
     
-    # URLs для форм (заглушки)
+    # URLs для форм (потрібно буде створити відповідні views та форми)
     # path('request/add/', views.add_work_request_view, name='add_work_request_view_name'),
     # path('trip/plan/', views.plan_trip_view, name='plan_trip_view_name'),
     # path('document/process/', views.add_document_processing_view, name='add_document_processing_view_name'),
-
-     # URL-и для форм
-    path('request/add/', views.add_work_request, name='add_work_request'),
-    path('trip/plan/', views.plan_trip, name='plan_trip'),
-    path('document/process/', views.add_document_processing, name='add_document_processing'),
-
 ]
