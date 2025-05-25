@@ -212,59 +212,71 @@ class TripForm(forms.ModelForm):
             }
 
 
-# # Форма фільтрації
-# class myFilterForm(forms.Form):
-#     unit = forms.ModelChoiceField(
-#         queryset=Unit.objects.all(),
-#         required=False, # Може бути True, якщо обов'язкове
-#         label="Військова частина (Unit)",
-#         # exclude="скасовано", # Якщо потрібно виключити певні частини
-#         empty_label="---------", # Це створить першу порожню опцію
-#         widget=forms.Select(attrs={'class': 'form-control'})
-#     )
- 
 
-class UniversalFilterForm(forms.Form):
-    # Початкові поля, які заповнюються з моделей
+
+# filter form for 
+class MainFilterForm(forms.Form):
+    # F1: Unit (одинарний)
     unit = forms.ModelChoiceField(
         queryset=Unit.objects.all(),
         required=False,
-        label="Військова частина",
-        empty_label="--- Оберіть В/Ч ---",
+        label="Військова частина (Unit)",
+        empty_label="---------",
         widget=forms.Select(attrs={'class': 'form-control'})
     )
+
+    # F2: Units (MultiSelect)
+    # Цей селектор має ID 'id_units'
+    units = forms.ModelMultipleChoiceField(
+        queryset=Unit.objects.all(),
+        required=False,
+        label="Військові частини (Units)",
+        widget=forms.SelectMultiple(attrs={'class': 'form-control', 'data-placeholder': 'Оберіть В/Ч(и)'})
+    )
+
+    # F1, F3, F7: OID (одинарний)
+    # Зверніть увагу: це поле буде заповнюватися динамічно JS.
+    # Його queryset може бути порожнім, або ж включати всі OID,
+    # але динамічний фільтр перезапише опції.
     oid = forms.ModelChoiceField(
-        queryset=OID.objects.all(),
+        queryset=OID.objects.all(), # Можна залишити .all() або OID.objects.none()
         required=False,
-        label="ОІД",
-        empty_label="--- Оберіть ОІД ---",
+        label="ОІД (OID)",
+        empty_label="Оберіть ОІД",
         widget=forms.Select(attrs={'class': 'form-control'})
     )
-    # incoming_number = forms.ModelChoiceField(
-    #     queryset=WorkRequest.objects.all(),
-    #     required=False,
-    #     label="Вхідний НОМЕР заявки",
-    #     empty_label="--- Оберіть вхідний НОМЕР заявки ---",
-    #     widget=forms.Select(attrs={'class': 'form-control'})
-    # )
-    # incoming_date = forms.ModelChoiceField(
-    #     queryset=WorkRequest.objects.all(),
-    #     required=False,
-    #     label="Вхідна ДАТА заявки",
-    #     empty_label="--- Оберіть вхідну ДАТУ заявки ---",
-    #     widget=forms.Select(attrs={'class': 'form-control'})
-    # )
-    # Це поле буде заповнюватися динамічно JS, queryset може бути порожнім
-    universal_select_1 = forms.ChoiceField(
-        choices=[],
+
+    # F2, F4: OIDs (MultiSelect)
+    # Це поле буде заповнюватися динамічно JS.
+    # Його queryset може бути порожнім, або ж включати всі OID,
+    # але динамічний фільтр перезапише опції.
+    oids = forms.ModelMultipleChoiceField(
+        queryset=OID.objects.all(), # Можна залишити .all() або OID.objects.none()
         required=False,
-        label="Динамічне поле 1",
-        widget=forms.Select(attrs={'class': 'form-control', 'data-filter-target': 'true'}) # Додамо data-атрибут
+        label="ОІДи (OIDs)",
+        widget=forms.SelectMultiple(attrs={'class': 'form-control', 'data-placeholder': 'Оберіть ОІД(и)'})
     )
-    universal_select_2 = forms.ChoiceField(
-        choices=[],
+
+    # F3, F4, F6: WorkRequest (одинарний/MultiSelect)
+    # Припустимо, що це буде одинарний вибір WorkRequest для прикладу
+    work_requests = forms.ModelChoiceField( # Якщо потрібно MultiSelect, змініть на ModelMultipleChoiceField
+        queryset=WorkRequest.objects.all(), # Можна залишити .all() або WorkRequest.objects.none()
         required=False,
-        label="Динамічне поле 2",
-        widget=forms.Select(attrs={'class': 'form-control', 'data-filter-target': 'true'})
+        label="Заявка (Work Request)",
+        empty_label="Оберіть заявку",
+        widget=forms.Select(attrs={'class': 'form-control'})
     )
-     # ... інші поля, які ви можете захотіти фільтрувати
+
+    # F7: TechnicalTask
+    technical_task = forms.ModelChoiceField(
+        queryset=TechnicalTask.objects.all(), # Можна залишити .all() або TechnicalTask.objects.none()
+        required=False,
+        label="Технічне завдання (Technical Task)",
+        empty_label="Оберіть технічне завдання",
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+
+    # Якщо у вас є формсет, вам потрібно буде додати його окремо у View та шаблоні.
+    # Поля формсету не додаються безпосередньо до цієї форми.
+    # Однак, якщо в формсеті є поля з іменами 'oid' або 'technical_task',
+    # dynamic_filters.js може їх обробити, якщо ви правильно налаштуєте `targetSelectBaseName`

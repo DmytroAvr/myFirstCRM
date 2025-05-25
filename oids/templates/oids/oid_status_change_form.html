@@ -1,160 +1,22 @@
 <!-- D:\myFirstCRM\oids\templates\oids\oid_status_change_form.html -->
 
-<head>
-  <meta charset="UTF-8">
-  <title>Форма зміни статусу</title>
-  <style>
-    :root {
-      --bg-light: #ffffff;
-      --bg-dark: #1a1a1a;
-      --text-light: #1a1a1a;
-      --text-dark: #f0f0f0;
-      --input-bg-light: #f9f9f9;
-      --input-bg-dark: #2a2a2a;
-      --border-light: #cccccc;
-      --border-dark: #555555;
-      --btn-bg-light: #eeeeee;
-      --btn-bg-dark: #444444;
-      --btn-text-light: #000;
-      --btn-text-dark: #fff;
-    }
 
-    body {
-      margin: 20px;
-      font-family: sans-serif;
-      background-color: var(--bg-light);
-      color: var(--text-light);
-      transition: background-color 0.3s, color 0.3s;
-    }
 
-    .dark-theme {
-      background-color: var(--bg-dark);
-      color: var(--text-dark);
-    }
 
-    .theme-toggle {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      background-color: transparent;
-      color: inherit;
-      border: 1px solid currentColor;
-      padding: 5px 10px;
-      cursor: pointer;
-      font-size: 0.9rem;
-      border-radius: 5px;
-    }
+{% extends 'base.html' %}
+{% block title %}Зміна статусу ОІД{% endblock %}
 
-    form {
-      max-width: 600px;
-      margin: auto;
-    }
+{% load static %}
+{% block extra_css %}{% endblock %}
 
-    label {
-      display: block;
-      margin-bottom: 4px;
-    }
-
-    input, select, textarea {
-      width: 100%;
-      padding: 8px;
-      margin-bottom: 16px;
-      border: 1px solid var(--border-light);
-      background-color: var(--input-bg-light);
-      color: var(--text-light);
-      transition: background-color 0.3s, color 0.3s, border-color 0.3s;
-    }
-
-    .dark-theme input,
-    .dark-theme select,
-    .dark-theme textarea {
-      background-color: var(--input-bg-dark);
-      color: var(--text-dark);
-      border: 1px solid var(--border-dark);
-    }
-
-    button[type="submit"] {
-      padding: 8px 16px;
-      background-color: var(--btn-bg-light);
-      color: var(--btn-text-light);
-      border: 1px solid var(--border-light);
-      border-radius: 4px;
-      cursor: pointer;
-      transition: background-color 0.3s, color 0.3s;
-    }
-
-    .dark-theme button[type="submit"] {
-      background-color: var(--btn-bg-dark);
-      color: var(--btn-text-dark);
-      border: 1px solid var(--border-dark);
-    }
-
-  </style>
-</head>
-<body>
-    
-
-{% block content %}
-
-<button class="theme-toggle" onclick="toggleTheme()">Змінити тему</button>
+{% block content %} 
 
 <h2>Зміна статусу ОІД</h2>
-
 <form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Змінити статус</button>
+    
+
+<!-- insert page content -->
 </form>
 
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-
-<script>
-$(function() {
-    $('#id_unit').change(function() {
-        const unitId = $(this).val();
-        $.ajax({
-            url: "{% url 'ajax_load_oids_for_unit' %}",
-            data: {'unit': unitId},
-            success: function(data) {
-                const $oidSelect = $('#id_oid');
-                $oidSelect.empty();
-                $oidSelect.append('<option value="">---------</option>');
-                data.forEach(function(oid) {
-                    $oidSelect.append($('<option>', {
-                        value: oid.id,
-                        text: oid.name
-                    }));
-                });
-            }
-        });
-    });
-
-    $('#id_oid').change(function() {
-        const oidId = $(this).val();
-        if (!oidId) return;
-
-        $.ajax({
-            url: "{% url 'ajax_get_oid_status' %}",
-            data: {'oid_id': oidId},
-            success: function(data) {
-                $('#id_old_status').val(data.status);
-            }
-        });
-    });
-});
-</script>
+{% block extra_js %}{% endblock %}
 {% endblock %}
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        document.querySelectorAll("form").forEach(form => {
-            form.setAttribute("autocomplete", "off");
-        });
-    });
-</script>
-<script>
-    function toggleTheme() {
-        document.body.classList.toggle('dark-theme');
-    }
-</script>
-
-  </body>

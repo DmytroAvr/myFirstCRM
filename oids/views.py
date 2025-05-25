@@ -384,79 +384,27 @@ def oid_details(request, oid_id):
         'documents': documents,
     })
 
-# 
-# 
 
+from .forms import MainFilterForm
 
-# power filter page
+def filters_example(request):
+    form = MainFilterForm(request.GET) # Важливо: ініціалізуємо форму даними з GET-запиту
 
-def my_filter_page(request):
-    form = UniversalFilterForm(request.GET)
-    context = {'form': form}
-    return render(request, 'your_template.html', context)
-
-@require_GET
-def get_filtered_options(request):
-    """
-    Універсальний AJAX-ендпоінт для отримання фільтрованих опцій.
-    Приймає параметри:
-    - model_name: Назва моделі (наприклад, 'OID', 'TechnicalTask')
-    - query_param: Назва параметра для фільтрації (наприклад, 'unit_id', 'oids__id__in')
-    - query_value: Значення параметра фільтрації (наприклад, '1', '1,2,3')
-    - label_field: Поле моделі, яке використовувати як label (за замовчуванням 'name' або '__str__')
-    - value_field: Поле моделі, яке використовувати як value (за замовчуванням 'id')
-    """
-    model_name = request.GET.get('model_name')
-    query_param = request.GET.get('query_param') # Наприклад, 'unit' або 'work_request'
-    query_value = request.GET.get('query_value')
-    label_field = request.GET.get('label_field', 'name') # Поле для відображення
-    value_field = request.GET.get('value_field', 'id')   # Поле для значення
-
-    app_label = 'your_app' # Замініть на назву вашого Django-додатку
-    try:
-        Model = apps.get_model(app_label, model_name)
-    except LookupError:
-        return JsonResponse([], safe=False) # Модель не знайдено
-
-    queryset = Model.objects.all()
-
-    # Застосування фільтрації за query_param та query_value
-    if query_param and query_value:
-        filter_kwargs = {}
-        if query_param.endswith('__in'): # Для multi-select (наприклад, 'oids__id__in')
-            values = [v.strip() for v in query_value.split(',') if v.strip()]
-            # Спробуйте перетворити на int, якщо це ID
-            try:
-                values = [int(v) for v in values]
-            except ValueError:
-                pass # Залишити як рядки, якщо не int
-
-            filter_kwargs[query_param] = values
-        else: # Для одиночного вибору (наприклад, 'unit_id')
-            try:
-                # Спробуйте перетворити на int, якщо це ID
-                filter_kwargs[query_param] = int(query_value)
-            except ValueError:
-                filter_kwargs[query_param] = query_value # Залишити як рядок, якщо не int
-
-        queryset = queryset.filter(**filter_kwargs)
-
-    # Якщо вам потрібна специфічна логіка фільтрації (наприклад, для OID
-    # за TechnicalTask, яка може бути через WorkRequest), це ускладнюється.
-    # Можна додати if/elif для конкретних Model_name, або
-    # додати більше параметрів до AJAX-запиту.
+    # Тут може бути логіка для фільтрації основних даних, які ви виводите на сторінку
+    # на основі значень з `form.cleaned_data` (якщо форма валідна)
     # Наприклад:
-    # if model_name == 'OID' and query_param == 'technical_task':
-    #    # Тут потрібно буде отримати WR через TT, а потім OID через WR
-    #    # Це краще робити на бекенді, або мати чіткий шлях через моделі.
-    #    # Або ж, кожна зв'язка є окремим filterConfiguration на JS.
+    # if form.is_valid():
+    #     selected_unit = form.cleaned_data.get('unit')
+    #     selected_oid = form.cleaned_data.get('oid')
+    #     # ... фільтруйте ваш основний QuerySet
 
-    # Отримання даних
-    options_data = []
-    for obj in queryset.order_by(label_field): # Сортуємо за полем для відображення
-        value = getattr(obj, value_field)
-        label = str(getattr(obj, label_field)) # Використовуємо str() для отримання текстового представлення
+    context = {
+        'form': form,
+        # 'some_filtered_data': some_filtered_data, # Додайте, якщо ви показуєте відфільтровані дані
+    }
+    return render(request, 'oids/filters_example.html', context)
 
-        options_data.append({'id': value, 'name': label}) # Формат, який очікує ваш JS
-
-    return JsonResponse(options_data, safe=False)
+# ... (ваш existing get_filtered_options view) ...
+# ... (ваші existing AJAX views like load-oids-for-unit, load-oids-for-units, get-requests-by-oid, etc.) ...
+# ... (ваш existing get-work-request-details view) ...
+# ... (ваш existing load-technical-tasks-for-oid view) ...
