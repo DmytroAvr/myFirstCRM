@@ -27,7 +27,7 @@ const FILTER_SELECTORS = {
  * @param {Object} config - Об'єкт конфігурації фільтра.
  */
 function loadSelectOptions($targetSelect, sourceValue, config) {
-    const { url, paramName, placeholder, transformItem, disableDefaultOption } = config;
+    const { url, paramName, placeholder, transformItem } = config;
 
     // Очищаємо цільовий select і встановлюємо статус "завантаження"
     $targetSelect.prop('disabled', true)
@@ -46,13 +46,7 @@ function loadSelectOptions($targetSelect, sourceValue, config) {
         $targetSelect.prop('disabled', false).empty();
 
         // Додаємо опцію за замовчуванням (якщо потрібна)
-        $targetSelect.append($('<option></option>').val('').text(placeholder.default || 'Оберіть значення...'));
-
-        const defaultOption = $('<option></option>').val('').text(placeholder.default || 'Оберіть значення...');
-        // === ДОДАНО ТУТ ===
-        if (disableDefaultOption) {
-            defaultOption.prop('disabled', true).prop('selected', true).prop('hidden', false);
-        }
+        $targetSelect.append($('<option></option>').val('').prop('disabled', true).prop('selected', true).text(placeholder.default || 'Оберіть значення...'));
 
         data.forEach(item => {
             const option = transformItem(item);
@@ -86,8 +80,6 @@ function loadSelectOptions($targetSelect, sourceValue, config) {
  * @param {Object} config.placeholder - Об'єкт з текстами плейсхолдерів ({ default: '...', loading: '...', error: '...' }).
  * @param {Function} config.transformItem - Функція, яка перетворює кожен елемент відповіді AJAX у { value: ..., label: ... }.
  * За замовчуванням: item => ({ value: item.id, label: item.name }).
- * @param {boolean} [config.disableDefaultOption=true] - Якщо true, це поле є "зворотним" фільтром (наприклад, WorkRequest).
- * 
  * @param {string} [config.formPrefix='form'] - Префікс формсету, якщо цільове поле знаходиться у формсеті.
  * @param {string} [config.formClass='.document-form'] - Клас формсетної форми, якщо цільове поле знаходиться у формсеті.
  * @param {string[]} [config.clearTargets=[]] - Масив ID/базових імен полів, які потрібно очистити при зміні `sourceSelectId`.
@@ -105,7 +97,6 @@ function setupDynamicFilter(config) {
         paramName,
         placeholder,
         transformItem,
-        disableDefaultOption,
         formPrefix = 'form',
         formClass = FILTER_SELECTORS.DOCUMENT_FORM_CLASS,
         clearTargets = [], // Поля, які потрібно очистити далі по ланцюжку
@@ -245,8 +236,7 @@ function initializeDynamicFilters() {
             paramName: 'unit',
             placeholder: { default: 'Оберіть ОІД', loading: 'Завантаження ОІД...' },
             transformItem: item => ({ value: item.id, label: item.name }), // мала бути "за замовчуванням" але не працювала так
-            clearTargets: ['oid', 'work_requests'], // При зміні Unit очистити OID та WorkRequests
-            disableDefaultOption: true
+            clearTargets: ['oid', 'work_requests'] // При зміні Unit очистити OID та WorkRequests
         },
         // F2: Units (MultiSelect) -> OIDs (MultiSelect)
         {
@@ -256,8 +246,7 @@ function initializeDynamicFilters() {
             paramName: 'units[]', // Масив значень для MultiSelectField
             placeholder: { default: 'Оберіть ОІД(и)', loading: 'Завантаження ОІД(ів)...' },
             transformItem: item => ({ value: item.id, label: item.name }), // мала бути "за замовчуванням" але не працювала так
-            clearTargets: ['oids', 'work_requests'],
-            disableDefaultOption: true
+            clearTargets: ['oids', 'work_requests']
         },
         // F3: OID (одинарний) -> WorkRequests (одинарний/MultiSelect)
         {
@@ -267,8 +256,7 @@ function initializeDynamicFilters() {
             paramName: 'oid_id',
             placeholder: { default: 'Оберіть заявку', loading: 'Завантаження заявок...' },
             transformItem: item => ({ value: item.id, label: `${item.incoming_number || item.id} — ${item.incoming_date || ''}` }),
-            clearTargets: ['work_requests'],
-            disableDefaultOption: true
+            clearTargets: ['work_requests']
         },
         // F4: OIDs (MultiSelect) -> WorkRequests (одинарний/MultiSelect)
         {
@@ -278,8 +266,7 @@ function initializeDynamicFilters() {
             paramName: 'oid_ids', // Масив значень для MultiSelectField
             placeholder: { default: 'Оберіть заявку', loading: 'Завантаження заявок...' },
             transformItem: item => ({ value: item.id, label: `${item.incoming_number || item.id} — ${item.incoming_date || ''}` }),
-            clearTargets: ['work_requests'],
-            disableDefaultOption: true
+            clearTargets: ['work_requests']
         },
         // F5: Unit (основний) -> OID у формсеті (.document-form)
         {
@@ -290,8 +277,7 @@ function initializeDynamicFilters() {
             placeholder: { default: 'Оберіть ОІД', loading: 'Оновлення ОІД...' },
             formPrefix: 'form',
             formClass: FILTER_SELECTORS.DOCUMENT_FORM_CLASS,
-            clearTargets: ['oid'], // Це очистить OID в кожній формі
-            disableDefaultOption: true
+            clearTargets: ['oid'] // Це очистить OID в кожній формі
         },
         // F6: WorkRequest (зворотна фільтрація) -> OID -> Unit
         // Цей сценарій складніший, оскільки потрібно оновити батьківські поля.
@@ -307,8 +293,7 @@ function initializeDynamicFilters() {
             isReverse: true,
             parentOidSelectId: FILTER_SELECTORS.OID_SELECT, // ID поля OID, яке потрібно оновити
             parentUnitSelectId: FILTER_SELECTORS.UNIT_SELECT, // ID поля Unit, яке потрібно оновити
-            clearTargets: ['oid', 'unit'], // Очистити ці поля перед завантаженням нових значень
-            disableDefaultOption: true
+            clearTargets: ['oid', 'unit'] // Очистити ці поля перед завантаженням нових значень
         },
         // F7: OID -> TechnicalTask (якщо TechnicalTask залежить від OID)
         {
@@ -318,8 +303,7 @@ function initializeDynamicFilters() {
             paramName: 'oid_id',
             placeholder: { default: 'Оберіть технічне завдання', loading: 'Завантаження ТЗ...' },
             transformItem: item => ({ value: item.id, label: `${item.input_number} — ${item.input_date}` }),
-            clearTargets: ['technical_tasks'],
-            disableDefaultOption: true
+            clearTargets: ['technical_tasks']
         }
     ];
 

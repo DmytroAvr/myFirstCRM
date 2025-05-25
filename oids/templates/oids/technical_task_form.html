@@ -7,29 +7,19 @@
 {% block content %}
 <h2>Додати технічне завдання</h2>
 
-{% csrf_token %}
 <form id="my-form" method="post">
-  <form method="GET"> <div class="form-group">
+  {% csrf_token %}
+  
+<div class="form-group">
     <label for="id_unit">Військова частина (Unit):</label>
-    <select name="unit" id="id_unit" class="form-control">
-        <option value="">---------</option>
-        {% for unit_obj in all_units %} <option value="{{ unit_obj.id }}">{{ unit_obj.name }}</option>
-        {% endfor %}
-    </select>
-</div>
-  
-  
-  
-  
-  <!-- {{ form.unit.label_tag }} {{ form.unit }}<br> -->
+    {{ form.unit }} </div>
 
-  {{ form.oid.label_tag }}
-  <select name="oid" id="id_oid">
-    <option value="">---------</option>
-    {% for oid in form.fields.oid.queryset %}
-      <option value="{{ oid.id }}">{{ oid.name }}</option>
-    {% endfor %}
-  </select>
+<div class="form-group">
+    <label for="id_oid">оберіть ОІД</label>
+    {{ form.oid }} </div>
+
+
+  
   <p style="display: inline;"> - Не знайшли потрібного ОІД? </p>
   <button type="button" class="add-oid-button" style="margin-right: 30px;">➕ Додати ОІД</button>
 
