@@ -11,7 +11,7 @@ from .models import (
     Document, DocumentType, Trip, Person, OIDStatusChoices, WorkRequestStatusChoices,
     WorkTypeChoices, TechnicalTask
 )
-from .forms import WorkRequestForm, TripForm, DocumentForm # Імпортуємо форми
+from .forms import WorkRequestForm, TripForm, DocumentForm
 
 # --- Утиліти та Допоміжні Функції (можна винести в окремий файл, наприклад, utils.py) ---
 

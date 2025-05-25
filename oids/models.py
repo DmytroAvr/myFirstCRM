@@ -169,7 +169,8 @@ class WorkRequest(models.Model):
         verbose_name="Військова частина",
         related_name='work_requests' # Дозволить отримати всі заявки для частини
     )
-    incoming_number = models.CharField(verbose_name="Вхідний обліковий номер заявки", max_length=50, unique=False) 
+    incoming_number = models.CharField(verbose_name="Вхідний обліковий номер заявки", max_length=50, unique=False)
+    incoming_date = models.DateField(verbose_name="Вхідна дата заявки", default=timezone.now) 
     note = models.TextField(verbose_name="Примітки", blank=True, null=True)
     status = models.CharField(
         max_length=30, 

@@ -1,107 +1,114 @@
 from django.contrib import admin
-from .models import Unit, OID, Document, Trip, Person, WorkRequest, WorkRequestItem, DocumentType, AttestationItem,  AttestationRegistration, TripResultForUnit, TechnicalTask, OIDStatusChange, AttestationResponse
-from .forms import TripResultForUnitForm, TechnicalTaskForm, OIDStatusChangeForm
+from .models import (
+    TerritorialManagement, UnitGroup, Unit, OID,
+    Person, WorkRequest, WorkRequestItem,
+    DocumentType, Document,
+    Trip, OIDStatusChange,
+    AttestationRegistration, AttestationItem, AttestationResponse,
+    TripResultForUnit, TechnicalTask
+)
 
+
+@admin.register(TerritorialManagement)
+class TerritorialManagementAdmin(admin.ModelAdmin):
+    list_display = ('code', 'name')
+    search_fields = ('code', 'name')
+
+
+@admin.register(UnitGroup)
+class UnitGroupAdmin(admin.ModelAdmin):
+    list_display = ('name',)
+    search_fields = ('name',)
 
 
 @admin.register(Unit)
 class UnitAdmin(admin.ModelAdmin):
-    list_display = ('name', 'management_unit', 'city', 'directionGroup')
-    list_filter = ('management_unit', 'city',)
+    list_display = ('code', 'name', 'city', 'territorial_management')
+    search_fields = ('code', 'name', 'city')
+    list_filter = ('territorial_management', 'unit_groups')
+
 
 @admin.register(OID)
 class OIDAdmin(admin.ModelAdmin):
-    list_display = ('name', 'unit', 'status')
-    list_filter = ('unit', 'status', 'oid_type')
+    list_display = ('cipher', 'oid_type', 'unit', 'room', 'status')
+    list_filter = ('oid_type', 'status', 'unit__territorial_management')
+    search_fields = ('cipher', 'full_name', 'room')
+
+
+@admin.register(Person)
+class PersonAdmin(admin.ModelAdmin):
+    list_display = ('full_name', 'position', 'is_active')
+    list_filter = ('is_active',)
+    search_fields = ('full_name', 'position')
+
 
 @admin.register(WorkRequest)
 class WorkRequestAdmin(admin.ModelAdmin):
-    list_display = ('unit', 'get_work_types', 'get_oids', 'incoming_number', 'incoming_date', 'status')
-    list_filter = ('unit', 'items__work_type', 'items__oid', 'status')
+    list_display = ('incoming_number', 'unit', 'status')
+    list_filter = ('status', 'unit')
+    search_fields = ('incoming_number',)
 
-    @admin.display(description='Типи робіт')
-    def get_work_types(self, obj):
-        work_types = obj.items.values_list('work_type', flat=True).distinct()
-        return ", ".join(work_types)
-
-    @admin.display(description='ОІД')
-    def get_oids(self, obj):
-        oids = obj.items.values_list('oid__name', flat=True).distinct()
-        return ", ".join(oids)
-    
 
 @admin.register(WorkRequestItem)
 class WorkRequestItemAdmin(admin.ModelAdmin):
     list_display = ('request', 'oid', 'work_type', 'status')
-    list_filter = ('request', 'oid', 'work_type', 'status')
+    list_filter = ('work_type', 'status')
+    search_fields = ('oid__cipher',)
 
-
-@admin.register(Trip)
-class WorkRequestAdmin(admin.ModelAdmin):
-    list_filter = (
-        ('start_date', admin.DateFieldListFilter),
-    )
 
 @admin.register(DocumentType)
-class DocumentType(admin.ModelAdmin):
-    list_display = ('oid_type', 'work_type', 'name', 'valid_days')
+class DocumentTypeAdmin(admin.ModelAdmin):
+    list_display = ('name', 'oid_type', 'work_type', 'has_expiration', 'duration_months', 'is_required')
+    list_filter = ('oid_type', 'work_type', 'has_expiration', 'is_required')
+    search_fields = ('name',)
 
 
 @admin.register(Document)
-class Document(admin.ModelAdmin):
-    list_display = ('unit', 'oid', 'work_date', 'work_type', 'document_type', 'document_number', 'process_date', 'author')
-    list_filter = ('unit', 'oid', 'work_date', 'work_type', 'process_date', 'author')
-
-    admin.site.register(Person)
-
+class DocumentAdmin(admin.ModelAdmin):
+    list_display = ('document_type', 'document_number', 'oid', 'work_date', 'process_date', 'author')
+    list_filter = ('document_type', 'work_date', 'author')
+    search_fields = ('document_number', 'oid__cipher')
 
 
-#  нові частини 
+@admin.register(Trip)
+class TripAdmin(admin.ModelAdmin):
+    list_display = ('start_date', 'end_date', 'purpose')
+    filter_horizontal = ('units', 'oids', 'persons', 'work_requests')
 
-class AttestationItemInline(admin.TabularInline):
-    model = AttestationItem
-    extra = 1
-
-@admin.register(AttestationRegistration)
-class AttestationRegistrationAdmin(admin.ModelAdmin):
-    inlines = [AttestationItemInline]
-    list_display = ("process_date", "get_units", "note")
-    filter_horizontal = ("units",)
-
-    def get_units(self, obj):
-        return ", ".join([str(u) for u in obj.units.all()])
-    get_units.short_description = "Військові частини"
-
-    from django.contrib import admin
 
 @admin.register(OIDStatusChange)
 class OIDStatusChangeAdmin(admin.ModelAdmin):
-    list_display = ('unit', 'oid', 'old_status', 'new_status', 'changed_by', 'changed_at')
-    list_filter = ('new_status', 'changed_at')
-    search_fields = ('oid__name', 'changed_by')
+    list_display = ('oid', 'old_status', 'new_status', 'changed_at', 'changed_by')
+    list_filter = ('old_status', 'new_status')
+    search_fields = ('oid__cipher',)
+
+
+@admin.register(AttestationRegistration)
+class AttestationRegistrationAdmin(admin.ModelAdmin):
+    list_display = ('process_date', 'registration_number')
+    filter_horizontal = ('units',)
+    search_fields = ('registration_number',)
+
+
+@admin.register(AttestationItem)
+class AttestationItemAdmin(admin.ModelAdmin):
+    list_display = ('registration', 'oid', 'document')
+    search_fields = ('oid__cipher', 'document__document_number')
+
+
+@admin.register(AttestationResponse)
+class AttestationResponseAdmin(admin.ModelAdmin):
+    list_display = ('registration', 'registered_number', 'registered_date', 'recorded_date')
+
 
 @admin.register(TripResultForUnit)
 class TripResultForUnitAdmin(admin.ModelAdmin):
-    form = TripResultForUnitForm
-    list_display = ("process_date", "get_units", "get_oids", "get_documents_count")
-    filter_horizontal = ("units", "oids", "documents")
+    list_display = ('process_date', 'trip')
+    filter_horizontal = ('units', 'oids', 'documents')
 
-    def get_units(self, obj):
-        return ", ".join([str(u) for u in obj.units.all()])
-    get_units.short_description = "Частини"
 
-    def get_oids(self, obj):
-        return ", ".join([str(o) for o in obj.oids.all()])
-    get_oids.short_description = "ОІД"
-
-    def get_documents_count(self, obj):
-        return obj.documents.count()
-    get_documents_count.short_description = "К-сть документів"
-
-# Технічне завдання
-@admin.register(TechnicalTask) 
+@admin.register(TechnicalTask)
 class TechnicalTaskAdmin(admin.ModelAdmin):
-    list_display = ('input_number', 'input_date', 'oid', 'reviewed_by', 'review_result')
-    list_filter = ('review_result', 'input_date')
-    search_fields = ('input_number', 'reviewed_by', 'oid__name')
-
+    list_display = ('input_number', 'input_date', 'oid', 'review_result', 'reviewed_by')
+    search_fields = ('input_number', 'oid__cipher')
+    list_filter = ('review_result',)

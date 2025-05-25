@@ -1,6 +1,5 @@
 # C:\myFirstCRM\oids\forms.py
 
-# oids/forms.py
 from django import forms
 from .models import (
     WorkRequest, WorkRequestItem, OID, Unit, Person, Trip, Document, DocumentType,
