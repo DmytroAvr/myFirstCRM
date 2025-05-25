@@ -1,31 +1,3 @@
-// document.addEventListener('DOMContentLoaded', function () {
-//   const unitSelect = document.querySelector('#id_unit');
-//   const taskFieldsBlock = document.getElementById('task-form-fields');
-
-//   if (unitSelect && taskFieldsBlock) {
-//     unitSelect.addEventListener('change', function () {
-//       if (this.value) {
-//         taskFieldsBlock.style.display = 'block';
-//       } else {
-//         taskFieldsBlock.style.display = 'none';
-//       }
-//     });
-
-//     // Початковий стан на reload
-//     if (unitSelect.value) {
-//       taskFieldsBlock.style.display = 'block';
-//     }
-//   }
-// });
-  /* 
-  <div id="task-form-fields" style="display: none;">
-  ...
-  {{ form.input_number.label_tag }} {{ form.input_number }}
-
-  </div> */
-
-
-
 $(document).ready(function () {
   $('.select2').select2();
 
@@ -150,14 +122,3 @@ $(document).ready(function () {
     placeholder: { default: 'Оберіть ОІД', loading: 'Оновлення ОІД...' }
   });
 });
-
-
-/* <select id="id_units" class="select2" multiple></select>
-<select id="id_oids" class="select2" multiple></select>
-<select id="id_work_requests" class="select2" multiple></select>
-
-або одиничний варіант:
-
-<select id="id_unit" class="select2"></select>
-<select id="id_oid" class="select2"></select>
-<select id="id_work_requests" class="select2"></select> */

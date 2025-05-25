@@ -1,4 +1,3 @@
-
 <!-- extends 'base.html' -->
 <!DOCTYPE html>
 <html lang="uk">
@@ -14,22 +13,23 @@
   {% block extra_css %}{% endblock %}
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+  <script src="{% static 'oids/js/select2-init.js' %}"></script>
 </head>
 <body>
-    
-  <button class="theme-toggle" onclick="toggleTheme()">Змінити тему</button>
+  <header>
+    <nav>
+      <ul>
+        <li><a href="{% url 'home' %}">Головна</a></li>
+      </ul>
+    </nav>
+    <button class="theme-toggle" onclick="toggleTheme()">Змінити тему</button>
+  </header>
   <div class="container">
     {% block content %}
-    
-                        
-                       
-
     {% endblock %}
   </div>
-  <!-- 
-  <button type="button" class="add-oid-button" style="margin-right: 30px;">➕ Додати ОІД</button> 
--->
-
+<footer>
+</footer>
                     {% if messages %}
                       <div id="messages" style="margin-bottom: 1em;">
                         {% for message in messages %}
@@ -54,14 +54,9 @@
                     {% endif %}
 
 {% include 'static/oid_create_aside.html' %}
-<script src="{% static 'oids/js/oid_create_aside.js' %}"></script>
+
 <script src="{% static 'oids/js/script.js' %}"></script>
-<script src="{% static 'oids/js/select2-init.js' %}"></script>
-<script>
-  document.addEventListener("DOMContentLoaded", function () {
-    attachOidAside();  // або attachOidAside('custom_unit_id') якщо інший id
-  });
-</script>
+<script src="{% static 'oids/js/oid_create_aside.js' %}"></script>
 <script src="{% static 'oids/js/filtering_dynamic.js' %}"></script>
 {% block extra_js %} {% endblock %}
 </body>

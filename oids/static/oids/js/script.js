@@ -1,6 +1,4 @@
 
-
-
 document.addEventListener("DOMContentLoaded", function () {
         document.querySelectorAll("form").forEach(form => {
             form.setAttribute("autocomplete", "off");
