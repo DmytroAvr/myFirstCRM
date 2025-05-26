@@ -84,64 +84,115 @@ def main_dashboard(request):
     }
     return render(request, 'oids/main_dashboard.html', context)
 
+# old. give ino by vocabulary
+# def ajax_load_oids_for_unit_categorized(request):
+#     """
+#     AJAX view для завантаження ОІДів обраної військової частини,
+#     розділених на категорії.
+#     """
+#     unit_id = request.GET.get('unit_id') # Параметр, який передає JS
+#     data = {
+#         'creating': [],
+#         'active': [],
+#         'cancelled': []
+#     }
+
+#     if unit_id:
+#         try:
+#             # Оптимізуємо запит, обираючи тільки потрібні поля для JSON відповіді
+#             # та пов'язані дані, якщо вони потрібні для відображення
+#             oids_for_unit = OID.objects.filter(unit__id=unit_id)\
+#                                      .select_related('unit')\
+#                                      .values('id', 'cipher', 'full_name', 'status', 'oid_type', 'unit__city')\
+#                                      .order_by('cipher')
+            
+#             # Визначення типів документів для ІК, Атестації, Припису один раз
+#             ik_doc_type_name_keyword = 'Висновок' # Або більш точно "Висновок ІК"
+#             attestation_doc_type_name_keyword = 'Акт атестації'
+#             prescription_doc_type_name_keyword = 'Припис'
+
+#             for oid_data in oids_for_unit:
+#                 # Створюємо тимчасовий об'єкт OID для передачі в get_last_document_expiration_date,
+#                 # або модифікуємо функцію, щоб вона приймала словник oid_data
+#                 temp_oid_obj = OID(pk=oid_data['id'], cipher=oid_data['cipher']) # Мінімально необхідні поля для функції
+
+#                 oid_item = {
+#                     'id': oid_data['id'],
+#                     'cipher': oid_data['cipher'],
+#                     'full_name': oid_data['full_name'] or oid_data['unit__city'], # Використовуємо місто, якщо назва порожня
+#                     'oid_type_display': dict(OIDTypeChoices.choices).get(oid_data['oid_type'], oid_data['oid_type']),
+#                     'status_display': dict(OIDStatusChoices.choices).get(oid_data['status'], oid_data['status']),
+#                     # Посилання на детальну сторінку
+#                     'detail_url': reverse('oids:oid_detail_view_name', args=[oid_data['id']]) # Заміни 'oid_detail_view_name'
+#                 }
+
+#                 if oid_data['status'] in [OIDStatusChoices.NEW, OIDStatusChoices.RECEIVED_REQUEST, OIDStatusChoices.RECEIVED_TZ]:
+#                     # Тут можна додати логіку перевірки наявності активних заявок, якщо потрібно
+#                     data['creating'].append(oid_item)
+#                 elif oid_data['status'] == OIDStatusChoices.ACTIVE:
+#                     oid_item['ik_expiration_date'] = get_last_document_expiration_date(temp_oid_obj, ik_doc_type_name_keyword, WorkTypeChoices.IK)
+#                     oid_item['attestation_expiration_date'] = get_last_document_expiration_date(temp_oid_obj, attestation_doc_type_name_keyword, WorkTypeChoices.ATTESTATION)
+#                     oid_item['prescription_expiration_date'] = get_last_document_expiration_date(temp_oid_obj, prescription_doc_type_name_keyword) # Може бути для обох типів робіт
+#                     data['active'].append(oid_item)
+#                 elif oid_data['status'] in [OIDStatusChoices.CANCELED, OIDStatusChoices.TERMINATED]:
+#                     data['cancelled'].append(oid_item)
+#         except ValueError: # Якщо unit_id не є числом
+#             return JsonResponse({'error': 'Невірний ID військової частини'}, status=400)
+#         except Exception as e:
+#             print(f"Серверна помилка в ajax_load_oids_for_unit_categorized: {e}")
+#             return JsonResponse({'error': 'Серверна помилка'}, status=500)
+            
+#     return JsonResponse(data)
+
+# changede by gemeni
 def ajax_load_oids_for_unit_categorized(request):
-    """
-    AJAX view для завантаження ОІДів обраної військової частини,
-    розділених на категорії.
-    """
-    unit_id = request.GET.get('unit_id') # Параметр, який передає JS
+    unit_id_str = request.GET.get('unit_id')
     data = {
         'creating': [],
         'active': [],
         'cancelled': []
     }
 
-    if unit_id:
+    if unit_id_str:
         try:
-            # Оптимізуємо запит, обираючи тільки потрібні поля для JSON відповіді
-            # та пов'язані дані, якщо вони потрібні для відображення
-            oids_for_unit = OID.objects.filter(unit__id=unit_id)\
-                                     .select_related('unit')\
-                                     .values('id', 'cipher', 'full_name', 'status', 'oid_type', 'unit__city')\
-                                     .order_by('cipher')
-            
-            # Визначення типів документів для ІК, Атестації, Припису один раз
-            ik_doc_type_name_keyword = 'Висновок' # Або більш точно "Висновок ІК"
-            attestation_doc_type_name_keyword = 'Акт атестації'
-            prescription_doc_type_name_keyword = 'Припис'
+            unit_id = int(unit_id_str)
+            # Замість .values(), отримуємо повні об'єкти OID, щоб передавати їх у helper
+            oids_for_unit_qs = OID.objects.filter(unit__id=unit_id)\
+                                        .select_related('unit', 'unit__territorial_management')\
+                                        .order_by('cipher')
 
-            for oid_data in oids_for_unit:
-                # Створюємо тимчасовий об'єкт OID для передачі в get_last_document_expiration_date,
-                # або модифікуємо функцію, щоб вона приймала словник oid_data
-                temp_oid_obj = OID(pk=oid_data['id'], cipher=oid_data['cipher']) # Мінімально необхідні поля для функції
-
+            for oid_instance in oids_for_unit_qs: # Тепер це повний екземпляр OID
                 oid_item = {
-                    'id': oid_data['id'],
-                    'cipher': oid_data['cipher'],
-                    'full_name': oid_data['full_name'] or oid_data['unit__city'], # Використовуємо місто, якщо назва порожня
-                    'oid_type_display': dict(OIDTypeChoices.choices).get(oid_data['oid_type'], oid_data['oid_type']),
-                    'status_display': dict(OIDStatusChoices.choices).get(oid_data['status'], oid_data['status']),
-                    # Посилання на детальну сторінку
-                    'detail_url': reverse('oids:oid_detail_view_name', args=[oid_data['id']]) # Заміни 'oid_detail_view_name'
+                    'id': oid_instance.id,
+                    'cipher': oid_instance.cipher,
+                    'full_name': oid_instance.full_name or oid_instance.unit.city,
+                    'oid_type_display': oid_instance.get_oid_type_display(), # Використовуємо метод моделі
+                    'status_display': oid_instance.get_status_display(),   # Використовуємо метод моделі
+                    'detail_url': reverse('oids:oid_detail_view_name', args=[oid_instance.id])
                 }
 
-                if oid_data['status'] in [OIDStatusChoices.NEW, OIDStatusChoices.RECEIVED_REQUEST, OIDStatusChoices.RECEIVED_TZ]:
-                    # Тут можна додати логіку перевірки наявності активних заявок, якщо потрібно
+                if oid_instance.status in [OIDStatusChoices.NEW, OIDStatusChoices.RECEIVED_REQUEST, OIDStatusChoices.RECEIVED_TZ]:
                     data['creating'].append(oid_item)
-                elif oid_data['status'] == OIDStatusChoices.ACTIVE:
-                    oid_item['ik_expiration_date'] = get_last_document_expiration_date(temp_oid_obj, ik_doc_type_name_keyword, WorkTypeChoices.IK)
-                    oid_item['attestation_expiration_date'] = get_last_document_expiration_date(temp_oid_obj, attestation_doc_type_name_keyword, WorkTypeChoices.ATTESTATION)
-                    oid_item['prescription_expiration_date'] = get_last_document_expiration_date(temp_oid_obj, prescription_doc_type_name_keyword) # Може бути для обох типів робіт
+                elif oid_instance.status == OIDStatusChoices.ACTIVE:
+                    # Тепер передаємо повний екземпляр oid_instance
+                    oid_item['ik_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Висновок', WorkTypeChoices.IK)
+                    oid_item['attestation_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Акт атестації', WorkTypeChoices.ATTESTATION)
+                    oid_item['prescription_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Припис')
                     data['active'].append(oid_item)
-                elif oid_data['status'] in [OIDStatusChoices.CANCELED, OIDStatusChoices.TERMINATED]:
+                elif oid_instance.status in [OIDStatusChoices.CANCELED, OIDStatusChoices.TERMINATED]:
                     data['cancelled'].append(oid_item)
-        except ValueError: # Якщо unit_id не є числом
+        
+        except ValueError:
             return JsonResponse({'error': 'Невірний ID військової частини'}, status=400)
         except Exception as e:
-            print(f"Серверна помилка в ajax_load_oids_for_unit_categorized: {e}")
-            return JsonResponse({'error': 'Серверна помилка'}, status=500)
+            # Виводимо помилку в консоль Django для дебагу
+            print(f"SERVER ERROR in ajax_load_oids_for_unit_categorized: {type(e).__name__} - {e}")
+            import traceback
+            traceback.print_exc() # Друкує повний трейсбек
+            return JsonResponse({'error': f'Серверна помилка: {type(e).__name__}'}, status=500)
             
     return JsonResponse(data)
+
 
 # Ваш ajax_load_oids_for_unit (якщо потрібен окремо для простого списку ОІДів, наприклад, для форм)
 def ajax_load_oids_for_unit(request):
