@@ -3,84 +3,101 @@ from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.urls import reverse # Не забувай імпортувати
 from .models import (
-    Unit, OID, TerritorialManagement, # Додав TerritorialManagement
+    Unit, OID, TerritorialManagement, 
     OIDStatusChoices, WorkTypeChoices, Document, DocumentType,
-    WorkRequest, WorkRequestItem, Trip, Person, TechnicalTask,
-    # Додай інші моделі, якщо вони потрібні для інших view
+    WorkRequest, WorkRequestStatusChoices, WorkRequestItem, Trip,TripResultForUnit, Person, TechnicalTask,
+    AttestationRegistration, AttestationItem, AttestationResponse
 )
-from django.db.models import Q # Для складних запитів
+
+from django.db.models import Q, Max, Prefetch
 
 # Твоя допоміжна функція (залишається без змін, але буде викликатися в AJAX view)
-def get_last_document_expiration_date(oid, document_name_keyword, work_type_choice=None):
+def get_last_document_expiration_date(oid_instance, document_name_keyword, work_type_choice=None):
     try:
         doc_type_filters = Q(name__icontains=document_name_keyword)
         if work_type_choice:
             doc_type_filters &= Q(work_type=work_type_choice)
         
-        # Шукаємо DocumentType, який відповідає ключовому слову та типу роботи
-        # Якщо тип роботи не вказано, але є кілька типів документів з однаковою назвою
-        # (наприклад, "Припис" для Атестації і "Припис" для ІК), це може потребувати уточнення
-        # або більш точних ключових слів.
         relevant_doc_type_qs = DocumentType.objects.filter(doc_type_filters)
         if not relevant_doc_type_qs.exists():
-            # print(f"Debug: DocumentType не знайдено для '{document_name_keyword}' та work_type '{work_type_choice}'")
             return None
-        
-        # Якщо знайдено кілька, можливо, потрібна додаткова логіка вибору
-        # Для простоти беремо перший знайдений, але це може бути не завжди коректно.
         relevant_doc_type = relevant_doc_type_qs.first()
 
         last_document = Document.objects.filter(
-            oid=oid,
+            oid=oid_instance, # Використовуємо переданий екземпляр OID
             document_type=relevant_doc_type,
             expiration_date__isnull=False
         ).order_by('-work_date', '-process_date').first()
         
-        # print(f"Debug: OID: {oid.cipher}, DocType: {relevant_doc_type.name}, LastDoc: {last_document}, ExpDate: {last_document.expiration_date if last_document else 'N/A'}")
         return last_document.expiration_date if last_document else None
     except Exception as e:
-        print(f"Помилка get_last_document_expiration_date для ОІД {oid.cipher if oid else 'N/A'} ({document_name_keyword}): {e}")
+        print(f"Помилка get_last_document_expiration_date для ОІД {oid_instance.cipher if oid_instance else 'N/A'} ({document_name_keyword}): {e}")
         return None
+    
 
 def main_dashboard(request):
     """
-    Головна сторінка. Завантажує список ВЧ.
-    ОІДи будуть завантажуватися через AJAX.
+    Головна сторінка. Фільтрація ВЧ -> ОІД відбувається на сервері 
+    через перезавантаження сторінки.
     """
-    # Кнопки керування (посилання на відповідні форми/views)
-    # Переконайся, що ці URL-и існують в твоїх urls.py
-    # і ведуть на реальні views для додавання/планування
     try:
-        add_request_url = reverse('oids:add_work_request_view_name') # Приклад name='add_work_request_view_name' в urls.py
+        add_request_url = reverse('oids:add_work_request_view_name') 
         plan_trip_url = reverse('oids:plan_trip_view_name')
         add_document_processing_url = reverse('oids:add_document_processing_view_name')
-    except Exception as e: # Обробка помилки, якщо URL-и ще не визначені
-        print(f"Помилка реверсу URL: {e}. Перевірте ваші urls.py.")
-        add_request_url = '#'
-        plan_trip_url = '#'
-        add_document_processing_url = '#'
-
+    except Exception:
+        add_request_url, plan_trip_url, add_document_processing_url = '#', '#', '#'
 
     all_units = Unit.objects.select_related('territorial_management').order_by('name')
     
-    # selected_unit_id буде використовуватися JavaScript для початкового завантаження,
-    # або якщо користувач переходить за прямим посиланням з GET-параметром.
     selected_unit_id_str = request.GET.get('unit')
     selected_unit_object = None
+    
+    oids_creating_list = []
+    oids_active_list = []
+    oids_cancelled_list = []
+
     if selected_unit_id_str:
         try:
-            selected_unit_object = Unit.objects.get(pk=int(selected_unit_id_str))
+            selected_unit_id = int(selected_unit_id_str)
+            selected_unit_object = Unit.objects.get(pk=selected_unit_id)
+            
+            oids_for_selected_unit = OID.objects.filter(unit_id=selected_unit_id)\
+                                              .select_related('unit')\
+                                              .order_by('cipher')
+
+            for oid_instance in oids_for_selected_unit:
+                oid_item_data = {
+                    'id': oid_instance.id,
+                    'cipher': oid_instance.cipher,
+                    'full_name': oid_instance.full_name or oid_instance.unit.city,
+                    'oid_type_display': oid_instance.get_oid_type_display(),
+                    'status_display': oid_instance.get_status_display(),
+                    'detail_url': reverse('oids:oid_detail_view_name', args=[oid_instance.id])
+                }
+                if oid_instance.status in [OIDStatusChoices.NEW, OIDStatusChoices.RECEIVED_REQUEST, OIDStatusChoices.RECEIVED_TZ]:
+                    oids_creating_list.append(oid_item_data)
+                elif oid_instance.status == OIDStatusChoices.ACTIVE:
+                    oid_item_data['ik_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Висновок', WorkTypeChoices.IK)
+                    oid_item_data['attestation_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Акт атестації', WorkTypeChoices.ATTESTATION)
+                    oid_item_data['prescription_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Припис')
+                    oids_active_list.append(oid_item_data)
+                elif oid_instance.status in [OIDStatusChoices.CANCELED, OIDStatusChoices.TERMINATED]:
+                    oids_cancelled_list.append(oid_item_data)
         except (ValueError, Unit.DoesNotExist):
-            selected_unit_object = None # або обробити помилку
+            selected_unit_object = None 
+            # Можна додати повідомлення про помилку, якщо unit_id невірний
+            # messages.error(request, "Обрана військова частина не знайдена.")
 
     context = {
         'add_request_url': add_request_url,
         'plan_trip_url': plan_trip_url,
         'add_document_processing_url': add_document_processing_url,
         'all_units': all_units,
-        'selected_unit_id': int(selected_unit_id_str) if selected_unit_id_str else None,
-        'selected_unit_object': selected_unit_object, 
-        # Списки ОІД тепер будуть завантажуватися через AJAX, тому їх тут немає
+        'selected_unit_id': selected_unit_id_str, # Передаємо рядок для порівняння в шаблоні
+        'selected_unit_object': selected_unit_object,
+        'oids_creating': oids_creating_list,
+        'oids_active': oids_active_list,
+        'oids_cancelled': oids_cancelled_list,
     }
     return render(request, 'oids/main_dashboard.html', context)
 
@@ -144,7 +161,7 @@ def main_dashboard(request):
             
 #     return JsonResponse(data)
 
-# changede by gemeni
+# changede by gemeni. перейшли від передачі словників до передачі повних екземплярів моделі OID у функцію get_last_document_expiration_date. Це важливо для коректної роботи сервера, незалежно від фронтенд-фільтрації.
 def ajax_load_oids_for_unit_categorized(request):
     unit_id_str = request.GET.get('unit_id')
     data = {
@@ -195,28 +212,27 @@ def ajax_load_oids_for_unit_categorized(request):
 
 
 # Ваш ajax_load_oids_for_unit (якщо потрібен окремо для простого списку ОІДів, наприклад, для форм)
+
+# AJAX view для завантаження ОІДів для Select2 у формах (якщо потрібно)
+# Цей view НЕ використовується для оновлення списків ОІД на головній панелі в цьому сценарії
 def ajax_load_oids_for_unit(request):
-    unit_id = request.GET.get('unit_id') # або 'unit'
+    unit_id = request.GET.get('unit_id') # Або 'unit', залежно від JS
     oids_data = []
     if unit_id:
         try:
-            # Фільтруємо ОІД за потрібними статусами для випадаючого списку
             oids = OID.objects.filter(
                 unit__id=unit_id,
-                status__in=[
-                    OIDStatusChoices.ACTIVE, 
-                    OIDStatusChoices.NEW, 
-                    OIDStatusChoices.RECEIVED_REQUEST, 
-                    OIDStatusChoices.RECEIVED_TZ
-                ]
+                status__in=[OIDStatusChoices.ACTIVE, OIDStatusChoices.NEW, 
+                            OIDStatusChoices.RECEIVED_REQUEST, OIDStatusChoices.RECEIVED_TZ]
             ).order_by('cipher')
             for oid in oids:
                 oids_data.append({
                     'id': oid.id, 
-                    'name': f"{oid.cipher} ({oid.get_oid_type_display()}) - {oid.full_name or oid.unit.city}"
+                    # 'name' або 'text' - залежно від того, що очікує transformItem або Select2
+                    'name': f"{oid.cipher} ({oid.get_oid_type_display()}) - {oid.full_name or oid.unit.city}" 
                 })
         except ValueError:
-             return JsonResponse([], safe=False) # Повертаємо порожній список при помилці ID
+            pass # unit_id не є числом
     return JsonResponse(list(oids_data), safe=False)
 
 # ... (решта ваших views: oid_detail_view, форми для додавання тощо) ...

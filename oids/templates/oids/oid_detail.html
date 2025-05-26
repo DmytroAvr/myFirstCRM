@@ -5,14 +5,14 @@
 {% block page_title %}Деталі ОІД: {{ oid.cipher }} ({{ oid.full_name|default:"Без назви" }}){% endblock %}
 
 {% block content %}
-<p><a href="{% url 'main_dashboard' %}">← Повернутися до панелі керування</a></p>
+<p><a href="{% url 'oids:main_dashboard' %}">← Повернутися до панелі керування</a></p>
 
 <h2>Основна інформація про ОІД</h2>
 <ul>
     <li><strong>Шифр:</strong> {{ oid.cipher }}</li>
     <li><strong>Повна назва:</strong> {{ oid.full_name|default:"Не вказано" }}</li>
     <li><strong>Тип ОІД:</strong> {{ oid.get_oid_type_display }}</li>
-    <li><strong>Військова частина:</strong> <a href="{% url 'main_dashboard' %}?unit={{ oid.unit.id }}">{{ oid.unit.code }} - {{ oid.unit.name|default:oid.unit.city }}</a></li>
+    <li><strong>Військова частина:</strong> <a href="{% url 'oids:main_dashboard' %}?unit={{ oid.unit.id }}">{{ oid.unit.code }} - {{ oid.unit.name|default:oid.unit.city }}</a></li>
     <li><strong>Територіальне управління:</strong> {{ oid.unit.territorial_management.name|default:"Не вказано" }}</li>
     <li><strong>Приміщення:</strong> {{ oid.room }}</li>
     <li><strong>Поточний стан:</strong> {{ oid.get_status_display }}</li>
@@ -49,7 +49,7 @@
                     <td>{{ change.changed_by.full_name|default:"Невідомо" }}</td>
                     <td>
                         {% if change.initiating_document %}
-                            <a href="{% url 'oid_detail' oid.id %}#doc-{{ change.initiating_document.id }}">
+                            <a href="{% url 'oids:oid_detail_view_name' oid.id %}#req-{{ doc.work_request_item.request.id }}">
                                 {{ change.initiating_document.document_type.name }} №{{ change.initiating_document.document_number }}
                             </a>
                         {% else %}
@@ -160,7 +160,7 @@
                     <td>{{ doc.author.full_name|default:"-" }}</td>
                     <td>
                         {% if doc.work_request_item %}
-                            <a href="{% url 'oid_detail' oid.id %}#req-{{ doc.work_request_item.request.id }}">
+                            <a href="{% url 'oids:oid_detail_view_name' oid.id %}#req-{{ doc.work_request_item.request.id }}">
                                 Заявка {{ doc.work_request_item.request.incoming_number }}
                             </a>
                         {% else %}
