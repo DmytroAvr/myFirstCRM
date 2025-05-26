@@ -10,7 +10,7 @@ from .models import (
     WorkRequest, WorkRequestStatusChoices, WorkRequestItem, Trip,TripResultForUnit, Person, TechnicalTask,
     AttestationRegistration, AttestationItem, AttestationResponse
 )
-from .forms import ( TripForm, DocumentForm
+from .forms import ( TripForm, DocumentForm, WorkRequestForm, 
 )
 
 # Твоя допоміжна функція (залишається без змін, але буде викликатися в AJAX view)
@@ -385,4 +385,39 @@ def add_document_processing_view(request, oid_id=None, work_request_item_id=None
         'form': form, 
         'page_title': 'Додати опрацювання документів',
         'selected_oid': selected_oid
+    })
+
+def add_work_request_view(request):
+    if request.method == 'POST':
+        form = WorkRequestForm(request.POST)
+        if form.is_valid():
+            work_request = form.save(commit=False) 
+            # Тут можна додати логіку перед збереженням, якщо потрібно
+            # наприклад, встановити автора work_request.created_by = request.user
+            work_request.save()
+            form.save_m2m() # Важливо для збереження ManyToMany полів (oids)
+
+            # Створюємо WorkRequestItem для кожного обраного ОІД у заявці
+            # Цю логіку можна перенести в метод save() самої форми WorkRequestForm
+            # як було показано в одному з попередніх прикладів форм.
+            # Якщо ти вже додав це в save() форми, то тут це не потрібно.
+            selected_oids = form.cleaned_data.get('oids')
+            selected_work_type = form.cleaned_data.get('request_work_type') # Якщо є таке поле у формі
+            for oid in selected_oids:
+                WorkRequestItem.objects.create(
+                    request=work_request,
+                    oid=oid,
+                    work_type=selected_work_type # Або визначати інакше
+                )
+
+            messages.success(request, f'Заявку №{work_request.incoming_number} успішно створено!')
+            return redirect('oids:main_dashboard') # Або на сторінку деталей заявки
+        else:
+            messages.error(request, 'Будь ласка, виправте помилки у формі.')
+    else:
+        form = WorkRequestForm()
+
+    return render(request, 'oids/forms/add_work_request_form.html', {
+        'form': form,
+        'page_title': 'Створення нової заявки на проведення робіт'
     })

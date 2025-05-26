@@ -1,32 +1,43 @@
 {% extends "oids/base.html" %}
 {% load static %}
 
-{% block title %}{{ page_title }}{% endblock %}
+{% block title %}{{ page_title|default:"Додати опрацювання документів" }}{% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container form-container">
     <h2 class="mb-4">
-        {{ page_title }}
+        {{ page_title|default:"Додати опрацювання документів" }}
         {% if selected_oid %}
             для ОІД: <a href="{% url 'oids:oid_detail_view_name' selected_oid.id %}">{{ selected_oid.cipher }}</a>
+             ({{ selected_oid.get_oid_type_display }})
         {% endif %}
     </h2>
-    <form method="post" enctype="multipart/form-data" novalidate> {# enctype для завантаження файлів #}
+
+    <form method="post" enctype="multipart/form-data" novalidate>
         {% csrf_token %}
         {{ form.media }}
 
-        {% for field in form %}
-            <div class="form-group mb-3">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% if field.help_text %}
-                    <small class="form-text text-muted">{{ field.help_text }}</small>
-                {% endif %}
-                {% for error in field.errors %}
-                    <div class="alert alert-danger mt-1 p-1" role="alert">{{ error }}</div>
-                {% endfor %}
-            </div>
-        {% endfor %}
+        <div class="table-like-form">
+            {% for field in form %}
+                <div class="form-row mb-3">
+                    <div class="form-group-label" style="font-weight: bold; padding-right: 10px; min-width: 200px; display: inline-block; vertical-align: top;">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
+                        {% if field.field.required %}
+                            <span style="color: red;">*</span>
+                        {% endif %}
+                    </div>
+                    <div class="form-group-field" style="display: inline-block; width: calc(100% - 220px);">
+                        {{ field }}
+                        {% if field.help_text %}
+                            <br><small class="form-text text-muted">{{ field.help_text }}</small>
+                        {% endif %}
+                        {% for error in field.errors %}
+                            <div class="alert alert-danger mt-1 p-1" role="alert" style="font-size: 0.9em;">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
 
         {% if form.non_field_errors %}
             <div class="alert alert-danger" role="alert">
@@ -35,13 +46,15 @@
                 {% endfor %}
             </div>
         {% endif %}
-        
-        <button type="submit" class="btn btn-primary">Зберегти документ</button>
-        {% if selected_oid %}
-             <a href="{% url 'oids:oid_detail_view_name' selected_oid.id %}" class="btn btn-secondary">Скасувати</a>
-        {% else %}
-            <a href="{% url 'oids:main_dashboard' %}" class="btn btn-secondary">Скасувати</a>
-        {% endif %}
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Зберегти документ</button>
+            {% if selected_oid %}
+                 <a href="{% url 'oids:oid_detail_view_name' selected_oid.id %}" class="btn btn-secondary">Скасувати</a>
+            {% else %}
+                <a href="{% url 'oids:main_dashboard' %}" class="btn btn-secondary">Скасувати</a>
+            {% endif %}
+        </div>
     </form>
 </div>
 {% endblock %}
@@ -50,58 +63,79 @@
 <script>
 $(document).ready(function() {
     // Ініціалізація Select2
-    // initSelect2Fields($('#documentForm'));
+    // initSelect2Fields($('.form-container'));
 
-    // Тут потрібен JS для динамічного оновлення поля "Тип документа" (id_document_type)
-    // на основі обраного "ОІД" (id_document_oid) та, можливо, "Елемент заявки".
-    // Це вимагатиме AJAX-запиту до нового view, який повертатиме відфільтровані DocumentType.
-    // Також потрібно буде налаштувати filtering_dynamic.js для цього.
+    // Динамічне оновлення "Тип документа" та "Елемент заявки" на основі "ОІД"
+    const oidSelect = $('#id_document_oid'); // ID з DocumentForm
+    const workRequestItemSelect = $('#id_work_request_item'); // ID з DocumentForm
+    const documentTypeSelect = $('#id_document_type'); // ID з DocumentForm (поле document_type у формі)
 
-    const oidSelect = $('#id_document_oid');
-    const workRequestItemSelect = $('#id_work_request_item'); // Якщо це поле є
-    const documentTypeSelect = $('#id_document_type'); // ID з DocumentForm
-
-    function loadDocumentTypes() {
+    function updateDependentFields() {
         const oidId = oidSelect.val();
-        // const wrItemId = workRequestItemSelect.val(); // Якщо використовується
         
-        // Припускаємо, що work_type визначається з обраного OID або WorkRequestItem
-        // або передається як окремий параметр, якщо документ не пов'язаний з заявкою.
-        // Ця логіка потребує уточнення.
-
+        // Оновлення WorkRequestItem
         if (oidId) {
-            // console.log(`OID обрано: ${oidId}, завантажуємо типи документів...`);
-            // AJAX-запит для отримання типів документів
-            // $.ajax({
-            //     url: "{% url 'oids:ajax_load_document_types' %}", // Потрібно створити цей URL та View
-            //     data: {
-            //         'oid_id': oidId,
-            //         // 'work_request_item_id': wrItemId // якщо потрібно
-            //     },
-            //     success: function(data) {
-            //         documentTypeSelect.empty().append($('<option value="">Оберіть тип...</option>'));
-            //         $.each(data, function(key, value) {
-            //             documentTypeSelect.append($('<option></option>').attr('value', value.id).text(value.name));
-            //         });
-            //         documentTypeSelect.trigger('change'); // для Select2
-            //     }
-            // });
+            // Припустимо, є AJAX URL для завантаження WorkRequestItems для OID
+            // Тобі потрібно створити цей view та URL
+            // const wrItemsUrl = "{% url 'oids:ajax_load_work_request_items_for_oid' %}"; // Приклад
+            const wrItemsUrl = `/oids/ajax/load-work-request-items-for-oid/`; // Або жорстко, якщо не впевнений в reverse у JS
+            
+            if (typeof loadSingleSelectOptions === 'function' && wrItemsUrl) {
+                 // Передаємо URL напряму, бо data-атрибут може бути не на oidSelect для цього конкретного зв'язку
+                 loadSingleSelectOptions(workRequestItemSelect, oidId, {
+                    url: wrItemsUrl,
+                    paramName: 'oid_id',
+                    placeholder: { default: 'Оберіть елемент заявки (необов\'язково)', loading: 'Завантаження...', error: 'Помилка', empty: 'Немає заявок для цього ОІД' },
+                    transformItem: item => ({ value: item.id, text: `Заявка №${item.request_incoming_number} - ${item.work_type_display}` }) 
+                    // Потрібно, щоб AJAX view повертав request_incoming_number та work_type_display
+                });
+            }
         } else {
-            documentTypeSelect.empty().append($('<option value="">Спочатку оберіть ОІД</option>')).trigger('change');
+            workRequestItemSelect.empty().append($('<option value="">Спочатку оберіть ОІД</option>')).prop('disabled', true).trigger('change');
+        }
+
+        // Оновлення DocumentType
+        // Ця логіка складніша, бо залежить від oid.oid_type та work_request_item.work_type (якщо обрано)
+        // або від якогось іншого способу визначення поточного типу робіт
+        if (oidId) {
+            // const docTypesUrl = "{% url 'oids:ajax_load_document_types_for_oid_and_work' %}"; // Приклад
+            const docTypesUrl = `/oids/ajax/load-document-types-for-oid/`; // Потрібен view, що приймає oid_id і, можливо, work_type
+            
+            // Потрібно визначити work_type. Це може бути обрано окремим полем або взято з workRequestItem, якщо воно обрано.
+            // let currentWorkType = $('#id_some_work_type_selector_on_form').val(); // Якщо є окремий вибір типу робіт
+            let currentWorkType = null;
+            if (workRequestItemSelect.val()) {
+                // Потрібно буде отримати work_type з обраного work_request_item, можливо, через інший AJAX або з data-атрибута
+                // currentWorkType = $(workRequestItemSelect.find('option:selected')).data('work-type');
+            }
+
+            if (typeof loadSingleSelectOptions === 'function' && docTypesUrl) {
+                let ajaxParams = { oid_id: oidId };
+                // if (currentWorkType) ajaxParams.work_type = currentWorkType; // Додати work_type, якщо він є
+
+                loadSingleSelectOptions(documentTypeSelect, oidId, { // sourceValue може бути oidId
+                    url: docTypesUrl, // AJAX view, що повертає DocumentType[]
+                    paramName: 'oid_id', // Або комбінація параметрів
+                    // В data функції в $.ajax можна передати кілька параметрів:
+                    // data: ajaxParams, 
+                    placeholder: { default: 'Оберіть тип документа', loading: 'Завантаження...', error: 'Помилка', empty: 'Немає доступних типів' },
+                    transformItem: item => ({ value: item.id, text: `${item.name} (${item.oid_type}, ${item.work_type})` })
+                });
+            }
+        } else {
+            documentTypeSelect.empty().append($('<option value="">Спочатку оберіть ОІД</option>')).prop('disabled', true).trigger('change');
         }
     }
 
-    if (oidSelect.length) { // Якщо поле ОІД існує на формі
-       oidSelect.on('change', loadDocumentTypes);
-       // Початкове завантаження, якщо ОІД вже обрано (наприклад, при редагуванні або з initial)
-       if(oidSelect.val()){
-           loadDocumentTypes();
-       }
+    if (oidSelect.length) {
+        oidSelect.on('change', updateDependentFields);
+        if (oidSelect.val()) { // Початкове завантаження, якщо ОІД вже обраний
+            updateDependentFields();
+        }
     }
-    // if (workRequestItemSelect.length) { // Якщо поле елемента заявки існує
-    //    workRequestItemSelect.on('change', loadDocumentTypes);
+    // if (workRequestItemSelect.length) {
+    //     workRequestItemSelect.on('change', updateDependentFields); // Зміна WorkRequestItem також може оновлювати DocumentType
     // }
-
 });
 </script>
 {% endblock %}

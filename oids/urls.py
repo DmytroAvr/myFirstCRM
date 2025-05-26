@@ -19,4 +19,5 @@ urlpatterns = [
     path('oid/<int:oid_id>/document/add/', views.add_document_processing_view, name='add_document_for_oid_view_name'),
     # Якщо форма додавання документа викликається з контексту елемента заявки:
     path('work-request-item/<int:work_request_item_id>/document/add/', views.add_document_processing_view, name='add_document_for_work_request_item_view_name'),
+    path('request/add/', views.add_work_request_view, name='add_work_request_view_name'),
 ]
