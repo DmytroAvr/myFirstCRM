@@ -309,4 +309,37 @@ class DocumentForm(forms.ModelForm):
             self.save_m2m() # Якщо є ManyToMany поля
         return instance
     
+class OIDForm(forms.ModelForm):
+    class Meta:
+        model = OID
+        fields = ['unit', 'oid_type', 'cipher', 'full_name', 'room', 'status', 'sec_level', 'note']
+        widgets = {
+            'unit': forms.Select(attrs={'class': 'select2-basic-modal'}), # Окремий клас для Select2 в модальному вікні
+            'oid_type': forms.Select(attrs={'class': 'form-control'}),
+            'cipher': forms.TextInput(attrs={'class': 'form-control'}),
+            'full_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'room': forms.TextInput(attrs={'class': 'form-control'}),
+            'status': forms.Select(attrs={'class': 'form-control'}),
+            'sec_level': forms.Select(attrs={'class': 'form-control'}),
+            'note': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+        }
+        labels = {
+            'unit': 'Військова частина',
+            'oid_type': 'Тип ОІД',
+            'cipher': 'Шифр ОІД',
+            'full_name': 'Повна назва ОІД',
+            'room': 'Приміщення №',
+            'status': 'Поточний стан ОІД',
+            'sec_level': 'Гриф ОІД',
+            'note': 'Примітка',
+        }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Можна відфільтрувати queryset для unit, якщо потрібно
+        self.fields['unit'].queryset = Unit.objects.all().order_by('code')
+        # Якщо форма відкривається з контексту заявки, де вже обрана ВЧ,
+        # можна передати initial_unit_id і встановити його
+        initial_unit_id = kwargs.pop('initial_unit_id', None)
+        if initial_unit_id:
+            self.fields['unit'].initial = initial_unit_id

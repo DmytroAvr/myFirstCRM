@@ -51,6 +51,93 @@
 		</nav>
 	</footer>
 
+
+	{# Приклад для oids/forms/add_work_request_form.html або base.html #}
+	{# Використовуємо Bootstrap 5 для модального вікна #}
+	<div class="modal fade" id="createOidModal" tabindex="-1" aria-labelledby="createOidModalLabel" aria-hidden="true">
+		<div class="modal-dialog modal-lg">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h5 class="modal-title" id="createOidModalLabel">Створити новий ОІД</h5>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+				</div>
+				<div class="modal-body">
+					{# Форма для створення ОІД буде тут #}
+					{# Можна завантажувати її через AJAX або мати статично, якщо поля відомі #}
+					<form id="ajaxOidCreateForm" method="POST" action="{% url 'oids:ajax_create_oid' %}">
+						{% csrf_token %}
+						{# Тут можна рендерити поля OIDForm вручну або через {{ oid_form.as_p }} #}
+						{# Якщо OIDForm передається з основного view, або завантажується окремо #}
+						{# Наприклад, якщо OIDForm проста: #}
+						<div class="mb-3">
+							<label for="id_modal_unit" class="form-label">Військова частина</label>
+							<select name="unit" id="id_modal_unit" class="form-control select2-basic-modal-init" style="width:100%;">
+								<option value="">Оберіть ВЧ...</option>
+								{# Опції будуть завантажені з контексту або JS #}
+							</select>
+							<div class="invalid-feedback" data-field-errors="unit"></div>
+						</div>
+						<div class="mb-3">
+							<label for="id_modal_oid_type" class="form-label">Тип ОІД</label>
+							<select name="oid_type" id="id_modal_oid_type" class="form-control">
+								{% for value, text in oid_type_choices %} {# Потрібно передати oid_type_choices в контекст #}
+								<option value="{{ value }}">{{ text }}</option>
+								{% endfor %}
+							</select>
+							<div class="invalid-feedback" data-field-errors="oid_type"></div>
+						</div>
+						<div class="mb-3">
+							<label for="id_modal_cipher" class="form-label">Шифр ОІД</label>
+							<input type="text" name="cipher" id="id_modal_cipher" class="form-control">
+							<div class="invalid-feedback" data-field-errors="cipher"></div>
+						</div>
+						<div class="mb-3">
+							<label for="id_modal_full_name" class="form-label">Повна назва ОІД</label>
+							<input type="text" name="full_name" id="id_modal_full_name" class="form-control">
+							<div class="invalid-feedback" data-field-errors="full_name"></div>
+						</div>
+						<div class="mb-3">
+							<label for="id_modal_room" class="form-label">Приміщення №</label>
+							<input type="text" name="room" id="id_modal_room" class="form-control">
+							<div class="invalid-feedback" data-field-errors="room"></div>
+						</div>
+						<div class="mb-3">
+							<label for="id_modal_status" class="form-label">Поточний стан ОІД</label>
+							<select name="status" id="id_modal_status" class="form-control">
+								{% for value, text in oid_status_choices %} {# Потрібно передати oid_status_choices в контекст #}
+								<option value="{{ value }}">{{ text }}</option>
+								{% endfor %}
+							</select>
+							<div class="invalid-feedback" data-field-errors="status"></div>
+						</div>
+						<div class="mb-3">
+							<label for="id_modal_sec_level" class="form-label">Гриф ОІД</label>
+							<select name="sec_level" id="id_modal_sec_level" class="form-control">
+								{% for value, text in sec_level_choices %} {# Потрібно передати sec_level_choices в контекст #}
+								<option value="{{ value }}">{{ text }}</option>
+								{% endfor %}
+							</select>
+							<div class="invalid-feedback" data-field-errors="sec_level"></div>
+						</div>
+						<div class="mb-3">
+							<label for="id_modal_note" class="form-label">Примітка</label>
+							<textarea name="note" id="id_modal_note" class="form-control" rows="2"></textarea>
+							<div class="invalid-feedback" data-field-errors="note"></div>
+						</div>
+
+						{# Приховане поле для передачі ID ВЧ з основної форми, якщо потрібно #}
+						<input type="hidden" name="unit_for_new_oid" id="id_unit_for_new_oid_hidden">
+					</form>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрити</button>
+					<button type="button" class="btn btn-primary" id="submitOidCreateForm">Створити ОІД</button>
+				</div>
+				<div id="oidCreateFormAlerts" class="m-3"></div> {# Для повідомлень про успіх/помилку #}
+			</div>
+		</div>
+	</div>
+
 	<script>
 		window.AJAX_LOAD_OIDS_CATEGORIZED_URL = "{% url 'oids:ajax_load_oids_categorized' %}";
 		// Також для інших AJAX URL, якщо потрібно
@@ -59,6 +146,8 @@
 	<script src="{% static 'oids/js/filtering_dynamic.js' %}"></script>
 	<script src="{% static 'oids/js/main.js' %}"></script> {# Якщо є головний JS файл #}
 	{% block extra_js %}{% endblock %}
+
+
 </body>
 
 </html>

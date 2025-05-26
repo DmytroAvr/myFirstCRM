@@ -121,6 +121,7 @@ class OID(models.Model):
     )
     oid_type = models.CharField(max_length=10, choices=OIDTypeChoices.choices, verbose_name="Тип ОІД")
     cipher = models.CharField(max_length=100, verbose_name="Шифр ОІД", unique=True) # Додав шифр, як вказано в описі
+    sec_level = models.CharField(max_length=15, choices=SecLevelChoices.choices, verbose_name="Гриф")
     full_name = models.CharField(max_length=255, verbose_name="Повна назва ОІД", blank=True, null=True) # Змінив name на full_name
     room = models.CharField(max_length=255, verbose_name="Приміщення №")
     status = models.CharField(max_length=30, choices=OIDStatusChoices.choices, default=OIDStatusChoices.NEW, verbose_name="Поточний стан ОІД")
@@ -596,3 +597,5 @@ class TechnicalTask(models.Model):
 
     def __str__(self):
         return f"ТЗ №{self.input_number} для {self.oid.cipher}"
+    
+	

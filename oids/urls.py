@@ -17,17 +17,17 @@ urlpatterns = [
     path('document/add/', views.add_document_processing_view, name='add_document_processing_view_name'),
     # Якщо форма додавання документа викликається з контексту ОІД:
     path('oid/<int:oid_id>/document/add/', views.add_document_processing_view, name='add_document_for_oid_view_name'),
-    # Якщо форма додавання документа викликається з контексту елемента заявки:
+    path('ajax/oid/create/', views.ajax_create_oid_view, name='ajax_create_oid'),
+	# Якщо форма додавання документа викликається з контексту елемента заявки:
     path('work-request-item/<int:work_request_item_id>/document/add/', views.add_document_processing_view, name='add_document_for_work_request_item_view_name'),
     path('request/add/', views.add_work_request_view, name='add_work_request_view_name'),
    
 
-     path('summary-hub/', views.summary_information_hub_view, name='summary_information_hub'),
+	path('summary-hub/', views.summary_information_hub_view, name='summary_information_hub'),
     # Далі будемо додавати URL-и для кожного списку моделей
     path('documents/', views.document_list_view, name='list_documents'),
     path('units/', views.unit_list_view, name='list_units'),
 
-     # !!! ТОБІ ПОТРІБНО ДОДАТИ URL ДЛЯ КОЖНОГО ПУНКТУ З model_views !!!
     # Наприклад, для Територіальних управлінь:
     path('territorial-managements/', views.territorial_management_list_view, name='list_territorial_managements'),
     # І так далі для:

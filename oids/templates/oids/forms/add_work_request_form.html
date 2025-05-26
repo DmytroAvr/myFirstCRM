@@ -4,95 +4,270 @@
 {% block title %}{{ page_title|default:"Додати заявку на проведення робіт" }}{% endblock %}
 
 {% block content %}
+
 <div class="container form-container">
-    <h2 class="mb-4">{{ page_title|default:"Нова заявка на проведення робіт" }}</h2>
-    
-    <form method="post" novalidate>
-        {% csrf_token %}
-        
-        {# {{ form.media }} - Розкоментуй, якщо твої віджети (наприклад, для дати) використовують JS/CSS #}
+	<h2 class="mb-4">{{ page_title|default:"Нова заявка на проведення робіт" }}</h2>
 
-        {# Виведення загальних помилок форми #}
-        {% if form.non_field_errors %}
-            <div class="alert alert-danger" role="alert">
-                {% for error in form.non_field_errors %}
-                    <p>{{ error }}</p>
-                {% endfor %}
-            </div>
-        {% endif %}
+	<form method="post" novalidate>
+		{% csrf_token %}
 
-        {# Виведення полів форми #}
-        <div class="table-like-form">
-            {% for field in form %}
-                <div class="form-row mb-3">
-                    <div class="form-group-label" style="font-weight: bold; padding-right: 10px; min-width: 250px; display: inline-block; vertical-align: top;">
-                        <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
-                        {% if field.field.required %}
-                            <span style="color: red;">*</span>
-                        {% endif %}
-                    </div>
-                    <div class="form-group-field" style="display: inline-block; width: calc(100% - 270px);">
-                        {{ field }}
-                        {% if field.help_text %}
-                            <br><small class="form-text text-muted">{{ field.help_text }}</small>
-                        {% endif %}
-                        {% for error in field.errors %}
-                            <div class="alert alert-danger mt-1 p-1" role="alert" style="font-size: 0.9em;">{{ error }}</div>
-                        {% endfor %}
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
-        
-        <div class="form-actions mt-4">
-            <button type="submit" class="btn btn-primary">Зберегти заявку</button>
-            <a href="{% url 'oids:main_dashboard' %}" class="btn btn-secondary">Скасувати</a>
-        </div>
-    </form>
+		{# {{ form.media }} - Розкоментуй, якщо твої віджети (наприклад, для дати) використовують JS/CSS #}
+
+		{# Виведення загальних помилок форми #}
+		{% if form.non_field_errors %}
+		<div class="alert alert-danger" role="alert">
+			{% for error in form.non_field_errors %}
+			<p>{{ error }}</p>
+			{% endfor %}
+		</div>
+		{% endif %}
+
+		{# Виведення полів форми #}
+		<div class="table-like-form">
+			{% for field in form %}
+			{% if field.name == 'oids' %}
+			{# Початок вашого кастомного блоку для поля 'oids' #}
+			<div class="form-row mb-3">
+				<div class="form-group-label" style="font-weight: bold; padding-right: 10px; min-width: 250px; display: inline-block; vertical-align: top;"> {# Стилі взяті з загального блоку для одноманітності, але можна використати ті, що були в вашому фрагменті #}
+					<label for="{{ form.oids.id_for_label }}">{{ form.oids.label }}:</label>
+					{% if form.oids.field.required %}<span style="color: red;">*</span>{% endif %}
+				</div>
+				<div class="form-group-field" style="display: inline-block; width: calc(100% - 270px);"> {# Стилі взяті з загального блоку #}
+					{{ form.oids }}
+					<button type="button" class="btn btn-sm btn-success ms-2" id="showCreateOidModalBtn" data-bs-toggle="modal" data-bs-target="#createOidModal">
+						<i class="fas fa-plus"></i> Створити новий ОІД
+					</button>
+					{% if form.oids.help_text %}
+					<br><small class="form-text text-muted">{{ form.oids.help_text }}</small>
+					{% endif %}
+					{% for error in form.oids.errors %}
+					<div class="alert alert-danger mt-1 p-1" role="alert" style="font-size: 0.9em;">{{ error }}</div>
+					{% endfor %}
+				</div>
+			</div>
+			{# Кінець вашого кастомного блоку для поля 'oids' #}
+			{% else %}
+			{# Стандартне виведення для всіх інших полів #}
+			<div class="form-row mb-3">
+				<div class="form-group-label" style="font-weight: bold; padding-right: 10px; min-width: 250px; display: inline-block; vertical-align: top;">
+					<label for="{{ field.id_for_label }}">{{ field.label }}:</label>
+					{% if field.field.required %}
+					<span style="color: red;">*</span>
+					{% endif %}
+				</div>
+				<div class="form-group-field" style="display: inline-block; width: calc(100% - 270px);">
+					{{ field }}
+					{% if field.help_text %}
+					<br><small class="form-text text-muted">{{ field.help_text }}</small>
+					{% endif %}
+					{% for error in field.errors %}
+					<div class="alert alert-danger mt-1 p-1" role="alert" style="font-size: 0.9em;">{{ error }}</div>
+					{% endfor %}
+				</div>
+			</div>
+			{% endif %}
+			{% endfor %}
+		</div>
+
+		<div class="form-actions mt-4">
+			<button type="submit" class="btn btn-primary">Зберегти заявку</button>
+			<a href="{% url 'oids:main_dashboard' %}" class="btn btn-secondary">Скасувати</a>
+		</div>
+	</form>
 </div>
+
 {% endblock %}
 
 {% block page_specific_js %}
 <script>
-$(document).ready(function() {
-    // Ініціалізація Select2 для полів цієї форми, якщо вони мають клас .select2
-    // (або інший клас, який ти використовуєш для ініціалізації в select2-init.js)
-    // Наприклад, якщо форма має ID 'addWorkRequestForm':
-    // if (typeof initSelect2Fields === 'function') {
-    //     initSelect2Fields($('#addWorkRequestForm')); 
-    // }
-    // Або якщо initSelect2Fields вже викликається глобально для всіх .select2, то це не потрібно.
+	$(document).ready(function () {
+		// Ініціалізація Select2 для полів цієї форми, якщо вони мають клас .select2
+		// (або інший клас, який ти використовуєш для ініціалізації в select2-init.js)
+		// Наприклад, якщо форма має ID 'addWorkRequestForm':
+		// if (typeof initSelect2Fields === 'function') {
+		//     initSelect2Fields($('#addWorkRequestForm')); 
+		// }
+		// Або якщо initSelect2Fields вже викликається глобально для всіх .select2, то це не потрібно.
 
-    // Динамічна фільтрація ОІДів на основі обраної Військової частини
-    // Якщо поле "Військова частина" має id 'id_unit' (з WorkRequestForm)
-    // а поле "ОІДи" має id 'id_oids' (з WorkRequestForm)
-    // і на #id_unit додано data-ajax-url="{% url 'oids:ajax_load_oids_for_unit' %}"
-    
-    // Це лише приклад, як можна було б налаштувати filtering_dynamic.js для цієї форми.
-    // Переконайся, що відповідна конфігурація є в initializeDynamicFilters().
-    // if (typeof initializeDynamicFilters === 'function' && typeof setupDynamicFilter === 'function') {
-    //     const $unitSelectInForm = $('#id_unit'); // ID поля Unit у формі
-    //     const $oidsSelectInForm = $('#id_oids'); // ID поля OIDs у формі
+		// Динамічна фільтрація ОІДів на основі обраної Військової частини
+		// Якщо поле "Військова частина" має id 'id_unit' (з WorkRequestForm)
+		// а поле "ОІДи" має id 'id_oids' (з WorkRequestForm)
+		// і на #id_unit додано data-ajax-url="{% url 'oids:ajax_load_oids_for_unit' %}"
 
-    //     if ($unitSelectInForm.length && $oidsSelectInForm.length) {
-    //         const ajaxUrlForOids = $unitSelectInForm.data('ajax-url-oids-for-form'); // Потрібно додати цей data-атрибут до HTML поля Unit
-            
-    //         if (ajaxUrlForOids) {
-    //             console.log("Налаштування фільтра для форми: Unit -> OIDs");
-    //             setupDynamicFilter({
-    //                 sourceSelectSelector: '#id_unit', // ID поля Unit у формі
-    //                 targetSelectSelector: '#id_oids',   // ID поля OIDs у формі
-    //                 url: ajaxUrlForOids, 
-    //                 paramName: 'unit_id', 
-    //                 placeholder: { default: 'Спочатку оберіть ВЧ', loading: 'Завантаження ОІД...', error: 'Помилка', empty: 'Немає ОІД для цієї ВЧ'},
-    //                 transformItem: item => ({ id: item.id, text: item.name }), // name - це те, що повертає ajax_load_oids_for_unit
-    //                 clearTargetsSelectors: ['#id_oids'] 
-    //             });
-    //         } else {
-    //             console.warn("Не знайдено data-ajax-url-oids-for-form на #id_unit для динамічного завантаження ОІДів у формі.");
-    //         }
-    //     }
-    // }
-});
+		// Це лише приклад, як можна було б налаштувати filtering_dynamic.js для цієї форми.
+		// Переконайся, що відповідна конфігурація є в initializeDynamicFilters().
+		// if (typeof initializeDynamicFilters === 'function' && typeof setupDynamicFilter === 'function') {
+		//     const $unitSelectInForm = $('#id_unit'); // ID поля Unit у формі
+		//     const $oidsSelectInForm = $('#id_oids'); // ID поля OIDs у формі
+
+		//     if ($unitSelectInForm.length && $oidsSelectInForm.length) {
+		//         const ajaxUrlForOids = $unitSelectInForm.data('ajax-url-oids-for-form'); // Потрібно додати цей data-атрибут до HTML поля Unit
+
+		//         if (ajaxUrlForOids) {
+		//             console.log("Налаштування фільтра для форми: Unit -> OIDs");
+		//             setupDynamicFilter({
+		//                 sourceSelectSelector: '#id_unit', // ID поля Unit у формі
+		//                 targetSelectSelector: '#id_oids',   // ID поля OIDs у формі
+		//                 url: ajaxUrlForOids, 
+		//                 paramName: 'unit_id', 
+		//                 placeholder: { default: 'Спочатку оберіть ВЧ', loading: 'Завантаження ОІД...', error: 'Помилка', empty: 'Немає ОІД для цієї ВЧ'},
+		//                 transformItem: item => ({ id: item.id, text: item.name }), // name - це те, що повертає ajax_load_oids_for_unit
+		//                 clearTargetsSelectors: ['#id_oids'] 
+		//             });
+		//         } else {
+		//             console.warn("Не знайдено data-ajax-url-oids-for-form на #id_unit для динамічного завантаження ОІДів у формі.");
+		//         }
+		//     }
+		// }
+	});
+
+</script>
+<script>
+
+	$(document).ready(function () {
+		const createOidModal = new bootstrap.Modal(document.getElementById('createOidModal'));
+		const oidCreateForm = $('#ajaxOidCreateForm');
+		const oidCreateFormAlerts = $('#oidCreateFormAlerts');
+		const mainWorkRequestFormOidsSelect = $('#id_oids'); // ID поля OIDs у головній формі WorkRequest
+		const mainWorkRequestFormUnitSelect = $('#id_unit'); // ID поля Unit у головній формі WorkRequest
+		const hiddenUnitForNewOidInput = $('#id_unit_for_new_oid_hidden');
+		const modalUnitSelect = $('#id_modal_unit'); // ID поля Unit у модальній формі OID
+
+		// Ініціалізація Select2 для поля Unit в модальному вікні
+		// Потрібно передати опції з головної форми, якщо вона вже завантажена
+		// Або завантажити їх окремим AJAX, якщо потрібно
+		if (typeof initSelect2Fields === 'function') {
+			// Переконайся, що initSelect2Fields може коректно обробляти select всередині модального вікна
+			// Можливо, знадобиться передати dropdownParent:
+			// modalUnitSelect.select2({
+			// dropdownParent: $('#createOidModal'),
+			// width: '100%',
+			// placeholder: 'Оберіть ВЧ...',
+			// allowClear: true,
+			// language: 'uk'
+			// });
+			// Або якщо твій select2-init.js вже обробляє клас 'select2-basic-modal-init' з dropdownParent:
+			// initSelect2Fields($('#createOidModal'));
+		}
+
+		// Коли відкривається модальне вікно для створення ОІД
+		$('#showCreateOidModalBtn').on('click', function () {
+			oidCreateForm[0].reset(); // Очищаємо форму
+			oidCreateFormAlerts.empty(); // Очищаємо попередні повідомлення
+			$('.is-invalid').removeClass('is-invalid'); // Прибираємо класи помилок
+			$('.invalid-feedback').empty();
+
+			// Копіюємо опції Unit з головної форми в модальну, якщо вони є
+			// Або завантажуємо їх через AJAX, якщо потрібно (складніше)
+			modalUnitSelect.empty().append($('<option value="">Оберіть ВЧ...</option>'));
+			mainWorkRequestFormUnitSelect.find('option').each(function () {
+				if ($(this).val()) { // Не копіюємо порожній плейсхолдер
+					modalUnitSelect.append($(this).clone());
+				}
+			});
+
+			// Встановлюємо початкове значення Unit в модальній формі, якщо воно обрано в головній
+			const selectedUnitInMainForm = mainWorkRequestFormUnitSelect.val();
+			if (selectedUnitInMainForm) {
+				modalUnitSelect.val(selectedUnitInMainForm);
+				hiddenUnitForNewOidInput.val(selectedUnitInMainForm); // Для передачі з POST запитом
+			}
+			modalUnitSelect.trigger('change'); // Оновити Select2, якщо він застосований
+
+			// Переініціалізувати Select2 для модального вікна, якщо він не працює автоматично
+			// після заповнення опцій.
+			if (modalUnitSelect.hasClass('select2-basic-modal-init') && modalUnitSelect.data('select2')) {
+				// modalUnitSelect.select2('destroy').select2({ /* options */ }); // Приклад
+			} else if (modalUnitSelect.hasClass('select2-basic-modal-init') && typeof initSelect2Fields === 'function') {
+				// initSelect2Fields(modalUnitSelect.parent()); // Спробувати ініціалізувати в контейнері
+			}
+
+			createOidModal.show();
+		});
+
+
+		// Відправка форми створення ОІД через AJAX
+		$('#submitOidCreateForm').on('click', function () {
+			oidCreateFormAlerts.empty();
+			$('.is-invalid').removeClass('is-invalid');
+			$('.invalid-feedback').text('');
+
+			// Встановлюємо значення прихованого поля unit_for_new_oid, якщо воно ще не встановлено
+			if (!hiddenUnitForNewOidInput.val() && modalUnitSelect.val()) {
+				hiddenUnitForNewOidInput.val(modalUnitSelect.val());
+			}
+
+			$.ajax({
+				type: 'POST',
+				url: oidCreateForm.attr('action'),
+				data: oidCreateForm.serialize(), // Серіалізуємо дані форми
+				success: function (response) {
+					if (response.status === 'success') {
+						oidCreateFormAlerts.html(`<div class="alert alert-success">${response.message}</div>`);
+
+						// Додаємо новий ОІД до select'а на головній формі
+						// і автоматично його обираємо
+						if (mainWorkRequestFormOidsSelect.length) {
+							const newOption = new Option(response.oid_name, response.oid_id, true, true);
+							mainWorkRequestFormOidsSelect.append(newOption).trigger('change');
+
+							// Якщо це single select, то просто встановити значення:
+							// mainWorkRequestFormOidsSelect.val(response.oid_id).trigger('change');
+						}
+
+						setTimeout(function () {
+							createOidModal.hide();
+							oidCreateForm[0].reset();
+						}, 1500); // Закриваємо модальне вікно через 1.5 секунди
+					} else if (response.status === 'error') {
+						let errorMessages = '<div class="alert alert-danger">Будь ласка, виправте наступні помилки:<ul>';
+						for (const field in response.errors) {
+							const fieldElement = oidCreateForm.find(`[name="${field}"]`);
+							fieldElement.addClass('is-invalid');
+							fieldElement.siblings('.invalid-feedback').text(response.errors[field].join(' '));
+							response.errors[field].forEach(err => {
+								errorMessages += `<li>${form.fields[field].label || field}: ${err}</li>`;
+							});
+						}
+						errorMessages += '</ul>
+</div > ';
+						oidCreateFormAlerts.html(errorMessages);
+					}
+				},
+				error: function (xhr) {
+					let errorMsg = 'Сталася помилка при створенні ОІД.';
+					if (xhr.responseJSON && xhr.responseJSON.error) {
+						errorMsg = xhr.responseJSON.error;
+					} else if (xhr.responseJSON && xhr.responseJSON.errors) {
+						errorMsg = 'Будь ласка, виправте помилки у формі:<ul>';
+						for (const field in xhr.responseJSON.errors) {
+							xhr.responseJSON.errors[field].forEach(err => {
+								errorMsg += `<li>${err}</li>`;
+							});
+						}
+						errorMsg += '</ul>';
+					}
+					oidCreateFormAlerts.html(`<div class="alert alert-danger">${errorMsg}</div>`);
+				}
+			});
+		});
+
+		// Переконатися, що Select2 для #id_modal_unit ініціалізується ПІСЛЯ того,
+		// як модальне вікно стане видимим, якщо є проблеми.
+		// Або ініціалізувати його з опцією dropdownParent.
+		// document.getElementById('createOidModal').addEventListener('shown.bs.modal', function () {
+		// if (!$('#id_modal_unit').data('select2') && typeof initSelect2Fields === 'function') {
+		// // initSelect2Fields($('#id_modal_unit').parent()); // Передаємо батьківський елемент як scope
+		// $('#id_modal_unit').select2({ // Або так, якщо initSelect2Fields не підходить
+		// dropdownParent: $('#createOidModal'),
+		// width: '100%',
+		// placeholder: 'Оберіть ВЧ...',
+		// allowClear: true,
+		// language: 'uk'
+		// });
+		// }
+		// });
+
+	});
 </script>
 {% endblock %}

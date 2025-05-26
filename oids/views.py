@@ -11,7 +11,7 @@ from .models import (
     WorkRequest, WorkRequestStatusChoices, WorkRequestItem, Trip,TripResultForUnit, Person, TechnicalTask,
     AttestationRegistration, AttestationItem, AttestationResponse,  
 )
-from .forms import ( TripForm, DocumentForm, WorkRequestForm,
+from .forms import ( TripForm, DocumentForm, WorkRequestForm, OIDForm
 )
 
 # Твоя допоміжна функція (залишається без змін, але буде викликатися в AJAX view)
@@ -723,3 +723,41 @@ def oid_status_change_list_view(request):
         'page_obj': page_obj
     }
     return render(request, 'oids/lists/oid_status_change_list.html', context)
+
+def ajax_create_oid_view(request):
+    if request.method == 'POST':
+        # Якщо ВЧ передається з форми заявки для попереднього заповнення
+        initial_data = {}
+        unit_id_from_request_form = request.POST.get('unit_for_new_oid') # Це поле може передаватися з JS
+        if unit_id_from_request_form:
+            initial_data['unit'] = unit_id_from_request_form
+        
+        form = OIDForm(request.POST, initial=initial_data) # Використовуємо OIDForm
+        if form.is_valid():
+            oid = form.save()
+            return JsonResponse({
+                'status': 'success',
+                'message': f'ОІД "{oid.cipher}" успішно створено!',
+                'oid_id': oid.id,
+                'oid_cipher': oid.cipher,
+                'oid_name': str(oid) # Використовуємо __str__ моделі OID
+            })
+        else:
+            # Збираємо помилки валідації для передачі на фронтенд
+            errors = {}
+            for field, field_errors in form.errors.items():
+                errors[field] = [str(e) for e in field_errors]
+            return JsonResponse({'status': 'error', 'errors': errors}, status=400)
+    
+    # Для GET запиту (якщо модальне вікно завантажує форму через AJAX)
+    # або якщо це окрема сторінка
+    unit_id_param = request.GET.get('unit_id')
+    form = OIDForm(initial={'unit': unit_id_param} if unit_id_param else None)
+    
+    # Якщо ти хочеш рендерити форму на сервері для модального вікна (менш типово для AJAX)
+    # return render(request, 'oids/partials/create_oid_form_content.html', {'oid_form': form})
+    
+    # Зазвичай, якщо модальне вікно вже має HTML структуру форми, цей GET не потрібен,
+    # або він може повертати порожню форму як HTML для вставки.
+    # Для чистого AJAX-створення GET-обробник може бути непотрібним, якщо форма статична в модалці.
+    return JsonResponse({'error': 'Only POST requests are allowed for creating OID via AJAX here'}, status=405)
