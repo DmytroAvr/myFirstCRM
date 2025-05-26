@@ -27,12 +27,12 @@
 			{% for field in form %}
 			{% if field.name == 'oids' %}
 			{# Початок вашого кастомного блоку для поля 'oids' #}
-			<div class="form-row mb-3">
+			<div class="form-row mb-3 ">
 				<div class="form-group-label" style="font-weight: bold; padding-right: 10px; min-width: 250px; display: inline-block; vertical-align: top;"> {# Стилі взяті з загального блоку для одноманітності, але можна використати ті, що були в вашому фрагменті #}
 					<label for="{{ form.oids.id_for_label }}">{{ form.oids.label }}:</label>
 					{% if form.oids.field.required %}<span style="color: red;">*</span>{% endif %}
 				</div>
-				<div class="form-group-field" style="display: inline-block; width: calc(100% - 270px);"> {# Стилі взяті з загального блоку #}
+				<div class="form-group-field " style="display: inline-block; width: calc(100% - 270px);"> {# Стилі взяті з загального блоку #}
 					{{ form.oids }}
 					<button type="button" class="btn btn-sm btn-success ms-2" id="showCreateOidModalBtn" data-bs-toggle="modal" data-bs-target="#createOidModal">
 						<i class="fas fa-plus"></i> Створити новий ОІД
