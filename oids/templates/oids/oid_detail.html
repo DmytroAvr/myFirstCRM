@@ -263,3 +263,8 @@
 {% endif %}
 
 {% endblock %}
+
+<!-- 
+<a href="{% url 'oids:add_document_for_oid_view_name' oid_id=oid.id %}">Додати документ для цього ОІД</a>
+{# Або коротше, якщо порядок аргументів збігається: #}
+<a href="{% url 'oids:add_document_for_oid_view_name' oid.id %}">Додати документ для цього ОІД</a> -->
