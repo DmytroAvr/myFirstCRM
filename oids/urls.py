@@ -20,4 +20,28 @@ urlpatterns = [
     # Якщо форма додавання документа викликається з контексту елемента заявки:
     path('work-request-item/<int:work_request_item_id>/document/add/', views.add_document_processing_view, name='add_document_for_work_request_item_view_name'),
     path('request/add/', views.add_work_request_view, name='add_work_request_view_name'),
+   
+
+     path('summary-hub/', views.summary_information_hub_view, name='summary_information_hub'),
+    # Далі будемо додавати URL-и для кожного списку моделей
+    path('documents/', views.document_list_view, name='list_documents'),
+    path('units/', views.unit_list_view, name='list_units'),
+
+     # !!! ТОБІ ПОТРІБНО ДОДАТИ URL ДЛЯ КОЖНОГО ПУНКТУ З model_views !!!
+    # Наприклад, для Територіальних управлінь:
+    path('territorial-managements/', views.territorial_management_list_view, name='list_territorial_managements'),
+    # І так далі для:
+    path('unit-groups/', views.unit_group_list_view, name='list_unit_groups'),
+    path('document-types/', views.document_type_list_view, name='list_document_types'),
+    path('persons/', views.person_list_view, name='list_persons'),
+    path('units/', views.unit_list_view, name='list_units'),
+    path('oids-list/', views.oid_list_view, name='list_oids'), # назва oids_list_view щоб не плутати з oid_detail_view
+    path('work-requests/', views.work_request_list_view, name='list_work_requests'),
+    path('trips/', views.trip_list_view, name='list_trips'),
+    path('technical-tasks/', views.technical_task_list_view, name='list_technical_tasks'),
+    path('attestation-registrations/', views.attestation_registration_list_view, name='list_attestation_registrations'),
+    path('attestation-responses/', views.attestation_response_list_view, name='list_attestation_responses'),
+    path('trip-results/', views.trip_result_for_unit_list_view, name='list_trip_results_for_units'),
+    path('oid-status-changes/', views.oid_status_change_list_view, name='list_oid_status_changes'),
+
 ]

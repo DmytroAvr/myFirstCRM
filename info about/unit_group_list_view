@@ -1,0 +1,52 @@
+2. Групи військових частин (UnitGroup)
+2.1. oids/views.py
+
+Python
+
+# oids/views.py
+# ...
+
+def unit_group_list_view(request):
+    group_list_queryset = UnitGroup.objects.prefetch_related('units').order_by('name') # prefetch_related для units
+    
+    paginator = Paginator(group_list_queryset, 25)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'page_title': 'Список Груп Військових Частин',
+        'object_list': page_obj,
+        'page_obj': page_obj
+    }
+    return render(request, 'oids/lists/unit_group_list.html', context)
+
+    
+2.3. oids/templates/oids/lists/unit_group_list.html
+
+Примітка: Для {% for unit in group.units.all %} потрібно, щоб у моделі Unit поле unit_groups мало related_name, який дозволяє зворотний доступ (зазвичай Django створює unit_set автоматично, якщо related_name не вказано, але для ManyToManyField він не потрібен для прямого доступу group.units.all(), якщо units є назвою поля в UnitGroup). Якщо поле в Unit називається unit_groups = models.ManyToManyField(UnitGroup, ... related_name='grouped_units'), то в шаблоні групи було б {{ unit_group.grouped_units.count }}. У твоєму випадку UnitGroup сама не має поля units, а Unit має unit_groups = models.ManyToManyField(UnitGroup, ...). Отже, group.units.all має бути group.unit_set.all або краще додати related_name до ManyToManyField в моделі Unit:
+
+Python
+
+# oids/models.py
+class Unit(models.Model):
+    # ...
+    unit_groups = models.ManyToManyField(
+        UnitGroup,
+        blank=True,
+        verbose_name="Групи військових частин",
+        related_name='units_in_group' # Наприклад, таке related_name
+    )
+    # ...
+Тоді в шаблоні unit_group_list.html буде: {% for unit in group.units_in_group.all %}. Або, якщо поле ManyToManyField визначено в UnitGroup як units = models.ManyToManyField(Unit, ...) то group.units.all() буде працювати. Судячи з твого опису, UnitGroup має "Перелік частин що входять до складу групи", тому логічно, щоб поле ManyToManyField(Unit) було саме в UnitGroup.
+
+Якщо UnitGroup має поле units:
+
+Python
+
+# oids/models.py
+class UnitGroup(models.Model):
+    name = models.CharField(max_length=255, unique=True, verbose_name="Назва групи частин")
+    units = models.ManyToManyField(Unit, blank=True, verbose_name="Військові частини в групі", related_name="groups_they_belong_to")
+    note = models.TextField(verbose_name="Примітка", blank=True, null=True)
+    # ...
+Тоді {% for unit in group.units.all %} в шаблоні буде коректним.

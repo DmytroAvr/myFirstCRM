@@ -1,16 +1,17 @@
 # :\myFirstCRM\oids\views.py
 from django.shortcuts import render, get_object_or_404, redirect
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.http import JsonResponse
 from django.urls import reverse_lazy, reverse
 from django.contrib import messages
 from django.db.models import Q, Max, Prefetch
 from .models import (
-    Unit, OID, TerritorialManagement, 
+    Unit, UnitGroup, OID, OIDStatusChange, TerritorialManagement, 
     OIDStatusChoices, WorkTypeChoices, Document, DocumentType,
     WorkRequest, WorkRequestStatusChoices, WorkRequestItem, Trip,TripResultForUnit, Person, TechnicalTask,
-    AttestationRegistration, AttestationItem, AttestationResponse
+    AttestationRegistration, AttestationItem, AttestationResponse,  
 )
-from .forms import ( TripForm, DocumentForm, WorkRequestForm, 
+from .forms import ( TripForm, DocumentForm, WorkRequestForm,
 )
 
 # Твоя допоміжна функція (залишається без змін, але буде викликатися в AJAX view)
@@ -421,3 +422,304 @@ def add_work_request_view(request):
         'form': form,
         'page_title': 'Створення нової заявки на проведення робіт'
     })
+
+# 
+# 
+# list info 
+
+
+def summary_information_hub_view(request):
+    """
+    Сторінка-хаб з посиланнями на списки об'єктів різних моделей.
+    """
+    # Список моделей та відповідних їм назв URL для перегляду
+    # Ключ 'label' - це те, що побачить користувач
+    # Ключ 'url_name' - це name з urls.py для відповідного списку
+    model_views = [
+        {'label': 'Територіальні управління', 'url_name': 'oids:list_territorial_managements'},
+        {'label': 'Групи військових частин', 'url_name': 'oids:list_unit_groups'},
+        {'label': 'Військові частини', 'url_name': 'oids:list_units'},
+        {'label': 'Об\'єкти інформаційної діяльності (ОІД)', 'url_name': 'oids:list_oids'},
+        {'label': 'Заявки на проведення робіт', 'url_name': 'oids:list_work_requests'},
+        {'label': 'Опрацьовані документи', 'url_name': 'oids:list_documents'},
+        {'label': 'Відрядження', 'url_name': 'oids:list_trips'},
+        {'label': 'Виконавці (Особи)', 'url_name': 'oids:list_persons'},
+        {'label': 'Технічні завдання', 'url_name': 'oids:list_technical_tasks'},
+        {'label': 'Реєстрації Актів Атестації', 'url_name': 'oids:list_attestation_registrations'},
+        {'label': 'Відповіді на Реєстрацію Атестації', 'url_name': 'oids:list_attestation_responses'},
+        {'label': 'Результати відряджень для частин', 'url_name': 'oids:list_trip_results_for_units'},
+        {'label': 'Історія змін статусу ОІД', 'url_name': 'oids:list_oid_status_changes'},
+        {'label': 'Типи документів (Довідник)', 'url_name': 'oids:list_document_types'},
+    ]
+    context = {
+        'page_title': 'Зведена інформація та перегляд даних за розділами',
+        'model_views': model_views
+    }
+    return render(request, 'oids/summary_information_hub.html', context)
+
+def document_list_view(request):
+    documents_list = Document.objects.select_related(
+        'oid__unit__territorial_management', # Оптимізація для доступу до Unit та OID
+        'oid__unit',
+        'oid',
+        'document_type', 
+        'author',
+        'work_request_item__request'
+    ).order_by('-process_date', '-created_at') # Новіші за датою опрацювання, потім за датою створення
+
+    paginator = Paginator(documents_list, 25) # 25 документів на сторінку
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'page_title': 'Список опрацьованих документів',
+        'documents': page_obj, # Передаємо об'єкт сторінки пагінатора
+        'page_obj': page_obj # Для навігації пагінатора
+    }
+    return render(request, 'oids/lists/document_list.html', context)
+
+def unit_list_view(request):
+    units_list = Unit.objects.select_related(
+        'territorial_management'
+    ).prefetch_related(
+        'unit_groups', 
+        'oids' # Для підрахунку кількості ОІД, якщо потрібно
+    ).order_by('territorial_management__name', 'name') # Сортування за ТУ, потім за назвою ВЧ
+
+    paginator = Paginator(units_list, 25) 
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'page_title': 'Список військових частин',
+        'units': page_obj,
+        'page_obj': page_obj
+    }
+    return render(request, 'oids/lists/unit_list.html', context)
+
+def territorial_management_list_view(request):
+    tm_list_queryset = TerritorialManagement.objects.all().order_by('name')
+    
+    paginator = Paginator(tm_list_queryset, 25) # 25 записів на сторінку
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'page_title': 'Список Територіальних Управлінь',
+        'object_list': page_obj, # Універсальне ім'я для використання в pagination.html
+        'page_obj': page_obj     # Для самого шаблону пагінації
+    }
+    return render(request, 'oids/lists/territorial_management_list.html', context)
+
+def unit_group_list_view(request):
+    group_list_queryset = UnitGroup.objects.prefetch_related('units').order_by('name') # prefetch_related для units
+    
+    paginator = Paginator(group_list_queryset, 25)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'page_title': 'Список Груп Військових Частин',
+        'object_list': page_obj,
+        'page_obj': page_obj
+    }
+    return render(request, 'oids/lists/unit_group_list.html', context)
+
+def person_list_view(request):
+    person_list_queryset = Person.objects.all().order_by('full_name')
+    
+    paginator = Paginator(person_list_queryset, 25)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+        
+    context = {
+        'page_title': 'Список Виконавців (Осіб)',
+        'object_list': page_obj,
+        'page_obj': page_obj
+    }
+    return render(request, 'oids/lists/person_list.html', context)
+
+def document_type_list_view(request):
+    doc_type_list_queryset = DocumentType.objects.all().order_by('oid_type', 'work_type', 'name')
+    
+    paginator = Paginator(doc_type_list_queryset, 25)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+        
+    context = {
+        'page_title': 'Довідник: Типи документів',
+        'object_list': page_obj,
+        'page_obj': page_obj
+    }
+    return render(request, 'oids/lists/document_type_list.html', context)
+
+# def unit_list_view(request):
+#     units_list_queryset = Unit.objects.select_related(
+#         'territorial_management'
+#     ).prefetch_related(
+#         'unit_groups', 
+#         'oids' # Для підрахунку кількості ОІД
+#     ).order_by('territorial_management__name', 'name')
+
+#     paginator = Paginator(units_list_queryset, 25) 
+#     page_number = request.GET.get('page')
+#     page_obj = paginator.get_page(page_number)
+
+#     context = {
+#         'page_title': 'Список Військових Частин',
+#         'object_list': page_obj, # Універсальне ім'я для пагінації
+#         'page_obj': page_obj
+#     }
+#     return render(request, 'oids/lists/unit_list.html', context)
+
+def oid_list_view(request):
+    # Для "дати додавання інформації" для ОІД, це може бути неоднозначно.
+    # Якщо є поле created_at на моделі OID, використовуй його.
+    # Якщо ні, можна сортувати за датою створення першого документа, або за unit/cipher.
+    # Поки що сортуємо за ВЧ та шифром.
+    oid_list_queryset = OID.objects.select_related(
+        'unit__territorial_management', # unit вже буде завантажено через select_related('unit')
+        'unit'
+    ).order_by('unit__code', 'cipher') # Сортування за кодом ВЧ, потім за шифром ОІД
+
+    # Якщо ти додав поле 'created_at = models.DateTimeField(auto_now_add=True)' до моделі OID,
+    # то можеш сортувати так: .order_by('-created_at')
+
+    paginator = Paginator(oid_list_queryset, 25)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+        
+    context = {
+        'page_title': 'Список Об\'єктів Інформаційної Діяльності (ОІД)',
+        'object_list': page_obj,
+        'page_obj': page_obj
+    }
+    return render(request, 'oids/lists/oid_list.html', context)
+
+def work_request_list_view(request):
+    # Сортуємо за датою заявки, новіші зверху
+    work_request_list_queryset = WorkRequest.objects.select_related(
+        'unit', 'unit__territorial_management'
+    ).prefetch_related(
+        Prefetch('items', queryset=WorkRequestItem.objects.select_related('oid')) # Оптимізація для доступу до ОІДів в заявці
+    ).order_by('-incoming_date')
+
+    paginator = Paginator(work_request_list_queryset, 25)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+        
+    context = {
+        'page_title': 'Список Заявок на Проведення Рoбіт',
+        'object_list': page_obj,
+        'page_obj': page_obj
+    }
+    return render(request, 'oids/lists/work_request_list.html', context)
+
+def trip_list_view(request):
+    trip_list_queryset = Trip.objects.prefetch_related(
+        'units', 
+        'oids', 
+        'persons', 
+        'work_requests' # Завантажуємо пов'язані об'єкти для уникнення N+1 запитів
+    ).order_by('-start_date') # Сортуємо за датою початку, новіші зверху
+
+    paginator = Paginator(trip_list_queryset, 15) # 15 відряджень на сторінку
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+        
+    context = {
+        'page_title': 'Список Відряджень',
+        'object_list': page_obj,
+        'page_obj': page_obj
+    }
+    return render(request, 'oids/lists/trip_list.html', context)
+
+def technical_task_list_view(request):
+    task_list_queryset = TechnicalTask.objects.select_related(
+        'oid__unit', # Для доступу до ВЧ через ОІД
+        'oid',
+        'reviewed_by'
+    ).order_by('-input_date', '-created_at') # Сортуємо за вхідною датою, потім за датою створення
+
+    paginator = Paginator(task_list_queryset, 25)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+        
+    context = {
+        'page_title': 'Список Технічних Завдань',
+        'object_list': page_obj,
+        'page_obj': page_obj
+    }
+    return render(request, 'oids/lists/technical_task_list.html', context)
+
+def attestation_registration_list_view(request):
+    registration_list_queryset = AttestationRegistration.objects.prefetch_related(
+        'units',  # ManyToMany зв'язок з Unit
+        Prefetch('attestation_items', queryset=AttestationItem.objects.select_related('oid__unit', 'document')) # Для доступу до ОІД та документів
+    ).order_by('-process_date') # Сортуємо за датою відправки, новіші зверху
+
+    paginator = Paginator(registration_list_queryset, 25)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+        
+    context = {
+        'page_title': 'Список Реєстрацій Актів Атестації',
+        'object_list': page_obj,
+        'page_obj': page_obj
+    }
+    return render(request, 'oids/lists/attestation_registration_list.html', context)
+
+def attestation_response_list_view(request):
+    response_list_queryset = AttestationResponse.objects.select_related(
+        'registration' # Для доступу до даних оригінальної реєстрації
+    ).order_by('-registered_date', '-recorded_date') # Сортуємо за датою реєстрації, потім за датою внесення
+
+    paginator = Paginator(response_list_queryset, 25)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+        
+    context = {
+        'page_title': 'Список Відповідей на Реєстрацію Актів Атестації',
+        'object_list': page_obj,
+        'page_obj': page_obj
+    }
+    return render(request, 'oids/lists/attestation_response_list.html', context)
+
+def trip_result_for_unit_list_view(request):
+    result_list_queryset = TripResultForUnit.objects.select_related(
+        'trip' # Якщо потрібно бачити деталі самого відрядження
+    ).prefetch_related(
+        'units', # ВЧ, куди відправлено
+        Prefetch('oids', queryset=OID.objects.select_related('unit')), # ОІДи, що стосуються результату
+        Prefetch('documents', queryset=Document.objects.select_related('document_type')) # Документи, що відправлені
+    ).order_by('-process_date') # Сортуємо за датою відправки до частини
+
+    paginator = Paginator(result_list_queryset, 25)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+        
+    context = {
+        'page_title': 'Список Результатів Відряджень (відправка до ВЧ)',
+        'object_list': page_obj,
+        'page_obj': page_obj
+    }
+    return render(request, 'oids/lists/trip_result_for_unit_list.html', context)
+
+def oid_status_change_list_view(request):
+    status_change_list_queryset = OIDStatusChange.objects.select_related(
+        'oid__unit', # Для виводу ВЧ ОІДа
+        'oid',
+        'initiating_document__document_type', # Для деталей документа, що спричинив зміну
+        'changed_by' # Для інформації про користувача, що вніс зміну
+    ).order_by('-changed_at') # Новіші зміни статусу зверху
+
+    paginator = Paginator(status_change_list_queryset, 25)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+        
+    context = {
+        'page_title': 'Історія Змін Статусу ОІД',
+        'object_list': page_obj,
+        'page_obj': page_obj
+    }
+    return render(request, 'oids/lists/oid_status_change_list.html', context)

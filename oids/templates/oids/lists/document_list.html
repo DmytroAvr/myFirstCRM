@@ -1,0 +1,81 @@
+{% extends "oids/base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid"> {# Використовуємо container-fluid для таблиць на всю ширину #}
+    <h2 class="mb-4">{{ page_title }}</h2>
+    
+    <a href="{% url 'oids:add_document_processing_view_name' %}" class="btn btn-primary mb-3">Додати новий документ</a>
+
+    {% if documents %}
+        <table class="table table-striped table-bordered table-hover">
+            <thead class="thead-dark">
+                <tr>
+                    <th>ВЧ + ОІД</th>
+                    <th>Тип документа</th>
+                    <th>Номер</th>
+                    <th>Дата опрац.</th>
+                    <th>Дата робіт</th>
+                    <th>Термін дії</th>
+                    <th>Автор</th>
+                    <th>Заявка</th>
+                    <th>Примітки</th>
+                    <th>Файл</th>
+                    <th>Дії</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for doc in documents %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'oids:oid_detail_view_name' doc.oid.id %}">
+                                {{ doc.oid.unit.code }} / {{ doc.oid.cipher }}
+                            </a>
+                        </td>
+                        <td>{{ doc.document_type.name }}</td>
+                        <td>{{ doc.document_number }}</td>
+                        <td>{{ doc.process_date|date:"d.m.Y" }}</td>
+                        <td>{{ doc.work_date|date:"d.m.Y" }}</td>
+                        <td>
+                            {% if doc.expiration_date %}
+                                {{ doc.expiration_date|date:"d.m.Y" }}
+                            {% else %}
+                                Безстроково
+                            {% endif %}
+                        </td>
+                        <td>{{ doc.author.full_name|default:"-" }}</td>
+                        <td>
+                            {% if doc.work_request_item %}
+                                Заявка №{{ doc.work_request_item.request.incoming_number }}
+                                (Тип: {{ doc.work_request_item.get_work_type_display }})
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ doc.note|truncatewords:10|default:"-" }}</td>
+                        <td>
+                            {% if doc.attachment %}
+                                <a href="{{ doc.attachment.url }}" target="_blank">Переглянути</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {# Тут можна додати посилання на редагування/видалення, якщо потрібно #}
+                            <a href="{% url 'oids:oid_detail_view_name' doc.oid.id %}#doc-{{ doc.id }}" class="btn btn-sm btn-info">Деталі ОІД</a>
+                            {# <a href="#" class="btn btn-sm btn-warning">Редагувати</a> #}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {# Пагінація #}
+        {% include "../includes/pagination.html" %}
+
+    {% else %}
+        <p>Немає опрацьованих документів.</p>
+    {% endif %}
+</div>
+{% endblock %}

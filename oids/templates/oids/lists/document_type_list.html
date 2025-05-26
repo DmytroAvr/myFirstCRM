@@ -1,0 +1,42 @@
+{% extends "oids/base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-4">{{ page_title }}</h2>
+    {# <a href="URL_ДЛЯ_ДОДАВАННЯ_ТИПУ_ДОКУМЕНТА" class="btn btn-primary mb-3">Додати Тип Документа</a> #}
+
+    {% if object_list %}
+        <table class="table table-striped table-bordered table-hover">
+            <thead class="thead-dark">
+                <tr>
+                    <th>Назва документа</th>
+                    <th>Тип ОІД</th>
+                    <th>Тип робіт</th>
+                    <th>Має термін дії</th>
+                    <th>Тривалість (міс.)</th>
+                    <th>Обов'язковий</th>
+                    {# <th>Дії</th> #}
+                </tr>
+            </thead>
+            <tbody>
+                {% for doc_type in object_list %}
+                    <tr>
+                        <td>{{ doc_type.name }}</td>
+                        <td>{{ doc_type.get_oid_type_display }}</td>
+                        <td>{{ doc_type.get_work_type_display }}</td>
+                        <td>{% if doc_type.has_expiration %}Так{% else %}Ні{% endif %}</td>
+                        <td>{% if doc_type.has_expiration %}{{ doc_type.duration_months }}{% else %}-{% endif %}</td>
+                        <td>{% if doc_type.is_required %}Так{% else %}Ні{% endif %}</td>
+                        {# <td><a href="#" class="btn btn-sm btn-warning">Редагувати</a></td> #}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% include "../includes/pagination.html" %}
+    {% else %}
+        <p>Типи документів не знайдено.</p>
+    {% endif %}
+</div>
+{% endblock %}

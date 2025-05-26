@@ -1,0 +1,23 @@
+{% extends "oids/base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">{{ page_title }}</h2>
+    
+    <p>Оберіть розділ для перегляду списку об'єктів:</p>
+    <ul class="list-group">
+        {% for model_view in model_views %}
+        <li>
+            <a href="{% url model_view.url_name %}" class="list-group-item list-group-item-action">
+                {{ model_view.label }}
+            </a>
+            
+        </li>
+        {% empty %}
+            <p>Немає доступних розділів для перегляду.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

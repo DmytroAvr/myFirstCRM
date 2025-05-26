@@ -60,6 +60,7 @@ class UnitGroup(models.Model):
     Зв'язки: Має кілька частин
     """
     name = models.CharField(max_length=255, unique=True, verbose_name="Назва групи частин")
+    # units = models.ManyToManyField(Unit, blank=True, verbose_name="Військові частини в групі", related_name="groups_they_belong_to") 
     note = models.TextField(verbose_name="Примітка", blank=True, null=True)
     # Зв'язок Many-to-Many з Unit буде визначено в моделі Unit
 
@@ -94,6 +95,7 @@ class Unit(models.Model):
         blank=True, 
         verbose_name="Групи військових частин",
         related_name='units' # Дозволить отримати всі частини для групи: `group_instance.units.all()`
+        # related_name='units_in_group' # Дозволить отримати всі частини для групи: `group_instance.units.all()`
     )
     note = models.TextField(verbose_name="Примітки", blank=True, null=True)
 
@@ -123,7 +125,7 @@ class OID(models.Model):
     room = models.CharField(max_length=255, verbose_name="Приміщення №")
     status = models.CharField(max_length=30, choices=OIDStatusChoices.choices, default=OIDStatusChoices.NEW, verbose_name="Поточний стан ОІД")
     note = models.TextField(verbose_name="Примітка", blank=True, null=True)
-
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису", null=True, blank=True) # Дозволь null/blank для існуючих
     # Прив'язка до першого та останнього документа для відстеження
     # OneToOneField для created_by_document може бути проблематичним, якщо один документ може "створити" кілька ОІД.
     # Краще використовувати ForeignKey, і вже на рівні логіки (service/views) забезпечувати, що це перший документ.

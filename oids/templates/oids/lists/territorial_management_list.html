@@ -1,0 +1,43 @@
+{% extends "oids/base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-4">{{ page_title }}</h2>
+    
+
+    {% if object_list %}
+        <table class="table table-striped table-bordered table-hover">
+            <thead class="thead-dark">
+                <tr>
+                    <th>Код</th>
+                    <th>Назва</th>
+                    <th>Примітки</th>
+                    <th>К-ть ВЧ <small>(приблизно)</small></th>
+                    {# <th>Дії</th> #}
+                </tr>
+            </thead>
+            <tbody>
+                {% for tm in object_list %}
+                    <tr>
+                        <td>{{ tm.code }}</td>
+                        <td>{{ tm.name }}</td>
+                        <td>{{ tm.note|default:"-" }}</td>
+                        <td>{{ tm.units.count }}</td> {# Потребує related_name='units' в моделі Unit для territorial_management #}
+                        {# <td>
+                            <a href="#" class="btn btn-sm btn-warning">Редагувати</a>
+                            <a href="{% url 'oids:main_dashboard' %}?tm={{ tm.id }}" class="btn btn-sm btn-info">Фільтр на панелі</a>
+                        </td> #}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        {% include "../includes/pagination.html" %} {# Використовуємо той самий шаблон пагінації #}
+
+    {% else %}
+        <p>Територіальні управління не знайдено.</p>
+    {% endif %}
+</div>
+{% endblock %}
