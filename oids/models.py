@@ -125,8 +125,9 @@ class OID(models.Model):
     room = models.CharField(max_length=255, verbose_name="Приміщення №")
     status = models.CharField(max_length=30, choices=OIDStatusChoices.choices, default=OIDStatusChoices.NEW, verbose_name="Поточний стан ОІД")
     note = models.TextField(verbose_name="Примітка", blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису", null=True, blank=True) # Дозволь null/blank для існуючих
-    # Прив'язка до першого та останнього документа для відстеження
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
+	# Прив'язка до першого та останнього документа для відстеження
     # OneToOneField для created_by_document може бути проблематичним, якщо один документ може "створити" кілька ОІД.
     # Краще використовувати ForeignKey, і вже на рівні логіки (service/views) забезпечувати, що це перший документ.
     # Я видалив created_by_document і latest_document, оскільки їх можна отримати через related_name
@@ -174,6 +175,7 @@ class WorkRequest(models.Model):
     incoming_number = models.CharField(verbose_name="Вхідний обліковий номер заявки", max_length=50, unique=False)
     incoming_date = models.DateField(verbose_name="Вхідна дата заявки", default=timezone.now) 
     note = models.TextField(verbose_name="Примітки", blank=True, null=True)
+
     status = models.CharField(
         max_length=30, 
         choices=WorkRequestStatusChoices.choices, 
@@ -181,6 +183,8 @@ class WorkRequest(models.Model):
         verbose_name="Статус заявки"
     )
     # Зв'язок Many-to-Many з OID буде через WorkRequestItem, щоб можна було вказувати тип роботи для кожного ОІД в заявці.
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
 
     def __str__(self):
         return f"Заявка №{self.incoming_number} від {self.incoming_date} ({self.get_status_display()})"
@@ -216,6 +220,8 @@ class WorkRequestItem(models.Model):
         default=WorkRequestStatusChoices.PENDING, 
         verbose_name="Статус опрацювання ОІД в заявці"
     )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
 
     class Meta:
         unique_together = ('request', 'oid', 'work_type') # Один ОІД не може мати двічі одну і ту ж роботу в одній заявці
@@ -322,7 +328,8 @@ class Document(models.Model):
     )
     attachment = models.FileField(upload_to="attestation_docs/", blank=True, null=True, verbose_name="Прикріплений файл (Опційно)")
     note = models.TextField(blank=True, null=True, verbose_name="Примітки")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата внесення в систему") # Змінив на DateTimeField
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
 
     # Додамо поле для автоматичного обчислення терміну дії
     expiration_date = models.DateField(verbose_name="Дата завершення дії", blank=True, null=True)
@@ -373,7 +380,9 @@ class Trip(models.Model):
         related_name='trips' # Дозволить знайти всі відрядження, в яких брала участь особа
     )
     purpose = models.TextField(blank=True, null=True, verbose_name="Мета відрядження")
-    
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
+
     def __str__(self):
         unit_names = ", ".join(unit.name for unit in self.units.all())
         return f"Відрядження {self.start_date}—{self.end_date} до {unit_names or 'немає частин'}"
@@ -415,6 +424,8 @@ class OIDStatusChange(models.Model):
         related_name='oid_status_changes'
     )
     changed_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата зміни") # Змінив на DateTimeField
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
 
     def __str__(self):
         return f"{self.oid.cipher}: {self.old_status} → {self.new_status} ({self.changed_at.strftime('%Y-%m-%d')})"
@@ -441,6 +452,8 @@ class AttestationRegistration(models.Model):
     process_date = models.DateField(verbose_name="Дата відправки на реєстрацію в ДССЗЗІ")
     attachment = models.FileField(upload_to="attestation_docs/", blank=True, null=True, verbose_name="Файл (опційно)")
     note = models.TextField(blank=True, null=True, verbose_name="Примітка")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
 
     def __str__(self):
         return f"Реєстрація Актів від {self.process_date}"
@@ -472,6 +485,8 @@ class AttestationItem(models.Model):
     )
     # document_number можна отримати з поля document.document_number, тому не дублюємо.
     # document_number = models.CharField(max_length=50, verbose_name="Номер Акту Атестації")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
 
     def __str__(self):
         return f"Акт {self.document.document_number} для {self.oid.cipher}"
@@ -495,6 +510,8 @@ class AttestationResponse(models.Model):
     registered_date = models.DateField(verbose_name="Дата реєстрації")
     note = models.TextField(blank=True, null=True, verbose_name="Примітка")
     recorded_date = models.DateTimeField(auto_now_add=True, verbose_name="Дата внесення")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
 
     def __str__(self):
         return f"Відповідь на реєстрацію {self.registration.registration_number} від {self.registered_date}"
@@ -534,7 +551,8 @@ class TripResultForUnit(models.Model):
     process_date = models.DateField(verbose_name="Дата відправки до частини")
     attachment = models.FileField(upload_to="trip_results_docs/", blank=True, null=True, verbose_name="Файл (опційно)")
     note = models.TextField(blank=True, null=True, verbose_name="Примітка")
-    
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
     # related_request - можна отримати через trip.work_requests.all() або через documents.work_request_item.request
     # Тому, якщо це не критично для прямого доступу, можна прибрати для уникнення дублювання.
     # related_request = models.ForeignKey('WorkRequest', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Пов’язана заявка")
@@ -573,12 +591,8 @@ class TechnicalTask(models.Model):
         verbose_name="Результат розгляду"
     )
     note = models.TextField(blank=True, null=True, verbose_name="Примітка")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата додання інформації") # Змінив на DateTimeField
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
 
     def __str__(self):
         return f"ТЗ №{self.input_number} для {self.oid.cipher}"
-
-    class Meta:
-        verbose_name = "Технічне завдання"
-        verbose_name_plural = "Технічні завдання"
-        unique_together = ('oid', 'input_number') # ТЗ унікальне в межах ОІД
