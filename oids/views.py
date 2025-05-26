@@ -1,15 +1,17 @@
-# oids/views.py
-from django.shortcuts import render, get_object_or_404
+# :\myFirstCRM\oids\views.py
+from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
-from django.urls import reverse # Не забувай імпортувати
+from django.urls import reverse_lazy, reverse
+from django.contrib import messages
+from django.db.models import Q, Max, Prefetch
 from .models import (
     Unit, OID, TerritorialManagement, 
     OIDStatusChoices, WorkTypeChoices, Document, DocumentType,
     WorkRequest, WorkRequestStatusChoices, WorkRequestItem, Trip,TripResultForUnit, Person, TechnicalTask,
     AttestationRegistration, AttestationItem, AttestationResponse
 )
-
-from django.db.models import Q, Max, Prefetch
+from .forms import ( TripForm, DocumentForm
+)
 
 # Твоя допоміжна функція (залишається без змін, але буде викликатися в AJAX view)
 def get_last_document_expiration_date(oid_instance, document_name_keyword, work_type_choice=None):
@@ -304,3 +306,83 @@ def oid_detail_view(request, oid_id):
         'last_prescription_expiration': last_prescription_expiration,
     }
     return render(request, 'oids/oid_detail.html', context)
+
+
+
+# ... (main_dashboard, ajax_load_oids_for_unit_categorized, ajax_load_oids_for_unit, oid_detail_view) ...
+# Переконайся, що функція get_last_document_expiration_date визначена вище
+
+def plan_trip_view(request):
+    if request.method == 'POST':
+        form = TripForm(request.POST)
+        if form.is_valid():
+            trip = form.save()
+            messages.success(request, f'Відрядження заплановано успішно (ID: {trip.id}).')
+            # Оновлюємо статус пов'язаних заявок на "В роботі"
+            for work_request in form.cleaned_data.get('work_requests', []):
+                if work_request.status == WorkRequestStatusChoices.PENDING:
+                    work_request.status = WorkRequestStatusChoices.IN_PROGRESS
+                    work_request.save()
+                    # Також оновити статус WorkRequestItem, якщо потрібно
+                    WorkRequestItem.objects.filter(request=work_request, status=WorkRequestStatusChoices.PENDING)\
+                                           .update(status=WorkRequestStatusChoices.IN_PROGRESS)
+
+            return redirect('oids:main_dashboard') # Або на сторінку деталей відрядження
+    else:
+        form = TripForm()
+    
+    return render(request, 'oids/forms/plan_trip_form.html', {'form': form, 'page_title': 'Запланувати відрядження'})
+
+def add_document_processing_view(request, oid_id=None, work_request_item_id=None):
+    initial_data = {}
+    selected_oid = None
+    
+    if oid_id:
+        selected_oid = get_object_or_404(OID, pk=oid_id)
+        initial_data['oid'] = selected_oid
+    
+    if work_request_item_id:
+        work_request_item_instance = get_object_or_404(WorkRequestItem, pk=work_request_item_id)
+        initial_data['work_request_item'] = work_request_item_instance
+        if not selected_oid: # Якщо OID не передано, беремо з WorkRequestItem
+            selected_oid = work_request_item_instance.oid
+            initial_data['oid'] = selected_oid
+
+    if request.method == 'POST':
+        form = DocumentForm(request.POST, request.FILES, initial_oid=selected_oid) # Передаємо initial_oid для фільтрації
+        if form.is_valid():
+            document = form.save()
+            messages.success(request, f'Документ "{document.document_type.name}" №{document.document_number} успішно додано.')
+            
+            # Оновлення статусу WorkRequestItem, якщо документ пов'язаний з ним
+            if document.work_request_item:
+                # Перевіряємо, чи всі обов'язкові документи для цього WorkRequestItem вже є
+                # Ця логіка може бути складною і залежить від бізнес-правил
+                # Поки що просто змінюємо статус, якщо він був "в роботі"
+                item = document.work_request_item
+                if item.status == WorkRequestStatusChoices.IN_PROGRESS:
+                     # Потрібно визначити, коли саме елемент заявки вважається виконаним
+                     # Наприклад, коли додано певний ключовий документ
+                     # Або коли всі обов'язкові документи для цього типу робіт по ОІД є.
+                     # Тут поки що не змінюємо статус автоматично, це потребує деталізації правил.
+                     pass
+
+            # Оновлення статусу ОІД (спрощена логіка)
+            # Цю логіку краще винести в сигнали або методи моделі OID
+            current_oid = document.oid
+            # Приклад: якщо додано "Акт атестації", змінюємо статус ОІД
+            if document.document_type.name.lower().startswith('акт атестації') and current_oid.status != OIDStatusChoices.ACTIVE:
+                # Потрібно створити запис в OIDStatusChange
+                current_oid.status = OIDStatusChoices.ACTIVE # Або ATTESTED, залежно від воркфлоу
+                current_oid.save()
+                messages.info(request, f'Статус ОІД "{current_oid.cipher}" оновлено на "{current_oid.get_status_display()}".')
+
+            return redirect('oids:oid_detail_view_name', oid_id=document.oid.id)
+    else:
+        form = DocumentForm(initial=initial_data, initial_oid=selected_oid)
+
+    return render(request, 'oids/forms/add_document_processing_form.html', {
+        'form': form, 
+        'page_title': 'Додати опрацювання документів',
+        'selected_oid': selected_oid
+    })

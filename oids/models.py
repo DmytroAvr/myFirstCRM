@@ -318,6 +318,7 @@ class Document(models.Model):
         verbose_name="Автор документа",
         related_name='authored_documents' # Дозволить отримати всі документи, створені особою
     )
+    attachment = models.FileField(upload_to="attestation_docs/", blank=True, null=True, verbose_name="Прикріплений файл (Опційно)")
     note = models.TextField(blank=True, null=True, verbose_name="Примітки")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата внесення в систему") # Змінив на DateTimeField
 

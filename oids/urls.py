@@ -12,8 +12,11 @@ urlpatterns = [
     path('ajax/load-oids-for-unit/', views.ajax_load_oids_for_unit, name='ajax_load_oids_for_unit'),
     path('ajax/load-oids-categorized/', views.ajax_load_oids_for_unit_categorized, name='ajax_load_oids_categorized'), # Новий URL
     
-    # URLs для форм (потрібно буде створити відповідні views та форми)
-    # path('request/add/', views.add_work_request_view, name='add_work_request_view_name'),
-    # path('trip/plan/', views.plan_trip_view, name='plan_trip_view_name'),
-    # path('document/process/', views.add_document_processing_view, name='add_document_processing_view_name'),
+    # URLs для форм
+    path('trip/plan/', views.plan_trip_view, name='plan_trip_view_name'),
+    path('document/add/', views.add_document_processing_view, name='add_document_processing_view_name'),
+    # Якщо форма додавання документа викликається з контексту ОІД:
+    path('oid/<int:oid_id>/document/add/', views.add_document_processing_view, name='add_document_for_oid_view_name'),
+    # Якщо форма додавання документа викликається з контексту елемента заявки:
+    path('work-request-item/<int:work_request_item_id>/document/add/', views.add_document_processing_view, name='add_document_for_work_request_item_view_name'),
 ]

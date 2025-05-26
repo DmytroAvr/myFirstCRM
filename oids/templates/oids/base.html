@@ -19,10 +19,9 @@
         </header>
 
         <div class="nav-buttons">
-            <a href="{{ add_request_url }}">Додати заявку</a>
-            <a href="{{ plan_trip_url }}">Запланувати відрядження</a>
-            <a href="{{ add_document_processing_url }}">Додати опрацювання документів</a>
-        </div>
+            <!-- <a href="{{ add_request_url }}">Додати заявку</a> -->
+<a href="{% url 'oids:plan_trip_view_name' %}">Запланувати відрядження</a>
+<a href="{% url 'oids:add_document_processing_view_name' %}">Додати опрацювання документів</a>        </div>
 
         {% if messages %}
             <ul class="messages">
