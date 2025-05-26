@@ -1,0 +1,52 @@
+{# oids/templates/oids/base.html (або main_dashboard.html) #}
+{% load static %}
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Управління ОІД{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'oids/css/style.css' %}"> 
+    <link rel="stylesheet" href="{% static 'oids/css/select2.min.css' %}"> 
+    <script src="{% static 'oids/js/jquery-3.7.1.min.js' %}"></script>
+    <script src="{% static 'oids/js/select2.min.js' %}"></script>
+    <script src="{% static 'oids/js/select2-uk.min.js' %}"></script>
+    
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>{% block page_title %}Панель керування ОІД{% endblock %}</h1>
+        </header>
+
+        <div class="nav-buttons">
+<a href="{% url 'oids:add_work_request_view_name' %}">Додати заявку</a>
+<a href="{% url 'oids:plan_trip_view_name' %}">Запланувати відрядження</a>
+<a href="{% url 'oids:add_document_processing_view_name' %}">Додати опрацювання документів</a>        </div>
+
+        {% if messages %}
+            <ul class="messages">
+                {% for message in messages %}
+                    <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        {% block content %}
+        {% endblock %}
+     </div>
+
+   
+    <script>
+        window.AJAX_LOAD_OIDS_CATEGORIZED_URL = "{% url 'oids:ajax_load_oids_categorized' %}";
+        // Також для інших AJAX URL, якщо потрібно
+    </script>
+    <script src="{% static 'oids/js/select2-init.js' %}"></script>
+    <script src="{% static 'oids/js/filtering_dynamic.js' %}"></script>
+    <script src="{% static 'oids/js/main.js' %}"></script> {# Якщо є головний JS файл #}
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
+
+
+
+ 

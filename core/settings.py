@@ -37,9 +37,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django_select2',
-    'oids', 
-    'widget_tweaks',
+    'multiselectfield', # Якщо ви використовуєте multiselectfield
+    'oids', # Ваш додаток
+    
+    
+    # 'django_select2',
     # 'core',
     # 'requests',
     # 'missions',
@@ -47,6 +49,7 @@ INSTALLED_APPS = [
     # 'staff',
     # 'reports',
 ]
+MESSAGE_STORAGE = 'django.contrib.messages.storage.session.SessionStorage'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -60,14 +63,15 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'core.urls'
 
+# Налаштування TEMPLATES (переконайтеся, що 'DIRS' вказує на кореневу папку шаблонів проекту, якщо є)
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        # 'DIRS': ['templates'],
-        'APP_DIRS': True,
+        'DIRS': [], # Можливо, тут є 'os.path.join(BASE_DIR, 'templates')', якщо у вас є глобальні шаблони
+        'APP_DIRS': True, # Важливо, щоб Django шукав шаблони у `templates` папках кожного додатка
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',

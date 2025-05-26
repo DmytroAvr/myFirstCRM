@@ -17,29 +17,30 @@
     <div style="padding: 20px; display: flex; flex-direction: row; justify-content: space-around; gap: 20px; margin: 0 auto;">
         <div>
             <h2>додати інформацію</h2>
-    <ol>
-        <li><a href="{% url 'technical_task_create' %}" target="_blank">🧾  Додати опрпацювання ТЗ</a></li>
-        <li><a href="{% url 'work_request' %}" target="_blank">📨 Додати заявку на проведення робіт</a></li>
-        <li><a href="{% url 'trip-create' %}" target="_blank">📤 📤 Планування відрядження</a></li>
-        <li><a href="{% url 'document_done' %}" target="_blank">➕ Додати опрацьовані документи</a></li>
 
-        <li><a href="{% url 'send_doc_cip' %}" target="_blank">🧾 зареєструвати атестацію</a></li>
-        <li><a href="{% url 'send_doc_unit' %}" target="_blank">📤 Відправка опрацьованих документів по відрядженню</a></li>
-        <li><a href="{% url 'oid_status_change' %}" target="_blank">🧾  зміна статусу ОІД</a></li>
-    </ol>
-            
-        </div>
-        <div>
-            <h2>переглянути інформацію</h2>
-<ol>
-        <li><a href="{% url 'unit_overview' %}" target="_blank"> Все про ОІД</a></li>
-        <li><a href="{% url 'technical_task_list' %}" target="_blank">🧾 Інформація про опрацювання ТЗ</a></li>
-        <li><a href="{% url 'work_request_list' %}" target="_blank">📨 Переглянути заявки на проведення робіт</a></li>
-        <!-- <li><a href="{% url 'document_done' %}" target="_blank">Інформація про опрацьовані документи </a></li> -->
-        <li><a href="{% url 'trip-list' %}" target="_blank">🧾 Сплановані відрядження</a></li>
-        <!-- <li><a href="{% url 'oid_status_change' %}" target="_blank">🧾  зміна статусу ОІД</a></li> -->
-
+  <ol>
+    <li><a href="{% url 'home' %}" target="_blank">📝 Додати опрацювання ТЗ</a></li>        <!-- technical_task_create-->
+    <li><a href="{% url 'home' %}" target="_blank">📨 Додати заявку на проведення робіт</a></li>         <!-- work_request-->
+    <li><a href="{% url 'home' %}" target="_blank">🧭 Планування відрядження</a></li>        <!-- tripcreate-->
+    <li><a href="{% url 'home' %}" target="_blank">📂 Додати опрацьовані документи</a></li>         <!-- document_done-->
+    <li><a href="{% url 'home' %}" target="_blank">✅ Зареєструвати атестацію</a></li>           <!-- send_doc_cip-->
+    <li><a href="{% url 'home' %}" target="_blank">📬 Відправка документів по відрядженню</a></li> <!-- send_doc_unit-->
+    <li><a href="{% url 'home' %}" target="_blank">🔄 Зміна статусу ОІД</a></li>            <!-- oid_status_change-->
 </ol>
+
+</div>
+<div>
+    <h2>📊 Переглянути інформацію</h2>
+    <ol>
+        <li><a href="{% url 'home' %}" target="_blank">📘 Все про ОІД</a></li>        <!-- unit_overview -->
+        <li><a href="{% url 'home' %}" target="_blank">🗂️ Інформація про опрацювання ТЗ</a></li>          <!-- technical_task_list -->
+        <li><a href="{% url 'home' %}" target="_blank">📄 Переглянути заявки</a></li>         <!-- work_request_list -->
+        <li><a href="{% url 'home' %}" target="_blank">📁 Опрацьовані документи</a></li>          <!-- document_done -->
+        <li><a href="{% url 'home' %}" target="_blank">🧳 Сплановані відрядження</a></li>         <!-- trip_list -->
+        <li><a href="{% url 'home' %}" target="_blank">📈 Історія зміни статусу ОІД</a></li>          <!-- oid_status_change -->
+    </ol>
+</div>
+
 
         </div>
     </div>

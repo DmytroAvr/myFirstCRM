@@ -16,11 +16,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from oids.views import home_view  # імпортуй view
+from oids.views import main_dashboard
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('oids/', include('oids.urls')),  # Все що стосується oids – тут
     path('select2/', include('django_select2.urls')),
-    path('', home_view, name='home'),  # ⬅ Головна сторінка
+    path('', main_dashboard, name='home'),  # ⬅ Головна сторінка
 ]

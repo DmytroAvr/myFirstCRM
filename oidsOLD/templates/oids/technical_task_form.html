@@ -1,0 +1,92 @@
+<!-- C:\myFirstCRM\oids\templates\oids\technical_task_form.html -->
+{% extends 'base.html' %}
+{% block title %}Технічне завдання - додати{% endblock %}
+
+{% load static %}
+ 
+{% block content %}
+<h2>Додати технічне завдання</h2>
+
+<form id="my-form" method="post">
+  {% csrf_token %}
+
+
+  <div class="form-group">
+    {{ form.unit.label_tag }}
+    {{ form.unit }} </div>
+
+<div class="form-group">
+    {{ form.oid.label_tag }}
+    {{ form.oid }} </div>
+    
+<div class="form-group">
+    {{ form.technical_task.label_tag }}
+    {{ form.technical_task }} </div>
+
+  <!-- <div class="form-group">
+    <label for="id_unit">Військова частина (Unit):</label>
+    {{ form.unit }} </div>
+
+<div class="form-group">
+    <label for="id_oid">оберіть ОІД</label>
+    {{ form.oid }} </div> -->
+
+
+  
+  <p style="display: inline;"> - Не знайшли потрібного ОІД? </p>
+  <button type="button" class="add-oid-button" style="margin-right: 30px;">➕ Додати ОІД</button>
+
+  <br><br>
+  {{ form.input_number.label_tag }} {{ form.input_number }}
+  {{ form.input_date.label_tag }} {{ form.input_date }}
+  {{ form.reviewed_by.label_tag }} {{ form.reviewed_by }}
+  {{ form.review_result.label_tag }} {{ form.review_result }}
+  {{ form.note.label_tag }} {{ form.note }}
+
+  <br>
+  <button type="submit">Зберегти</button>
+</form>
+
+
+<script>
+  document.getElementById("my-form").addEventListener("submit", function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+
+    fetch(this.action, {
+      method: "POST",
+      body: formData,
+      headers: {
+        'X-CSRFToken': getCookie('csrftoken')
+      }
+    })
+    .then(response => {
+      if (response.ok) {
+        alert("✅ Дані збережено!");
+        location.reload();
+      } else {
+        alert("⚠️ Помилка при збереженні.");
+      }
+    });
+  });
+
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let cookie of cookies) {
+        cookie = cookie.trim();
+        if (cookie.startsWith(name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+
+  
+</script>
+
+{% endblock %}
+

@@ -1,0 +1,50 @@
+<!-- C:\myFirstCRM\oids\templates\attestation_registration_form.html -->
+{% extends 'base.html' %}
+{% block title %}Відправити А Атестації до ДССЗЗІ{% endblock %}
+{% load static %}
+
+{% block content %}  
+
+    <h2>Нова відправка Акту Атестації</h2>
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      {{ form.as_p }}
+
+      <button type="submit" class="btn btn-primary">Зберегти</button>
+    </form>
+    {% endblock %}
+
+
+
+
+
+<script>
+    // script for select2 with search
+    $(document).ready(function() {
+    $('select').select2();
+        $('#id_units').on('change', function() {
+            const unitIds = $(this).val();
+            if (!unitIds.length) return;
+
+            $.ajax({
+                url: "{% url 'ajax_load_oids_for_units' %}",
+                data: {
+                    'units[]': unitIds
+                },
+                success: function(data) {
+                    const $oidSelect = $('#id_oids');
+                    $oidSelect.empty();
+                    data.forEach(function(oid) {
+                        $oidSelect.append($('<option>', {
+                            value: oid.id,
+                            text: oid.name
+                        }));
+                    });
+                    $oidSelect.trigger('change');
+                }
+            });
+        });
+    });
+</script>
+
+

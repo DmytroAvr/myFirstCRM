@@ -1,0 +1,45 @@
+<!-- C:\myFirstCRM\oids\templates\oids\document_done.html -->
+
+{% extends 'base.html' %}
+{% block title %}enter title{% endblock %}
+{% load static %}
+
+{% block extra_css %}
+    <!-- <style>
+        додав в main.css
+        p:has(input[id$="-DELETE"]) {
+            display: none;
+        }
+    </style> -->
+{% endblock %}
+
+{% block content %}
+<!-- % endblock % -->
+
+
+    <form method="post">
+        {% csrf_token %}
+
+        <h2>Додати опрацьовані документи по ОІД</h2>
+
+        <h3>загальна інформація:</h3>
+        {{ header_form.as_p }}
+<br>
+        <h3>Документи:</h3>
+        <div id="formset">
+            {{ formset.management_form }}
+            {% for form in formset %}
+                <div class="document-form" style="border: 1px solid #ccc; margin: 10px; padding: 10px; position: relative;">
+                    {{ form.as_p }}
+                    <button type="button" class="remove-form">🗑 Видалити</button>
+                </div>
+            {% endfor %}
+        </div>
+
+        <button type="button" id="add-form">➕ Додати документ</button>
+        <br><br>
+        <button type="submit">💾 Зберегти всі документи</button>
+    </form>
+
+</body>
+{% endblock %}

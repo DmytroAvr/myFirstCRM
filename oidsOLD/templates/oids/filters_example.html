@@ -1,0 +1,107 @@
+{% extends 'base.html' %} {# Або ваш базовий шаблон #}
+{% load static %}
+
+{% block content %}
+    <h1>Сторінка з динамічними фільтрами</h1>
+
+    <form method="GET" action=""> {# action="" відправить форму на поточний URL #}
+        <div class="form-group">
+            {{ form.unit.label_tag }}
+            {{ form.unit }} {# ID буде id_unit #}
+        </div>
+
+        <div class="form-group">
+            {{ form.oid.label_tag }}
+            {{ form.oid }} {# ID буде id_oid #}
+        </div>
+
+        <hr>
+
+        <div class="form-group">
+            {{ form.units.label_tag }}
+            {{ form.units }} {# ID буде id_units #}
+        </div>
+
+        <div class="form-group">
+            {{ form.oids.label_tag }}
+            {{ form.oids }} {# ID буде id_oids #}
+        </div>
+
+        <hr>
+
+        <div class="form-group">
+            {{ form.work_requests.label_tag }}
+            {{ form.work_requests }} {# ID буде id_work_requests #}
+        </div>
+
+        <hr>
+
+        <div class="form-group">
+            {{ form.technical_task.label_tag }}
+            {{ form.technical_task }} {# ID буде id_technical_task #}
+        </div>
+
+        <hr>
+
+        <h2>Формсет з динамічним OID (F5)</h2>
+        <div id="formset-container">
+            {# Тут буде рендеритися ваш формсет. Наприклад: #}
+            {# {{ document_formset.management_form }} #}
+            {# {% for form in document_formset %} #}
+            {#    <div class="document-form"> #}
+            {#        {{ form.id }} #}
+            {#        <div class="form-group"> #}
+            {#            <label for="{{ form.oid.id_for_label }}">ОІД (формсет):</label> #}
+            {#            {{ form.oid }} #}
+            {#        </div> #}
+            {#        ... інші поля форми ... #}
+            {#    </div> #}
+            {# {% endfor %} #}
+            <p>
+                * Тут має бути рендеринг вашого формсету.
+                Поля формсету матимуть ID типу `id_form-0-oid`, `id_form-1-oid` тощо.
+            </p>
+        </div>
+        
+        <hr>
+
+        <h3>Зворотна фільтрація (F6)</h3>
+        <p>Виберіть заявку, щоб побачити відповідні ОІД та військову частину:</p>
+        <div class="form-group">
+            {{ form.work_requests.label_tag }}
+            {{ form.work_requests }} {# Поле work_requests вже визначено вище #}
+        </div>
+        <div class="form-group">
+            {{ form.oid.label_tag }}
+            {{ form.oid }} {# Поле oid вже визначено вище #}
+        </div>
+        <div class="form-group">
+            {{ form.unit.label_tag }}
+            {{ form.unit }} {# Поле unit вже визначено вище #}
+        </div>
+
+        <br>
+        <button type="submit" class="btn btn-primary">Застосувати фільтри</button>
+        <a href="{% url 'filters_example' %}" class="btn btn-secondary">Скинути фільтри</a>
+    </form>
+
+    <script>
+        // Ваш select2-init.js буде ініціалізувати ці поля
+        // Наприклад:
+        $(document).ready(function() {
+            // Одинарні Select2 поля
+            $('#id_unit').select2({ placeholder: "Оберіть військову частину", allowClear: true, language: "uk" });
+            $('#id_oid').select2({ placeholder: "Оберіть ОІД", allowClear: true, language: "uk" });
+            $('#id_work_requests').select2({ placeholder: "Оберіть заявку", allowClear: true, language: "uk" });
+            $('#id_technical_task').select2({ placeholder: "Оберіть технічне завдання", allowClear: true, language: "uk" });
+
+            // Множинні Select2 поля
+            $('#id_units').select2({ placeholder: "Оберіть В/Ч(и)", allowClear: true, language: "uk" });
+            $('#id_oids').select2({ placeholder: "Оберіть ОІД(и)", allowClear: true, language: "uk" });
+
+            // Для формсетів, вам, можливо, потрібно буде ініціалізувати Select2 після додавання нової форми.
+            // Це зазвичай робиться в логіці "додати форму" вашого формсету (наприклад, у setupDocumentFormsetLogic).
+            // $('.document-form select[name$="-oid"]').select2(...);
+        });
+    </script>
+{% endblock %}
