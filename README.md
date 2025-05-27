@@ -34,7 +34,7 @@ https://www.w3schools.com/django/django_install_django.php
 # install Django
 python -m pip install Django
 pip install django-multiselectfield
-pip install django-select2
+pip install django-tomselect
 
 <!-- 
  -->

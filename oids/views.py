@@ -7,10 +7,11 @@ from django.urls import reverse_lazy, reverse
 from django.contrib import messages
 from django.db.models import Q, Max, Prefetch, Count
 from .models import (
-    Unit, UnitGroup, OID, OIDStatusChange, TerritorialManagement, 
-    OIDStatusChoices, WorkTypeChoices, Document, DocumentType,
-    WorkRequest, WorkRequestStatusChoices, WorkRequestItem, Trip,TripResultForUnit, Person, TechnicalTask,
-    AttestationRegistration, AttestationItem, AttestationResponse,  
+    Unit, UnitGroup, OID, OIDStatusChange, TerritorialManagement, Document, DocumentType,
+    WorkRequest, WorkRequestItem, Trip,TripResultForUnit, Person, TechnicalTask,
+    AttestationRegistration, AttestationItem, AttestationResponse,
+    
+    OIDTypeChoices, OIDStatusChoices, SecLevelChoices, WorkRequestStatusChoices, WorkTypeChoices, DocumentReviewResultChoices
 )
 from .forms import ( TripForm, DocumentForm, WorkRequestForm, OIDForm
 )
@@ -38,6 +39,79 @@ def get_last_document_expiration_date(oid_instance, document_name_keyword, work_
         print(f"Помилка get_last_document_expiration_date для ОІД {oid_instance.cipher if oid_instance else 'N/A'} ({document_name_keyword}): {e}")
         return None
     
+# changede by gemeni. перейшли від передачі словників до передачі повних екземплярів моделі OID у функцію get_last_document_expiration_date. Це важливо для коректної роботи сервера, незалежно від фронтенд-фільтрації.
+def ajax_load_oids_for_unit_categorized(request):
+    unit_id_str = request.GET.get('unit_id')
+    data = {
+        'creating': [],
+        'active': [],
+        'cancelled': []
+    }
+
+    if unit_id_str:
+        try:
+            unit_id = int(unit_id_str)
+            # Замість .values(), отримуємо повні об'єкти OID, щоб передавати їх у helper
+            oids_for_unit_qs = OID.objects.filter(unit__id=unit_id)\
+                                        .select_related('unit', 'unit__territorial_management')\
+                                        .order_by('cipher')
+
+            for oid_instance in oids_for_unit_qs: # Тепер це повний екземпляр OID
+                oid_item = {
+                    'id': oid_instance.id,
+                    'cipher': oid_instance.cipher,
+                    'full_name': oid_instance.full_name or oid_instance.unit.city,
+                    'oid_type_display': oid_instance.get_oid_type_display(), # Використовуємо метод моделі
+                    'status_display': oid_instance.get_status_display(),   # Використовуємо метод моделі
+                    'detail_url': reverse('oids:oid_detail_view_name', args=[oid_instance.id])
+                }
+
+                if oid_instance.status in [OIDStatusChoices.NEW, OIDStatusChoices.RECEIVED_REQUEST, OIDStatusChoices.RECEIVED_TZ]:
+                    data['creating'].append(oid_item)
+                elif oid_instance.status == OIDStatusChoices.ACTIVE:
+                    # Тепер передаємо повний екземпляр oid_instance
+                    oid_item['ik_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Висновок', WorkTypeChoices.IK)
+                    oid_item['attestation_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Акт атестації', WorkTypeChoices.ATTESTATION)
+                    oid_item['prescription_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Припис')
+                    data['active'].append(oid_item)
+                elif oid_instance.status in [OIDStatusChoices.CANCELED, OIDStatusChoices.TERMINATED]:
+                    data['cancelled'].append(oid_item)
+        
+        except ValueError:
+            return JsonResponse({'error': 'Невірний ID військової частини'}, status=400)
+        except Exception as e:
+            # Виводимо помилку в консоль Django для дебагу
+            print(f"SERVER ERROR in ajax_load_oids_for_unit_categorized: {type(e).__name__} - {e}")
+            import traceback
+            traceback.print_exc() # Друкує повний трейсбек
+            return JsonResponse({'error': f'Серверна помилка: {type(e).__name__}'}, status=500)
+            
+    return JsonResponse(data)
+
+# Ваш ajax_load_oids_for_unit (якщо потрібен окремо для простого списку ОІДів, наприклад, для форм)
+
+# AJAX view для завантаження ОІДів для Select2 у формах (якщо потрібно)
+# Цей view НЕ використовується для оновлення списків ОІД на головній панелі в цьому сценарії
+def ajax_load_oids_for_unit(request):
+    unit_id = request.GET.get('unit_id') # Або 'unit', залежно від JS
+    oids_data = []
+    if unit_id:
+        try:
+            oids = OID.objects.filter(
+                unit__id=unit_id,
+                status__in=[OIDStatusChoices.ACTIVE, OIDStatusChoices.NEW, 
+                            OIDStatusChoices.RECEIVED_REQUEST, OIDStatusChoices.RECEIVED_TZ]
+            ).order_by('cipher')
+            for oid in oids:
+                oids_data.append({
+                    'id': oid.id, 
+                    # 'name' або 'text' - залежно від того, що очікує transformItem або Select2
+                    'name': f"{oid.cipher} ({oid.get_oid_type_display()}) - {oid.full_name or oid.unit.city}" 
+                })
+        except ValueError:
+            pass # unit_id не є числом
+    return JsonResponse(list(oids_data), safe=False)
+
 
 def main_dashboard(request):
     """
@@ -105,139 +179,7 @@ def main_dashboard(request):
     }
     return render(request, 'oids/main_dashboard.html', context)
 
-# old. give ino by vocabulary
-# def ajax_load_oids_for_unit_categorized(request):
-#     """
-#     AJAX view для завантаження ОІДів обраної військової частини,
-#     розділених на категорії.
-#     """
-#     unit_id = request.GET.get('unit_id') # Параметр, який передає JS
-#     data = {
-#         'creating': [],
-#         'active': [],
-#         'cancelled': []
-#     }
 
-#     if unit_id:
-#         try:
-#             # Оптимізуємо запит, обираючи тільки потрібні поля для JSON відповіді
-#             # та пов'язані дані, якщо вони потрібні для відображення
-#             oids_for_unit = OID.objects.filter(unit__id=unit_id)\
-#                                      .select_related('unit')\
-#                                      .values('id', 'cipher', 'full_name', 'status', 'oid_type', 'unit__city')\
-#                                      .order_by('cipher')
-            
-#             # Визначення типів документів для ІК, Атестації, Припису один раз
-#             ik_doc_type_name_keyword = 'Висновок' # Або більш точно "Висновок ІК"
-#             attestation_doc_type_name_keyword = 'Акт атестації'
-#             prescription_doc_type_name_keyword = 'Припис'
-
-#             for oid_data in oids_for_unit:
-#                 # Створюємо тимчасовий об'єкт OID для передачі в get_last_document_expiration_date,
-#                 # або модифікуємо функцію, щоб вона приймала словник oid_data
-#                 temp_oid_obj = OID(pk=oid_data['id'], cipher=oid_data['cipher']) # Мінімально необхідні поля для функції
-
-#                 oid_item = {
-#                     'id': oid_data['id'],
-#                     'cipher': oid_data['cipher'],
-#                     'full_name': oid_data['full_name'] or oid_data['unit__city'], # Використовуємо місто, якщо назва порожня
-#                     'oid_type_display': dict(OIDTypeChoices.choices).get(oid_data['oid_type'], oid_data['oid_type']),
-#                     'status_display': dict(OIDStatusChoices.choices).get(oid_data['status'], oid_data['status']),
-#                     # Посилання на детальну сторінку
-#                     'detail_url': reverse('oids:oid_detail_view_name', args=[oid_data['id']]) # Заміни 'oid_detail_view_name'
-#                 }
-
-#                 if oid_data['status'] in [OIDStatusChoices.NEW, OIDStatusChoices.RECEIVED_REQUEST, OIDStatusChoices.RECEIVED_TZ]:
-#                     # Тут можна додати логіку перевірки наявності активних заявок, якщо потрібно
-#                     data['creating'].append(oid_item)
-#                 elif oid_data['status'] == OIDStatusChoices.ACTIVE:
-#                     oid_item['ik_expiration_date'] = get_last_document_expiration_date(temp_oid_obj, ik_doc_type_name_keyword, WorkTypeChoices.IK)
-#                     oid_item['attestation_expiration_date'] = get_last_document_expiration_date(temp_oid_obj, attestation_doc_type_name_keyword, WorkTypeChoices.ATTESTATION)
-#                     oid_item['prescription_expiration_date'] = get_last_document_expiration_date(temp_oid_obj, prescription_doc_type_name_keyword) # Може бути для обох типів робіт
-#                     data['active'].append(oid_item)
-#                 elif oid_data['status'] in [OIDStatusChoices.CANCELED, OIDStatusChoices.TERMINATED]:
-#                     data['cancelled'].append(oid_item)
-#         except ValueError: # Якщо unit_id не є числом
-#             return JsonResponse({'error': 'Невірний ID військової частини'}, status=400)
-#         except Exception as e:
-#             print(f"Серверна помилка в ajax_load_oids_for_unit_categorized: {e}")
-#             return JsonResponse({'error': 'Серверна помилка'}, status=500)
-            
-#     return JsonResponse(data)
-
-# changede by gemeni. перейшли від передачі словників до передачі повних екземплярів моделі OID у функцію get_last_document_expiration_date. Це важливо для коректної роботи сервера, незалежно від фронтенд-фільтрації.
-def ajax_load_oids_for_unit_categorized(request):
-    unit_id_str = request.GET.get('unit_id')
-    data = {
-        'creating': [],
-        'active': [],
-        'cancelled': []
-    }
-
-    if unit_id_str:
-        try:
-            unit_id = int(unit_id_str)
-            # Замість .values(), отримуємо повні об'єкти OID, щоб передавати їх у helper
-            oids_for_unit_qs = OID.objects.filter(unit__id=unit_id)\
-                                        .select_related('unit', 'unit__territorial_management')\
-                                        .order_by('cipher')
-
-            for oid_instance in oids_for_unit_qs: # Тепер це повний екземпляр OID
-                oid_item = {
-                    'id': oid_instance.id,
-                    'cipher': oid_instance.cipher,
-                    'full_name': oid_instance.full_name or oid_instance.unit.city,
-                    'oid_type_display': oid_instance.get_oid_type_display(), # Використовуємо метод моделі
-                    'status_display': oid_instance.get_status_display(),   # Використовуємо метод моделі
-                    'detail_url': reverse('oids:oid_detail_view_name', args=[oid_instance.id])
-                }
-
-                if oid_instance.status in [OIDStatusChoices.NEW, OIDStatusChoices.RECEIVED_REQUEST, OIDStatusChoices.RECEIVED_TZ]:
-                    data['creating'].append(oid_item)
-                elif oid_instance.status == OIDStatusChoices.ACTIVE:
-                    # Тепер передаємо повний екземпляр oid_instance
-                    oid_item['ik_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Висновок', WorkTypeChoices.IK)
-                    oid_item['attestation_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Акт атестації', WorkTypeChoices.ATTESTATION)
-                    oid_item['prescription_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Припис')
-                    data['active'].append(oid_item)
-                elif oid_instance.status in [OIDStatusChoices.CANCELED, OIDStatusChoices.TERMINATED]:
-                    data['cancelled'].append(oid_item)
-        
-        except ValueError:
-            return JsonResponse({'error': 'Невірний ID військової частини'}, status=400)
-        except Exception as e:
-            # Виводимо помилку в консоль Django для дебагу
-            print(f"SERVER ERROR in ajax_load_oids_for_unit_categorized: {type(e).__name__} - {e}")
-            import traceback
-            traceback.print_exc() # Друкує повний трейсбек
-            return JsonResponse({'error': f'Серверна помилка: {type(e).__name__}'}, status=500)
-            
-    return JsonResponse(data)
-
-
-# Ваш ajax_load_oids_for_unit (якщо потрібен окремо для простого списку ОІДів, наприклад, для форм)
-
-# AJAX view для завантаження ОІДів для Select2 у формах (якщо потрібно)
-# Цей view НЕ використовується для оновлення списків ОІД на головній панелі в цьому сценарії
-def ajax_load_oids_for_unit(request):
-    unit_id = request.GET.get('unit_id') # Або 'unit', залежно від JS
-    oids_data = []
-    if unit_id:
-        try:
-            oids = OID.objects.filter(
-                unit__id=unit_id,
-                status__in=[OIDStatusChoices.ACTIVE, OIDStatusChoices.NEW, 
-                            OIDStatusChoices.RECEIVED_REQUEST, OIDStatusChoices.RECEIVED_TZ]
-            ).order_by('cipher')
-            for oid in oids:
-                oids_data.append({
-                    'id': oid.id, 
-                    # 'name' або 'text' - залежно від того, що очікує transformItem або Select2
-                    'name': f"{oid.cipher} ({oid.get_oid_type_display()}) - {oid.full_name or oid.unit.city}" 
-                })
-        except ValueError:
-            pass # unit_id не є числом
-    return JsonResponse(list(oids_data), safe=False)
 
 # ... (решта ваших views: oid_detail_view, форми для додавання тощо) ...
 # Не забудьте додати oid_detail_view з попередньої відповіді.
@@ -437,20 +379,20 @@ def summary_information_hub_view(request):
     # Ключ 'label' - це те, що побачить користувач
     # Ключ 'url_name' - це name з urls.py для відповідного списку
     model_views = [
-        {'label': 'Територіальні управління', 'url_name': 'oids:list_territorial_managements'},
-        {'label': 'Групи військових частин', 'url_name': 'oids:list_unit_groups'},
         {'label': 'Військові частини', 'url_name': 'oids:list_units'},
         {'label': 'Об\'єкти інформаційної діяльності (ОІД)', 'url_name': 'oids:list_oids'},
         {'label': 'Заявки на проведення робіт', 'url_name': 'oids:list_work_requests'},
         {'label': 'Опрацьовані документи', 'url_name': 'oids:list_documents'},
         {'label': 'Відрядження', 'url_name': 'oids:list_trips'},
-        {'label': 'Виконавці (Особи)', 'url_name': 'oids:list_persons'},
         {'label': 'Технічні завдання', 'url_name': 'oids:list_technical_tasks'},
-        {'label': 'Реєстрації Актів Атестації', 'url_name': 'oids:list_attestation_registrations'},
-        {'label': 'Відповіді на Реєстрацію Атестації', 'url_name': 'oids:list_attestation_responses'},
-        {'label': 'Результати відряджень для частин', 'url_name': 'oids:list_trip_results_for_units'},
+        {'label': 'Надсилання на реєстрацію Актів Атестації', 'url_name': 'oids:list_attestation_registrations'},
+        {'label': 'Відповіді Реєстрація Атестації', 'url_name': 'oids:list_attestation_responses'},
+        {'label': 'Надсилання до частин пакетів документів', 'url_name': 'oids:list_trip_results_for_units'},
         {'label': 'Історія змін статусу ОІД', 'url_name': 'oids:list_oid_status_changes'},
-        {'label': 'Типи документів (Довідник)', 'url_name': 'oids:list_document_types'},
+        {'label': 'Довідник: Територіальні управління', 'url_name': 'oids:list_territorial_managements'},
+        {'label': 'Довідник: Групи військових частин', 'url_name': 'oids:list_unit_groups'},
+        {'label': 'Довідник: Типи документів', 'url_name': 'oids:list_document_types'},
+        {'label': 'Довідник: Виконавці (Особи)', 'url_name': 'oids:list_persons'},
     ]
     context = {
         'page_title': 'Зведена інформація та перегляд даних за розділами',
@@ -599,102 +541,483 @@ def document_type_list_view(request):
     }
     return render(request, 'oids/lists/document_type_list.html', context)
 
-# def unit_list_view(request):
-#     units_list_queryset = Unit.objects.select_related(
-#         'territorial_management'
-#     ).prefetch_related(
-#         'unit_groups', 
-#         'oids' # Для підрахунку кількості ОІД
-#     ).order_by('territorial_management__name', 'name')
-
-#     paginator = Paginator(units_list_queryset, 25) 
-#     page_number = request.GET.get('page')
-#     page_obj = paginator.get_page(page_number)
-
-#     context = {
-#         'page_title': 'Список Військових Частин',
-#         'object_list': page_obj, # Універсальне ім'я для пагінації
-#         'page_obj': page_obj
-#     }
-#     return render(request, 'oids/lists/unit_list.html', context)
 
 def oid_list_view(request):
-    # Для "дати додавання інформації" для ОІД, це може бути неоднозначно.
-    # Якщо є поле created_at на моделі OID, використовуй його.
-    # Якщо ні, можна сортувати за датою створення першого документа, або за unit/cipher.
-    # Поки що сортуємо за ВЧ та шифром.
     oid_list_queryset = OID.objects.select_related(
-        'unit__territorial_management', # unit вже буде завантажено через select_related('unit')
-        'unit'
-    ).order_by('unit__code', 'cipher') # Сортування за кодом ВЧ, потім за шифром ОІД
+        'unit',  # Завантажуємо пов'язану військову частину
+        'unit__territorial_management' # А також ТУ для ВЧ, якщо потрібно (наприклад, для відображення)
+    )
 
-    # Якщо ти додав поле 'created_at = models.DateTimeField(auto_now_add=True)' до моделі OID,
-    # то можеш сортувати так: .order_by('-created_at')
+    # --- Фільтрація ---
+    filter_unit_id_str = request.GET.get('filter_unit')
+    filter_oid_type = request.GET.get('filter_oid_type')
+    filter_status = request.GET.get('filter_status')
+    filter_sec_level = request.GET.get('filter_sec_level')
+    search_query = request.GET.get('search_query')
 
-    paginator = Paginator(oid_list_queryset, 25)
+    current_filter_unit_id = None
+    if filter_unit_id_str and filter_unit_id_str.isdigit():
+        current_filter_unit_id = int(filter_unit_id_str)
+        oid_list_queryset = oid_list_queryset.filter(unit__id=current_filter_unit_id)
+    
+    if filter_oid_type:
+        oid_list_queryset = oid_list_queryset.filter(oid_type=filter_oid_type)
+    
+    if filter_status:
+        oid_list_queryset = oid_list_queryset.filter(status=filter_status)
+
+    if filter_sec_level:
+        oid_list_queryset = oid_list_queryset.filter(sec_level=filter_sec_level)
+    
+    if search_query:
+        oid_list_queryset = oid_list_queryset.filter(
+            Q(cipher__icontains=search_query) |
+            Q(full_name__icontains=search_query) |
+            Q(room__icontains=search_query) |
+            Q(note__icontains=search_query) # Додамо пошук по примітках ОІД
+        )
+
+    # --- Сортування ---
+    # За замовчуванням сортуємо за датою створення (новіші спочатку), якщо поле created_at існує
+    # Перевірте вашу модель OID на наявність поля created_at
+    # Якщо у вас є поле created_at = models.DateTimeField(auto_now_add=True)
+    sort_by_param = request.GET.get('sort_by', '-created_at') # За замовчуванням - новіші ОІД
+    sort_order_from_request = request.GET.get('sort_order', '') # 'asc' або 'desc'
+
+    # Визначаємо напрямок сортування
+    # Якщо sort_by_param починається з '-', це вже desc. В іншому випадку дивимося на sort_order_from_request
+    actual_sort_order_is_desc = False
+    if sort_by_param.startswith('-'):
+        actual_sort_order_is_desc = True
+        sort_by_param_cleaned = sort_by_param[1:]
+    else:
+        sort_by_param_cleaned = sort_by_param
+        if sort_order_from_request == 'desc':
+            actual_sort_order_is_desc = True
+    
+    valid_sort_fields = {
+        'unit': 'unit__code',
+        'cipher': 'cipher',
+        'full_name': 'full_name',
+        'oid_type': 'oid_type',
+        'room': 'room',
+        'status': 'status',
+        'sec_level': 'sec_level',
+        'created_at': 'created_at' # Додаємо поле для сортування за датою створення
+    }
+    
+    order_by_field_key = valid_sort_fields.get(sort_by_param_cleaned, 'created_at')
+
+    final_order_by_field = f"-{order_by_field_key}" if actual_sort_order_is_desc else order_by_field_key
+    
+    # Додаємо вторинне сортування для стабільності
+    if order_by_field_key == 'created_at':
+        secondary_sort = 'cipher'
+    elif order_by_field_key == 'cipher':
+        secondary_sort = '-created_at'
+    else:
+        secondary_sort = '-created_at' # Загальне вторинне сортування
+
+    oid_list_queryset = oid_list_queryset.order_by(final_order_by_field, secondary_sort)
+
+    # --- Пагінація ---
+    paginator = Paginator(oid_list_queryset, 25) # 25 ОІД на сторінку
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+    
+    # Дані для фільтрів
+    units_for_filter = Unit.objects.all().order_by('code')
+    # Передаємо самі choices, а не їх відображення
+    oid_type_choices_for_filter = OIDTypeChoices.choices
+    oid_status_choices_for_filter = OIDStatusChoices.choices
+    sec_level_choices_for_filter = SecLevelChoices.choices
         
     context = {
         'page_title': 'Список Об\'єктів Інформаційної Діяльності (ОІД)',
-        'object_list': page_obj,
-        'page_obj': page_obj
+        'object_list': page_obj, # 'object_list' використовується у вашому шаблоні
+        'page_obj': page_obj,    # для пагінації
+        # Фільтри
+        'units_for_filter': units_for_filter,
+        'oid_type_choices_for_filter': oid_type_choices_for_filter,
+        'oid_status_choices_for_filter': oid_status_choices_for_filter,
+        'sec_level_choices_for_filter': sec_level_choices_for_filter,
+        'current_filter_unit_id': current_filter_unit_id,
+        'current_filter_oid_type': filter_oid_type,
+        'current_filter_status': filter_status,
+        'current_filter_sec_level': filter_sec_level,
+        'current_search_query': search_query,
+        # Сортування
+        'current_sort_by': sort_by_param_cleaned, # Чистий параметр сортування
+        'current_sort_order_is_desc': actual_sort_order_is_desc, # Поточний напрямок desc (true/false)
     }
     return render(request, 'oids/lists/oid_list.html', context)
 
 def work_request_list_view(request):
-    # Сортуємо за датою заявки, новіші зверху
     work_request_list_queryset = WorkRequest.objects.select_related(
-        'unit', 'unit__territorial_management'
+        'unit', 
+        'unit__territorial_management' # Для можливого відображення ТУ
     ).prefetch_related(
-        Prefetch('items', queryset=WorkRequestItem.objects.select_related('oid')) # Оптимізація для доступу до ОІДів в заявці
-    ).order_by('-incoming_date')
+        Prefetch('items', queryset=WorkRequestItem.objects.select_related('oid')) 
+    )
 
+    # --- Фільтрація ---
+    filter_unit_id_str = request.GET.get('filter_unit')
+    filter_status = request.GET.get('filter_status')
+    filter_date_from_str = request.GET.get('filter_date_from')
+    filter_date_to_str = request.GET.get('filter_date_to')
+    search_query = request.GET.get('search_query')
+
+    current_filter_unit_id = None
+    if filter_unit_id_str and filter_unit_id_str.isdigit():
+        current_filter_unit_id = int(filter_unit_id_str)
+        work_request_list_queryset = work_request_list_queryset.filter(unit__id=current_filter_unit_id)
+    
+    if filter_status:
+        work_request_list_queryset = work_request_list_queryset.filter(status=filter_status)
+
+    current_filter_date_from = None
+    if filter_date_from_str:
+        try:
+            current_filter_date_from = datetime.strptime(filter_date_from_str, '%Y-%m-%d').date()
+            work_request_list_queryset = work_request_list_queryset.filter(incoming_date__gte=current_filter_date_from)
+        except ValueError:
+            current_filter_date_from = None # Якщо дата невалідна, ігноруємо
+
+    current_filter_date_to = None
+    if filter_date_to_str:
+        try:
+            current_filter_date_to = datetime.strptime(filter_date_to_str, '%Y-%m-%d').date()
+            work_request_list_queryset = work_request_list_queryset.filter(incoming_date__lte=current_filter_date_to)
+        except ValueError:
+            current_filter_date_to = None # Якщо дата невалідна, ігноруємо
+            
+    if search_query:
+        work_request_list_queryset = work_request_list_queryset.filter(
+            Q(incoming_number__icontains=search_query) |
+            Q(unit__code__icontains=search_query) | # Пошук за кодом ВЧ
+            Q(unit__name__icontains=search_query) | # Пошук за назвою ВЧ
+            Q(items__oid__cipher__icontains=search_query) # Пошук за шифром ОІД в елементах заявки
+        ).distinct() # distinct потрібен через фільтрацію по M2M (items)
+
+    # --- Сортування ---
+    sort_by_param = request.GET.get('sort_by', '-incoming_date') # За замовчуванням - новіші заявки
+    sort_order_from_request = request.GET.get('sort_order', '') 
+
+    actual_sort_order_is_desc = False
+    if sort_by_param.startswith('-'):
+        actual_sort_order_is_desc = True
+        sort_by_param_cleaned = sort_by_param[1:]
+    else:
+        sort_by_param_cleaned = sort_by_param
+        if sort_order_from_request == 'desc':
+            actual_sort_order_is_desc = True
+            
+    valid_sort_fields = {
+        'unit': 'unit__code',
+        'number': 'incoming_number',
+        'date': 'incoming_date',
+        'status': 'status',
+    }
+    
+    order_by_field_key = valid_sort_fields.get(sort_by_param_cleaned, 'incoming_date')
+    final_order_by_field = f"-{order_by_field_key}" if actual_sort_order_is_desc else order_by_field_key
+    
+    # Вторинне сортування
+    secondary_sort = '-pk' if order_by_field_key != 'incoming_date' else 'unit__code'
+
+    work_request_list_queryset = work_request_list_queryset.order_by(final_order_by_field, secondary_sort)
+
+    # --- Пагінація ---
     paginator = Paginator(work_request_list_queryset, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
         
+    # Дані для фільтрів
+    units_for_filter = Unit.objects.all().order_by('code')
+    status_choices_for_filter = WorkRequestStatusChoices.choices
+        
     context = {
-        'page_title': 'Список Заявок на Проведення Рoбіт',
+        'page_title': 'Список Заявок на Проведення Робіт',
         'object_list': page_obj,
-        'page_obj': page_obj
+        'page_obj': page_obj,
+        # Фільтри
+        'units_for_filter': units_for_filter,
+        'status_choices_for_filter': status_choices_for_filter,
+        'current_filter_unit_id': current_filter_unit_id,
+        'current_filter_status': filter_status,
+        'current_filter_date_from': filter_date_from_str, # Передаємо рядок для заповнення поля форми
+        'current_filter_date_to': filter_date_to_str,     # Передаємо рядок для заповнення поля форми
+        'current_search_query': search_query,
+        # Сортування
+        'current_sort_by': sort_by_param_cleaned,
+        'current_sort_order_is_desc': actual_sort_order_is_desc,
     }
     return render(request, 'oids/lists/work_request_list.html', context)
+
 
 def trip_list_view(request):
     trip_list_queryset = Trip.objects.prefetch_related(
         'units', 
-        'oids', 
+        'oids__unit', # Для доступу до oid.unit.code без додаткових запитів
         'persons', 
-        'work_requests' # Завантажуємо пов'язані об'єкти для уникнення N+1 запитів
-    ).order_by('-start_date') # Сортуємо за датою початку, новіші зверху
+        'work_requests'
+    )
 
-    paginator = Paginator(trip_list_queryset, 15) # 15 відряджень на сторінку
+    # --- Фільтрація ---
+    filter_unit_id_str = request.GET.get('filter_unit')
+    filter_person_id_str = request.GET.get('filter_person')
+    filter_date_from_str = request.GET.get('filter_date_from')
+    filter_date_to_str = request.GET.get('filter_date_to')
+    search_query = request.GET.get('search_query') # Для мети, шифру ОІД, коду ВЧ
+
+    current_filter_unit_id = None
+    if filter_unit_id_str and filter_unit_id_str.isdigit():
+        current_filter_unit_id = int(filter_unit_id_str)
+        # Фільтруємо відрядження, які мають цю ВЧ у своєму списку units
+        trip_list_queryset = trip_list_queryset.filter(units__id=current_filter_unit_id) 
+    
+    current_filter_person_id = None
+    if filter_person_id_str and filter_person_id_str.isdigit():
+        current_filter_person_id = int(filter_person_id_str)
+        # Фільтруємо відрядження, які мають цю особу у своєму списку persons
+        trip_list_queryset = trip_list_queryset.filter(persons__id=current_filter_person_id)
+
+    current_filter_date_from = None
+    if filter_date_from_str:
+        try:
+            current_filter_date_from = datetime.strptime(filter_date_from_str, '%Y-%m-%d').date()
+            # Фільтр по даті початку АБО даті закінчення (або перетину діапазону)
+            trip_list_queryset = trip_list_queryset.filter(
+                Q(start_date__gte=current_filter_date_from) | Q(end_date__gte=current_filter_date_from)
+            )
+        except ValueError:
+            current_filter_date_from = None
+
+    current_filter_date_to = None
+    if filter_date_to_str:
+        try:
+            current_filter_date_to = datetime.strptime(filter_date_to_str, '%Y-%m-%d').date()
+            trip_list_queryset = trip_list_queryset.filter(
+                Q(start_date__lte=current_filter_date_to) | Q(end_date__lte=current_filter_date_to)
+            )
+        except ValueError:
+            current_filter_date_to = None
+            
+    if search_query:
+        trip_list_queryset = trip_list_queryset.filter(
+            Q(purpose__icontains=search_query) |
+            Q(units__code__icontains=search_query) |
+            Q(oids__cipher__icontains=search_query) |
+            Q(persons__full_name__icontains=search_query) |
+            Q(work_requests__incoming_number__icontains=search_query)
+        ).distinct() # distinct важливий через пошук по M2M
+
+    # --- Сортування ---
+    sort_by_param = request.GET.get('sort_by', '-start_date') # За замовчуванням - новіші відрядження
+    sort_order_from_request = request.GET.get('sort_order', '') 
+
+    actual_sort_order_is_desc = False
+    if sort_by_param.startswith('-'):
+        actual_sort_order_is_desc = True
+        sort_by_param_cleaned = sort_by_param[1:]
+    else:
+        sort_by_param_cleaned = sort_by_param
+        if sort_order_from_request == 'desc':
+            actual_sort_order_is_desc = True
+            
+    valid_sort_fields = {
+        'start_date': 'start_date',
+        'end_date': 'end_date',
+        'purpose': 'purpose',
+        # Сортування за M2M полями (units, oids, persons) напряму через order_by складне.
+        # Якщо потрібно, це вимагає анотації або більш складних запитів.
+        # Поки що обмежимось прямими полями моделі Trip.
+    }
+    
+    order_by_field_key = valid_sort_fields.get(sort_by_param_cleaned, 'start_date')
+    final_order_by_field = f"-{order_by_field_key}" if actual_sort_order_is_desc else order_by_field_key
+    
+    secondary_sort = '-pk' # Загальне вторинне сортування для стабільності
+
+    trip_list_queryset = trip_list_queryset.order_by(final_order_by_field, secondary_sort).distinct() # distinct тут теж може бути корисним
+
+    # --- Пагінація ---
+    paginator = Paginator(trip_list_queryset, 15)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+        
+    # Дані для фільтрів
+    units_for_filter = Unit.objects.all().order_by('code')
+    persons_for_filter = Person.objects.filter(is_active=True).order_by('full_name')
         
     context = {
         'page_title': 'Список Відряджень',
         'object_list': page_obj,
-        'page_obj': page_obj
+        'page_obj': page_obj,
+        # Фільтри
+        'units_for_filter': units_for_filter,
+        'persons_for_filter': persons_for_filter,
+        'current_filter_unit_id': current_filter_unit_id,
+        'current_filter_person_id': current_filter_person_id,
+        'current_filter_date_from': filter_date_from_str,
+        'current_filter_date_to': filter_date_to_str,
+        'current_search_query': search_query,
+        # Сортування
+        'current_sort_by': sort_by_param_cleaned,
+        'current_sort_order_is_desc': actual_sort_order_is_desc,
     }
     return render(request, 'oids/lists/trip_list.html', context)
 
 def technical_task_list_view(request):
     task_list_queryset = TechnicalTask.objects.select_related(
-        'oid__unit', # Для доступу до ВЧ через ОІД
+        'oid__unit', 
         'oid',
         'reviewed_by'
-    ).order_by('-input_date', '-created_at') # Сортуємо за вхідною датою, потім за датою створення
+    )
 
+    # --- Фільтрація ---
+    filter_unit_id_str = request.GET.get('filter_unit')
+    filter_oid_id_str = request.GET.get('filter_oid')
+    filter_review_result = request.GET.get('filter_review_result')
+    filter_reviewed_by_id_str = request.GET.get('filter_reviewed_by')
+    
+    filter_input_date_from_str = request.GET.get('filter_input_date_from')
+    filter_input_date_to_str = request.GET.get('filter_input_date_to')
+    filter_read_till_date_from_str = request.GET.get('filter_read_till_date_from')
+    filter_read_till_date_to_str = request.GET.get('filter_read_till_date_to')
+    
+    search_query = request.GET.get('search_query')
+
+    current_filter_unit_id = None
+    if filter_unit_id_str and filter_unit_id_str.isdigit():
+        current_filter_unit_id = int(filter_unit_id_str)
+        task_list_queryset = task_list_queryset.filter(oid__unit__id=current_filter_unit_id)
+
+    current_filter_oid_id = None
+    if filter_oid_id_str and filter_oid_id_str.isdigit():
+        current_filter_oid_id = int(filter_oid_id_str)
+        task_list_queryset = task_list_queryset.filter(oid__id=current_filter_oid_id)
+    
+    if filter_review_result:
+        task_list_queryset = task_list_queryset.filter(review_result=filter_review_result)
+
+    current_filter_reviewed_by_id = None
+    if filter_reviewed_by_id_str and filter_reviewed_by_id_str.isdigit():
+        current_filter_reviewed_by_id = int(filter_reviewed_by_id_str)
+        task_list_queryset = task_list_queryset.filter(reviewed_by__id=current_filter_reviewed_by_id)
+
+    # Фільтри по датах
+    current_filter_input_date_from = None
+    if filter_input_date_from_str:
+        try:
+            current_filter_input_date_from = datetime.strptime(filter_input_date_from_str, '%Y-%m-%d').date()
+            task_list_queryset = task_list_queryset.filter(input_date__gte=current_filter_input_date_from)
+        except ValueError:
+            current_filter_input_date_from = None
+
+    current_filter_input_date_to = None
+    if filter_input_date_to_str:
+        try:
+            current_filter_input_date_to = datetime.strptime(filter_input_date_to_str, '%Y-%m-%d').date()
+            task_list_queryset = task_list_queryset.filter(input_date__lte=current_filter_input_date_to)
+        except ValueError:
+            current_filter_input_date_to = None
+            
+    current_filter_read_till_date_from = None
+    if filter_read_till_date_from_str:
+        try:
+            current_filter_read_till_date_from = datetime.strptime(filter_read_till_date_from_str, '%Y-%m-%d').date()
+            task_list_queryset = task_list_queryset.filter(read_till_date__gte=current_filter_read_till_date_from) #
+        except ValueError:
+            current_filter_read_till_date_from = None
+            
+    current_filter_read_till_date_to = None
+    if filter_read_till_date_to_str:
+        try:
+            current_filter_read_till_date_to = datetime.strptime(filter_read_till_date_to_str, '%Y-%m-%d').date()
+            task_list_queryset = task_list_queryset.filter(read_till_date__lte=current_filter_read_till_date_to) #
+        except ValueError:
+            current_filter_read_till_date_to = None
+            
+    if search_query:
+        task_list_queryset = task_list_queryset.filter(
+            Q(input_number__icontains=search_query) |
+            Q(oid__cipher__icontains=search_query) |
+            Q(oid__full_name__icontains=search_query) |
+            Q(note__icontains=search_query)
+        ).distinct()
+
+    # --- Сортування ---
+    sort_by_param = request.GET.get('sort_by', '-input_date') # За замовчуванням, як у вас було
+    sort_order_from_request = request.GET.get('sort_order', '') 
+
+    actual_sort_order_is_desc = False
+    if sort_by_param.startswith('-'):
+        actual_sort_order_is_desc = True
+        sort_by_param_cleaned = sort_by_param[1:]
+    else:
+        sort_by_param_cleaned = sort_by_param
+        if sort_order_from_request == 'desc':
+            actual_sort_order_is_desc = True
+            
+    valid_sort_fields = {
+        'oid_loc': 'oid__unit__code', # Сортування за кодом ВЧ, потім можна додати шифр ОІД
+        'input_number': 'input_number', #
+        'input_date': 'input_date', #
+        'read_till_date': 'read_till_date', #
+        'review_result': 'review_result', #
+        'reviewed_by': 'reviewed_by__full_name',
+        'created_at': 'created_at' #
+    }
+    
+    order_by_field_key = valid_sort_fields.get(sort_by_param_cleaned, 'input_date')
+    final_order_by_field = f"-{order_by_field_key}" if actual_sort_order_is_desc else order_by_field_key
+    
+    # Вторинне сортування
+    if order_by_field_key == 'input_date':
+        secondary_sort = '-created_at' #
+    elif order_by_field_key == 'oid__unit__code':
+        secondary_sort = 'oid__cipher' # Якщо сортуємо за ВЧ, то потім за шифром ОІД
+    else:
+        secondary_sort = '-input_date'
+
+    task_list_queryset = task_list_queryset.order_by(final_order_by_field, secondary_sort).distinct()
+
+    # --- Пагінація ---
     paginator = Paginator(task_list_queryset, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
         
+    # Дані для фільтрів
+    units_for_filter = Unit.objects.all().order_by('code')
+    # Якщо ОІДів дуже багато, цей список може бути великим. 
+    # Розгляньте можливість динамічного завантаження ОІДів залежно від обраної ВЧ у фільтрі, якщо це стане проблемою.
+    oids_for_filter = OID.objects.select_related('unit').all().order_by('unit__code', 'cipher') 
+    review_result_choices_for_filter = DocumentReviewResultChoices.choices #
+    # Фільтруємо осіб, які справді щось розглядали, щоб список не був занадто великим
+    persons_for_filter = Person.objects.filter(reviewed_technical_tasks__isnull=False).distinct().order_by('full_name')
+        
     context = {
         'page_title': 'Список Технічних Завдань',
         'object_list': page_obj,
-        'page_obj': page_obj
+        'page_obj': page_obj,
+        # Фільтри
+        'units_for_filter': units_for_filter,
+        'oids_for_filter': oids_for_filter,
+        'review_result_choices_for_filter': review_result_choices_for_filter,
+        'persons_for_filter': persons_for_filter,
+        'current_filter_unit_id': current_filter_unit_id,
+        'current_filter_oid_id': current_filter_oid_id,
+        'current_filter_review_result': filter_review_result,
+        'current_filter_reviewed_by_id': current_filter_reviewed_by_id,
+        'current_filter_input_date_from': filter_input_date_from_str,
+        'current_filter_input_date_to': filter_input_date_to_str,
+        'current_filter_read_till_date_from': filter_read_till_date_from_str,
+        'current_filter_read_till_date_to': filter_read_till_date_to_str,
+        'current_search_query': search_query,
+        # Сортування
+        'current_sort_by': sort_by_param_cleaned,
+        'current_sort_order_is_desc': actual_sort_order_is_desc,
     }
     return render(request, 'oids/lists/technical_task_list.html', context)
 
@@ -753,20 +1076,130 @@ def trip_result_for_unit_list_view(request):
 
 def oid_status_change_list_view(request):
     status_change_list_queryset = OIDStatusChange.objects.select_related(
-        'oid__unit', # Для виводу ВЧ ОІДа
+        'oid__unit', 
         'oid',
-        'initiating_document__document_type', # Для деталей документа, що спричинив зміну
-        'changed_by' # Для інформації про користувача, що вніс зміну
-    ).order_by('-changed_at') # Новіші зміни статусу зверху
+        'initiating_document__document_type', 
+        'changed_by' 
+    )
 
+    # --- Фільтрація ---
+    filter_unit_id_str = request.GET.get('filter_unit')
+    filter_oid_id_str = request.GET.get('filter_oid')
+    filter_old_status = request.GET.get('filter_old_status')
+    filter_new_status = request.GET.get('filter_new_status')
+    filter_changed_by_id_str = request.GET.get('filter_changed_by')
+    filter_date_from_str = request.GET.get('filter_date_from')
+    filter_date_to_str = request.GET.get('filter_date_to')
+    search_query = request.GET.get('search_query') # Для ОІД, причини, документа
+
+    current_filter_unit_id = None
+    if filter_unit_id_str and filter_unit_id_str.isdigit():
+        current_filter_unit_id = int(filter_unit_id_str)
+        status_change_list_queryset = status_change_list_queryset.filter(oid__unit__id=current_filter_unit_id)
+
+    current_filter_oid_id = None
+    if filter_oid_id_str and filter_oid_id_str.isdigit():
+        current_filter_oid_id = int(filter_oid_id_str)
+        status_change_list_queryset = status_change_list_queryset.filter(oid__id=current_filter_oid_id)
+    
+    if filter_old_status:
+        status_change_list_queryset = status_change_list_queryset.filter(old_status=filter_old_status)
+    
+    if filter_new_status:
+        status_change_list_queryset = status_change_list_queryset.filter(new_status=filter_new_status)
+
+    current_filter_changed_by_id = None
+    if filter_changed_by_id_str and filter_changed_by_id_str.isdigit():
+        current_filter_changed_by_id = int(filter_changed_by_id_str)
+        status_change_list_queryset = status_change_list_queryset.filter(changed_by__id=current_filter_changed_by_id)
+
+    current_filter_date_from = None
+    if filter_date_from_str:
+        try:
+            current_filter_date_from = datetime.strptime(filter_date_from_str, '%Y-%m-%d').date()
+            status_change_list_queryset = status_change_list_queryset.filter(changed_at__date__gte=current_filter_date_from)
+        except ValueError:
+            current_filter_date_from = None
+
+    current_filter_date_to = None
+    if filter_date_to_str:
+        try:
+            current_filter_date_to = datetime.strptime(filter_date_to_str, '%Y-%m-%d').date()
+            status_change_list_queryset = status_change_list_queryset.filter(changed_at__date__lte=current_filter_date_to)
+        except ValueError:
+            current_filter_date_to = None
+            
+    if search_query:
+        status_change_list_queryset = status_change_list_queryset.filter(
+            Q(oid__cipher__icontains=search_query) |
+            Q(oid__unit__code__icontains=search_query) |
+            Q(reason__icontains=search_query) |
+            Q(initiating_document__document_number__icontains=search_query) |
+            Q(initiating_document__document_type__name__icontains=search_query)
+        ).distinct()
+
+    # --- Сортування ---
+    sort_by_param = request.GET.get('sort_by', '-changed_at') # За замовчуванням
+    sort_order_from_request = request.GET.get('sort_order', '') 
+
+    actual_sort_order_is_desc = False
+    if sort_by_param.startswith('-'):
+        actual_sort_order_is_desc = True
+        sort_by_param_cleaned = sort_by_param[1:]
+    else:
+        sort_by_param_cleaned = sort_by_param
+        if sort_order_from_request == 'desc':
+            actual_sort_order_is_desc = True
+            
+    valid_sort_fields = {
+        'oid_loc': 'oid__unit__code', 
+        'changed_at': 'changed_at',
+        'old_status': 'old_status',
+        'new_status': 'new_status',
+        'reason': 'reason', # Сортування за причиною може бути менш корисним
+        'document': 'initiating_document__document_number', # Або initiating_document__document_type__name
+        'changed_by': 'changed_by__full_name',
+    }
+    
+    order_by_field_key = valid_sort_fields.get(sort_by_param_cleaned, 'changed_at')
+    final_order_by_field = f"-{order_by_field_key}" if actual_sort_order_is_desc else order_by_field_key
+    
+    secondary_sort = '-pk' if order_by_field_key != 'changed_at' else 'oid__cipher'
+
+    status_change_list_queryset = status_change_list_queryset.order_by(final_order_by_field, secondary_sort).distinct()
+
+    # --- Пагінація ---
     paginator = Paginator(status_change_list_queryset, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
         
+    # Дані для фільтрів
+    units_for_filter = Unit.objects.all().order_by('code')
+    oids_for_filter = OID.objects.select_related('unit').all().order_by('unit__code', 'cipher')
+    # Припускаємо, що old_status та new_status використовують ті ж choices, що й статус ОІД
+    status_choices_for_filter = OIDStatusChoices.choices 
+    persons_for_filter = Person.objects.filter(oid_status_changes__isnull=False).distinct().order_by('full_name')
+        
     context = {
         'page_title': 'Історія Змін Статусу ОІД',
         'object_list': page_obj,
-        'page_obj': page_obj
+        'page_obj': page_obj,
+        # Фільтри
+        'units_for_filter': units_for_filter,
+        'oids_for_filter': oids_for_filter,
+        'status_choices_for_filter': status_choices_for_filter, # Однаковий для old_status та new_status
+        'persons_for_filter': persons_for_filter,
+        'current_filter_unit_id': current_filter_unit_id,
+        'current_filter_oid_id': current_filter_oid_id,
+        'current_filter_old_status': filter_old_status,
+        'current_filter_new_status': filter_new_status,
+        'current_filter_changed_by_id': current_filter_changed_by_id,
+        'current_filter_date_from': filter_date_from_str,
+        'current_filter_date_to': filter_date_to_str,
+        'current_search_query': search_query,
+        # Сортування
+        'current_sort_by': sort_by_param_cleaned,
+        'current_sort_order_is_desc': actual_sort_order_is_desc,
     }
     return render(request, 'oids/lists/oid_status_change_list.html', context)
 

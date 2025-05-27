@@ -1,51 +1,204 @@
+{# oids/templates/oids/lists/oid_list.html #}
 {% extends "oids/base.html" %}
 
 {% block title %}{{ page_title }}{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
-    <h2 class="mb-4">{{ page_title }}</h2>
-    {# <a href="URL_ДЛЯ_ДОДАВАННЯ_ОІД" class="btn btn-primary mb-3">Додати новий ОІД</a> #}
+	<h2 class="mb-4">{{ page_title }}</h2>
 
-    {% if object_list %}
-        <table class="table table-striped table-bordered table-hover">
-            <thead class="thead-dark">
-                <tr>
-                    <th>ВЧ + ОІД (Шифр)</th>
-                    <th>Повна назва ОІД</th>
-                    <th>Тип ОІД</th>
-                    <th>Приміщення</th>
-                    <th>Стан</th>
-                    <th>Гриф</th>
-                    <th>Примітки ОІД</th>
-                    <th>Дії</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for oid_item in object_list %}
-                    <tr>
-                        <td>
-                            <a href="{% url 'oids:oid_detail_view_name' oid_item.id %}">
-                                {{ oid_item.unit.code }} / {{ oid_item.cipher }}
-                            </a>
-                        </td>
-                        <td>{{ oid_item.full_name|default_if_none:"Не вказано" }}</td>
-                        <td>{{ oid_item.get_oid_type_display }}</td>
-                        <td>{{ oid_item.room }}</td>
-                        <td>{{ oid_item.get_status_display }}</td>
-                        <td>{{ oid_item.get_sec_level_display }}</td>
-                        <td>{{ oid_item.note|truncatewords:10|default:"-" }}</td>
-                        <td>
-                            <a href="{% url 'oids:oid_detail_view_name' oid_item.id %}" class="btn btn-sm btn-info">Деталі</a>
-                            {# <a href="#" class="btn btn-sm btn-warning">Редагувати</a> #}
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% include "../includes/pagination.html" %}
-    {% else %}
-        <p>Об'єкти інформаційної діяльності не знайдено.</p>
-    {% endif %}
+	{# Форма для фільтрації ОІД #}
+	<form method="GET" action="{% url 'oids:list_oids' %}" class="mb-4 p-3 border bg-light rounded">
+		<div class="row g-3">
+			<div class="col-md-3">
+                <label for="filter_unit" class="form-label">Військова частина:</label>
+                <select name="filter_unit" id="filter_unit" class="form-select tomselect-field">
+                    <option value="">Всі ВЧ</option>
+                    {% for unit_choice in units_for_filter %}
+                        {# Make sure there are spaces around == here! #}
+					
+					
+						<option value="{{ unit_choice.id }}" {% if current_filter_unit_id == unit_choice.id %}selected{% endif %}>
+							{{ unit_choice.code }} - {{ unit_choice.name|default_if_none:unit_choice.city }}
+						</option> 
+					
+                    {% endfor %}
+                </select>
+            </div>
+			<div class="col-md-2">
+				<label for="filter_oid_type" class="form-label">Тип ОІД:</label>
+				<select name="filter_oid_type" id="filter_oid_type" class="form-select tomselect-field">
+					<option value="">Всі типи</option>
+					{% for value, text in oid_type_choices_for_filter %}
+					<option value="{{ value }}" {% if current_filter_oid_type == value %}selected{% endif %}>{{ text }}</option>
+					{% endfor %}
+				</select>
+			</div>
+			<div class="col-md-2">
+				<label for="filter_status" class="form-label">Стан:</label>
+				<select name="filter_status" id="filter_status" class="form-select tomselect-field">
+					<option value="">Всі стани</option>
+					{% for value, text in oid_status_choices_for_filter %}
+					<option value="{{ value }}" {% if current_filter_status == value %}selected{% endif %}>{{ text }}</option>
+					{% endfor %}
+				</select>
+			</div>
+			<div class="col-md-2">
+				<label for="filter_sec_level" class="form-label">Гриф:</label>
+				<select name="filter_sec_level" id="filter_sec_level" class="form-select tomselect-field">
+					<option value="">Всі грифи</option>
+					{% for value, text in sec_level_choices_for_filter %}
+					<option value="{{ value }}" {% if current_filter_sec_level == value %}selected{% endif %}>{{ text }}</option>
+					{% endfor %}
+				</select>
+			</div>
+			<div class="col-md-3">
+				<label for="search_query_filter_oid" class="form-label">Пошук (шифр, назва, прим.):</label>
+				<input type="text" name="search_query" id="search_query_filter_oid" class="form-control" value="{{ current_search_query|default:'' }}">
+			</div>
+		</div>
+		<div class="row g-3 mt-2">
+			<div class="col-md-auto">
+				<button type="submit" class="btn btn-primary">Фільтрувати</button>
+			</div>
+			<div class="col-md-auto">
+				<a href="{% url 'oids:list_oids' %}" class="btn btn-secondary">Скинути фільтри</a>
+			</div>
+		</div>
+		{# Приховані поля для збереження поточного сортування при фільтрації #}
+		{% if current_sort_by %}
+		<input type="hidden" name="sort_by" value="{{ current_sort_by }}">
+		{% comment %} sort_order визначається напрямком (знак '-' у sort_by або значення desc) {% endcomment %}
+		{% if current_sort_order_is_desc %}
+		<input type="hidden" name="sort_order" value="desc">
+		{% else %}
+		<input type="hidden" name="sort_order" value="asc">
+		{% endif %}
+		{% endif %}
+	</form>
+
+	{# <a href="URL_ДЛЯ_ДОДАВАННЯ_ОІД" class="btn btn-primary mb-3">Додати новий ОІД</a> #}
+
+	{% if object_list %}
+	<div class="table-responsive">
+		<table class="table table-striped table-bordered table-hover">
+			<thead class="thead-dark">
+				<tr>
+					{% url 'oids:list_oids' as list_url %}
+					{# Побудова базових параметрів для фільтрації, щоб не втрачати їх при сортуванні #}
+					{% with unit_param=current_filter_unit_id|default_if_none:""|stringformat:"s" type_param=current_filter_oid_type|default_if_none:"" status_param=current_filter_status|default_if_none:"" sec_param=current_filter_sec_level|default_if_none:"" search_param=current_search_query|default_if_none:"" %}
+					{% with base_filter_params="filter_unit="|add:unit_param|add:"&filter_oid_type="|add:type_param|add:"&filter_status="|add:status_param|add:"&filter_sec_level="|add:sec_param|add:"&search_query="|add:search_param %}
+					<th>
+						<a href="{{ list_url }}?sort_by=unit&sort_order={% if current_sort_by == 'unit' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+							ВЧ {% if current_sort_by == 'unit' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+						</a>
+					</th>
+					<th>
+						<a href="{{ list_url }}?sort_by=cipher&sort_order={% if current_sort_by == 'cipher' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+							ОІД (Шифр) {% if current_sort_by == 'cipher' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+						</a>
+					</th>
+					<th>
+						<a href="{{ list_url }}?sort_by=full_name&sort_order={% if current_sort_by == 'full_name' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+							Повна назва {% if current_sort_by == 'full_name' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+						</a>
+					</th>
+					<th>
+						<a href="{{ list_url }}?sort_by=oid_type&sort_order={% if current_sort_by == 'oid_type' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+							Тип {% if current_sort_by == 'oid_type' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+						</a>
+					</th>
+					<th>
+						<a href="{{ list_url }}?sort_by=room&sort_order={% if current_sort_by == 'room' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+							Приміщення {% if current_sort_by == 'room' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+						</a>
+					</th>
+					<th>
+						<a href="{{ list_url }}?sort_by=status&sort_order={% if current_sort_by == 'status' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+							Стан {% if current_sort_by == 'status' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+						</a>
+					</th>
+					<th>
+						<a href="{{ list_url }}?sort_by=sec_level&sort_order={% if current_sort_by == 'sec_level' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+							Гриф {% if current_sort_by == 'sec_level' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+						</a>
+					</th>
+					<th>Примітки</th>
+					<th>
+						<a href="{{ list_url }}?sort_by=created_at&sort_order={% if current_sort_by == 'created_at' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+							Дата створення {% if current_sort_by == 'created_at' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+						</a>
+					</th>
+					<th>Дії</th>
+					{% endwith %}
+					{% endwith %}
+				</tr>
+			</thead>
+			<tbody>
+				{% for oid_item in object_list %}
+				<tr>
+					<td>
+						{% if oid_item.unit %}
+						{{ oid_item.unit.code }}
+						{% if oid_item.unit.name %}({{ oid_item.unit.name }}){% endif %}
+						{% else %}
+						N/A
+						{% endif %}
+					</td>
+					<td>
+						<a href="{% url 'oids:oid_detail_view_name' oid_item.id %}">
+							{{ oid_item.cipher }}
+						</a>
+					</td>
+					<td>{{ oid_item.full_name|default_if_none:"Не вказано" }}</td>
+					<td>{{ oid_item.get_oid_type_display }}</td>
+					<td>{{ oid_item.room|default_if_none:"-" }}</td>
+					<td>{{ oid_item.get_status_display }}</td>
+					<td>{{ oid_item.get_sec_level_display }}</td>
+					<td>{{ oid_item.note|truncatewords:10|default:"-" }}</td>
+					<td>{{ oid_item.created_at|date:"d.m.Y H:i"|default:"-" }}</td>
+					<td>
+						<a href="{% url 'oids:oid_detail_view_name' oid_item.id %}" class="btn btn-sm btn-info">Деталі</a>
+						{# <a href="#" class="btn btn-sm btn-warning">Редагувати</a> #}
+					</td>
+				</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	</div>
+	{% if page_obj %}
+	{% include "../includes/pagination.html" with page_obj=page_obj sort_by=current_sort_by sort_order=current_sort_order_is_desc|yesno:"desc,asc" filter_unit=current_filter_unit_id filter_oid_type=current_filter_oid_type filter_status=current_filter_status filter_sec_level=current_filter_sec_level search_query=current_search_query %}
+	{% endif %}
+	{% else %}
+	<p>Об'єкти інформаційної діяльності не знайдено (або не відповідають критеріям фільтрації).</p>
+	{% if current_filter_unit_id or current_filter_oid_type or current_filter_status or current_filter_sec_level or current_search_query %}
+	<a href="{% url 'oids:list_oids' %}" class="btn btn-primary">Скинути всі фільтри</a>
+	{% endif %}
+	{% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+	document.addEventListener('DOMContentLoaded', function () {
+		const selectsToInitialize = ['filter_unit', 'filter_oid_type', 'filter_status', 'filter_sec_level'];
+
+		if (typeof TomSelect !== 'undefined') {
+			selectsToInitialize.forEach(function (selectId) {
+				const element = document.getElementById(selectId);
+				if (element) {
+					new TomSelect(element, {
+						create: false, // Заборонити створення нових опцій, якщо не потрібно
+						// sortField: { field: "text", direction: "asc" }, // Можна вимкнути, якщо сортування не потрібне для опцій
+						placeholder: element.querySelector('option[value=""]').textContent || "Оберіть...", // Текст з пустої опції
+						allowEmptyOption: true, // Дозволяє вибрати пусту опцію для скидання фільтра
+						// plugins: ['clear_button'], // Якщо потрібна кнопка очищення
+					});
+				}
+			});
+		} else {
+			console.log("TomSelect library not found. Filters will use standard select fields.");
+		}
+	});
+</script>
 {% endblock %}

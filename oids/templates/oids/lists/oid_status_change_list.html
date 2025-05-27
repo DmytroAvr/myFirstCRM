@@ -1,3 +1,4 @@
+{# oids/templates/oids/lists/oid_status_change_list.html #}
 {% extends "oids/base.html" %}
 
 {% block title %}{{ page_title }}{% endblock %}
@@ -6,33 +7,152 @@
 <div class="container-fluid">
     <h2 class="mb-4">{{ page_title }}</h2>
 
+    {# Форма для фільтрації Історії Змін Статусу ОІД #}
+    <form method="GET" action="{% url 'oids:list_oid_status_changes' %}" class="mb-4 p-3 border bg-light rounded">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label for="filter_unit_sc" class="form-label">Військова частина:</label>
+                <select name="filter_unit" id="filter_unit_sc" class="form-select tomselect-field">
+                    <option value="">Всі ВЧ</option>
+                    {% for unit_choice in units_for_filter %}
+                        <option value="{{ unit_choice.id }}" {% if current_filter_unit_id == unit_choice.id %}selected{% endif %}>
+                            {{ unit_choice.code }} - {{ unit_choice.name|default_if_none:unit_choice.city }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="filter_oid_sc" class="form-label">ОІД:</label>
+                <select name="filter_oid" id="filter_oid_sc" class="form-select tomselect-field">
+                    <option value="">Всі ОІДи</option>
+                    {% for oid_choice in oids_for_filter %}
+                        <option value="{{ oid_choice.id }}" {% if current_filter_oid_id == oid_choice.id %}selected{% endif %} data-unit-id="{{ oid_choice.unit_id }}">
+                             {{ oid_choice.cipher }} (ВЧ: {{ oid_choice.unit.code }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="filter_old_status_sc" class="form-label">Попередній статус:</label>
+                <select name="filter_old_status" id="filter_old_status_sc" class="form-select tomselect-field">
+                    <option value="">Всі статуси</option>
+                    {% for value, text in status_choices_for_filter %}
+                        <option value="{{ value }}" {% if current_filter_old_status == value %}selected{% endif %}>{{ text }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="filter_new_status_sc" class="form-label">Новий статус:</label>
+                <select name="filter_new_status" id="filter_new_status_sc" class="form-select tomselect-field">
+                    <option value="">Всі статуси</option>
+                    {% for value, text in status_choices_for_filter %}
+                        <option value="{{ value }}" {% if current_filter_new_status == value %}selected{% endif %}>{{ text }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="row g-3 mt-2">
+            <div class="col-md-3">
+                <label for="filter_changed_by_sc" class="form-label">Хто змінив:</label>
+                <select name="filter_changed_by" id="filter_changed_by_sc" class="form-select tomselect-field">
+                    <option value="">Всі особи</option>
+                    {% for person_choice in persons_for_filter %}
+                        <option value="{{ person_choice.id }}" {% if current_filter_changed_by_id == person_choice.id %}selected{% endif %}>
+                            {{ person_choice.full_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="filter_date_from_sc" class="form-label">Дата зміни (з):</label>
+                <input type="date" name="filter_date_from" id="filter_date_from_sc" class="form-control" value="{{ current_filter_date_from|default:'' }}">
+            </div>
+            <div class="col-md-3">
+                <label for="filter_date_to_sc" class="form-label">Дата зміни (по):</label>
+                <input type="date" name="filter_date_to" id="filter_date_to_sc" class="form-control" value="{{ current_filter_date_to|default:'' }}">
+            </div>
+             <div class="col-md-3">
+                <label for="search_query_filter_sc" class="form-label">Пошук (ОІД, причина, док.):</label>
+                <input type="text" name="search_query" id="search_query_filter_sc" class="form-control" value="{{ current_search_query|default:'' }}">
+            </div>
+        </div>
+         <div class="row g-3 mt-2">
+            <div class="col-md-auto">
+                <button type="submit" class="btn btn-primary">Фільтрувати</button>
+            </div>
+            <div class="col-md-auto">
+                <a href="{% url 'oids:list_oid_status_changes' %}" class="btn btn-secondary">Скинути фільтри</a>
+            </div>
+        </div>
+        {% if current_sort_by %}
+            <input type="hidden" name="sort_by" value="{{ current_sort_by }}">
+            {% if current_sort_order_is_desc %}
+                 <input type="hidden" name="sort_order" value="desc">
+            {% else %}
+                 <input type="hidden" name="sort_order" value="asc">
+            {% endif %}
+        {% endif %}
+    </form>
+
     {% if object_list %}
+    <div class="table-responsive">
         <table class="table table-striped table-bordered table-hover">
             <thead class="thead-dark">
                 <tr>
-                    <th>ВЧ + ОІД (Шифр)</th>
-                    <th>Дата зміни</th>
-                    <th>Попередній статус</th>
-                    <th>Новий статус</th>
-                    <th>Причина / Документ-ініціатор</th>
-                    <th>Хто змінив</th>
+                    {% url 'oids:list_oid_status_changes' as list_url %}
+                    {% with unit_param=current_filter_unit_id|default_if_none:""|stringformat:"s" oid_param=current_filter_oid_id|default_if_none:""|stringformat:"s" old_s_param=current_filter_old_status|default_if_none:"" new_s_param=current_filter_new_status|default_if_none:"" person_param=current_filter_changed_by_id|default_if_none:""|stringformat:"s" date_f_param=current_filter_date_from|default_if_none:"" date_t_param=current_filter_date_to|default_if_none:"" search_param=current_search_query|default_if_none:"" %}
+                    {% with base_filter_params="filter_unit="|add:unit_param|add:"&filter_oid="|add:oid_param|add:"&filter_old_status="|add:old_s_param|add:"&filter_new_status="|add:new_s_param|add:"&filter_changed_by="|add:person_param|add:"&filter_date_from="|add:date_f_param|add:"&filter_date_to="|add:date_t_param|add:"&search_query="|add:search_param %}
+                        <th>
+                            <a href="{{ list_url }}?sort_by=oid_loc&sort_order={% if current_sort_by == 'oid_loc' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+                                ВЧ / ОІД (Шифр) {% if current_sort_by == 'oid_loc' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ list_url }}?sort_by=changed_at&sort_order={% if current_sort_by == 'changed_at' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+                                Дата зміни {% if current_sort_by == 'changed_at' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ list_url }}?sort_by=old_status&sort_order={% if current_sort_by == 'old_status' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+                                Попередній статус {% if current_sort_by == 'old_status' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ list_url }}?sort_by=new_status&sort_order={% if current_sort_by == 'new_status' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+                                Новий статус {% if current_sort_by == 'new_status' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ list_url }}?sort_by=document&sort_order={% if current_sort_by == 'document' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+                                Причина / Документ {% if current_sort_by == 'document' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ list_url }}?sort_by=changed_by&sort_order={% if current_sort_by == 'changed_by' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+                                Хто змінив {% if current_sort_by == 'changed_by' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                            </a>
+                        </th>
+                    {% endwith %}
+                    {% endwith %}
                 </tr>
             </thead>
             <tbody>
                 {% for change in object_list %}
                     <tr>
                         <td>
+                            {% if change.oid %}
                             <a href="{% url 'oids:oid_detail_view_name' change.oid.id %}">
                                 {{ change.oid.unit.code }} / {{ change.oid.cipher }}
                             </a>
+                            {% else %}N/A{% endif %}
                         </td>
                         <td>{{ change.changed_at|date:"d.m.Y H:i:s" }}</td>
-                        <td>{{ change.old_status }}</td>
-                        <td>{{ change.new_status }}</td>
+                        <td>{{ change.old_status }}</td> {# Або {{ change.get_old_status_display }}, якщо у вас є такий метод/поле #}
+                        <td>{{ change.new_status }}</td> {# Або {{ change.get_new_status_display }} #}
                         <td>
-                            {{ change.reason|default:"" }}
+                            {{ change.reason|truncatewords:10|default:"" }}
                             {% if change.initiating_document %}
-                                <br><small>Док.: {{ change.initiating_document.document_type.name }} №{{ change.initiating_document.document_number }}</small>
+                                <br><small class="text-muted">Док.: {{ change.initiating_document.document_type.name }} №{{ change.initiating_document.document_number }}</small>
                             {% endif %}
                         </td>
                         <td>{{ change.changed_by.full_name|default:"Система" }}</td>
@@ -40,9 +160,76 @@
                 {% endfor %}
             </tbody>
         </table>
-        {% include "../includes/pagination.html" %}
+    </div>
+        {% if page_obj %}
+            {% include "../includes/pagination.html" with page_obj=page_obj sort_by=current_sort_by sort_order=current_sort_order_is_desc|yesno:"desc,asc" filter_unit=current_filter_unit_id filter_oid=current_filter_oid_id filter_old_status=current_filter_old_status filter_new_status=current_filter_new_status filter_changed_by=current_filter_changed_by_id filter_date_from=current_filter_date_from filter_date_to=current_filter_date_to search_query=current_search_query %}
+        {% endif %}
     {% else %}
-        <p>Історія змін статусу ОІД відсутня.</p>
+        <p>Історія змін статусу ОІД відсутня (або не відповідає критеріям фільтрації).</p>
+        {% if current_filter_unit_id or current_filter_oid_id or current_filter_old_status or current_filter_new_status or current_filter_changed_by_id or current_filter_date_from or current_filter_date_to or current_search_query %}
+             <a href="{% url 'oids:list_oid_status_changes' %}" class="btn btn-primary">Скинути всі фільтри</a>
+        {% endif %}
     {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectsToInitializeSC = ['filter_unit_sc', 'filter_oid_sc', 'filter_old_status_sc', 'filter_new_status_sc', 'filter_changed_by_sc'];
+    
+    if (typeof TomSelect !== 'undefined') {
+        selectsToInitializeSC.forEach(function(selectId) {
+            const element = document.getElementById(selectId);
+            if (element) {
+                new TomSelect(element, {
+                    create: false,
+                    placeholder: element.querySelector('option[value=""]').textContent || "Оберіть...",
+                    allowEmptyOption: true,
+                });
+            }
+        });
+    } else {
+        console.log("TomSelect library not found for OID Status Change list. Filters will use standard select fields.");
+    }
+
+    // Динамічне оновлення списку ОІДів при зміні ВЧ (якщо потрібно)
+    const unitSelectSC = document.getElementById('filter_unit_sc');
+    const oidSelectSC = document.getElementById('filter_oid_sc');
+
+    if (unitSelectSC && oidSelectSC && oidSelectSC.tomselect) { // Перевірка, що TomSelect для ОІД ініціалізований
+        unitSelectSC.addEventListener('change', function() {
+            const selectedUnitId = this.value;
+            const oidTomSelectInstance = oidSelectSC.tomselect;
+            oidTomSelectInstance.clearOptions(); 
+            oidTomSelectInstance.addOption({value: "", text: "Всі ОІДи"});
+
+            {% if oids_for_filter %} // Використовуємо дані, передані з view
+            const allOidsForFilter = [
+                {% for oid_opt in oids_for_filter %}
+                { value: "{{ oid_opt.id }}", text: "{{ oid_opt.cipher }} (ВЧ: {{ oid_opt.unit.code }})", unitId: "{{ oid_opt.unit_id }}" },
+                {% endfor %}
+            ];
+            
+            allOidsForFilter.forEach(function(oidOption) {
+                if (!selectedUnitId || oidOption.unitId === selectedUnitId) {
+                    oidTomSelectInstance.addOption(oidOption);
+                }
+            });
+            {% endif %}
+            oidTomSelectInstance.refreshOptions(false);
+            // Можливо, скинути обраний ОІД, якщо він більше не належить до обраної ВЧ
+            // oidTomSelectInstance.clear(); 
+        });
+    }
+
+    // Обмеження для полів дат
+    const dateFromInputSC = document.getElementById('filter_date_from_sc');
+    const dateToInputSC = document.getElementById('filter_date_to_sc');
+    if (dateFromInputSC && dateToInputSC) {
+        dateFromInputSC.addEventListener('change', function() { if (this.value) dateToInputSC.min = this.value; });
+        dateToInputSC.addEventListener('change', function() { if (this.value) dateFromInputSC.max = this.value; });
+    }
+});
+</script>
 {% endblock %}

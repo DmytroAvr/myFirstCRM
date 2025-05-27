@@ -1,3 +1,4 @@
+{# oids/templates/oids/lists/trip_list.html #}
 {% extends "oids/base.html" %}
 
 {% block title %}{{ page_title }}{% endblock %}
@@ -5,74 +6,193 @@
 {% block content %}
 <div class="container-fluid">
     <h2 class="mb-4">{{ page_title }}</h2>
-    
+
     <a href="{% url 'oids:plan_trip_view_name' %}" class="btn btn-primary mb-3">Запланувати нове Відрядження</a>
 
+    {# Форма для фільтрації Відряджень #}
+    <form method="GET" action="{% url 'oids:list_trips' %}" class="mb-4 p-3 border bg-light rounded">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label for="filter_unit_trip" class="form-label">Військова частина:</label>
+                <select name="filter_unit" id="filter_unit_trip" class="form-select tomselect-field">
+                    <option value="">Всі ВЧ</option>
+                    {% for unit_choice in units_for_filter %}
+                        <option value="{{ unit_choice.id }}" {% if current_filter_unit_id == unit_choice.id %}selected{% endif %}>
+                            {{ unit_choice.code }} - {{ unit_choice.name|default_if_none:unit_choice.city }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="filter_person_trip" class="form-label">Відряджена особа:</label>
+                <select name="filter_person" id="filter_person_trip" class="form-select tomselect-field">
+                    <option value="">Всі особи</option>
+                    {% for person_choice in persons_for_filter %}
+                        <option value="{{ person_choice.id }}" {% if current_filter_person_id == person_choice.id %}selected{% endif %}>
+                            {{ person_choice.full_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="filter_date_from_trip" class="form-label">Період (з):</label>
+                <input type="date" name="filter_date_from" id="filter_date_from_trip" class="form-control" value="{{ current_filter_date_from|default:'' }}">
+            </div>
+            <div class="col-md-2">
+                <label for="filter_date_to_trip" class="form-label">Період (по):</label>
+                <input type="date" name="filter_date_to" id="filter_date_to_trip" class="form-control" value="{{ current_filter_date_to|default:'' }}">
+            </div>
+            <div class="col-md-2">
+                <label for="search_query_filter_trip" class="form-label">Пошук (мета, ОІД):</label>
+                <input type="text" name="search_query" id="search_query_filter_trip" class="form-control" value="{{ current_search_query|default:'' }}">
+            </div>
+        </div>
+        <div class="row g-3 mt-2">
+            <div class="col-md-auto">
+                <button type="submit" class="btn btn-primary">Фільтрувати</button>
+            </div>
+            <div class="col-md-auto">
+                <a href="{% url 'oids:list_trips' %}" class="btn btn-secondary">Скинути фільтри</a>
+            </div>
+        </div>
+        {% if current_sort_by %}
+            <input type="hidden" name="sort_by" value="{{ current_sort_by }}">
+            {% if current_sort_order_is_desc %}
+                 <input type="hidden" name="sort_order" value="desc">
+            {% else %}
+                 <input type="hidden" name="sort_order" value="asc">
+            {% endif %}
+        {% endif %}
+    </form>
+
     {% if object_list %}
+    <div class="table-responsive">
         <table class="table table-striped table-bordered table-hover">
             <thead class="thead-dark">
                 <tr>
-                    <th>Період відрядження</th>
+                    {% url 'oids:list_trips' as list_url %}
+                    {% with unit_param=current_filter_unit_id|default_if_none:""|stringformat:"s" person_param=current_filter_person_id|default_if_none:""|stringformat:"s" date_from_param=current_filter_date_from|default_if_none:"" date_to_param=current_filter_date_to|default_if_none:"" search_param=current_search_query|default_if_none:"" %}
+                    {% with base_filter_params="filter_unit="|add:unit_param|add:"&filter_person="|add:person_param|add:"&filter_date_from="|add:date_from_param|add:"&filter_date_to="|add:date_to_param|add:"&search_query="|add:search_param %}
+                    <th>
+                        <a href="{{ list_url }}?sort_by=start_date&sort_order={% if current_sort_by == 'start_date' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+                            Період відрядження {% if current_sort_by == 'start_date' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                        </a>
+                    </th>
                     <th>Військові частини</th>
-                    <th>ОІДи (кількість)</th>
+                    <th>ОІДи (Шифр - ВЧ ОІДа)</th>
                     <th>Відряджені особи</th>
                     <th>Пов'язані заявки</th>
-                    <th>Мета/Примітки</th>
+                    <th>
+                        <a href="{{ list_url }}?sort_by=purpose&sort_order={% if current_sort_by == 'purpose' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+                           Мета/Примітки {% if current_sort_by == 'purpose' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                        </a>
+                    </th>
                     {# <th>Дії</th> #}
+                    {% endwith %}
+                    {% endwith %}
                 </tr>
             </thead>
             <tbody>
-                {% for trip_item in object_list %} {# Змінив trip на trip_item #}
-                    <tr>
-                        <td>{{ trip_item.start_date|date:"d.m.Y" }} - {{ trip_item.end_date|date:"d.m.Y" }}</td>
-                        <td>
-                            <ul>
+                {% for trip_item in object_list %}
+                <tr>
+                    <td>{{ trip_item.start_date|date:"d.m.Y" }} - {{ trip_item.end_date|date:"d.m.Y" }}</td>
+                    <td>
+                        {% if trip_item.units.all %}
+                        <ul class="list-unstyled mb-0">
                             {% for unit in trip_item.units.all %}
-                                <li>{{ unit.code }} - {{ unit.name|default:unit.city }}</li>
-                            {% empty %}
-                                <li>-</li>
+                            <li>{{ unit.code }} {% if unit.name %}({{ unit.name }}){% elif unit.city %}({{ unit.city }}){% endif %}</li>
                             {% endfor %}
-                            </ul>
-                        </td>
-                        <td>
-                            {% if trip_item.oids.all.count > 0 %}
-                                {{ trip_item.oids.all.count }} ОІД(и)
-                                {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td>
-                            <ul>
+                        </ul>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        {% if trip_item.oids.all %}
+                        <ul class="list-unstyled mb-0">
+                            {% for oid in trip_item.oids.all %}
+                            <li>
+                                <a href="{% url 'oids:oid_detail_view_name' oid.id %}">{{ oid.cipher }}</a>
+                                {% if oid.unit %}
+                                <small class="text-muted">({{ oid.unit.code }})</small>
+                                {% endif %}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        {% if trip_item.persons.all %}
+                        <ul class="list-unstyled mb-0">
                             {% for person in trip_item.persons.all %}
-                                <li>{{ person.full_name }}</li>
-                            {% empty %}
-                                <li>-</li>
+                            <li>{{ person.full_name }}</li>
                             {% endfor %}
-                            </ul>
-                        </td>
-                        <td>
-                            <ul>
+                        </ul>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        {% if trip_item.work_requests.all %}
+                        <ul class="list-unstyled mb-0">
                             {% for wr in trip_item.work_requests.all %}
-                                <li>Заявка №{{ wr.incoming_number }}</li>
-                            {% empty %}
-                                <li>-</li>
+                            <li>№{{ wr.incoming_number }} <small class="text-muted">({{wr.unit.code}})</small></li>
                             {% endfor %}
-                            </ul>
-                        </td>
-                        <td>{{ trip_item.purpose|truncatewords:15|default:"-" }}</td>
-                        {# <td>
-                            <a href="#" class="btn btn-sm btn-info">Деталі</a>
-                            <a href="#" class="btn btn-sm btn-warning">Редагувати</a>
-                        </td> #}
-                    </tr>
+                        </ul>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>{{ trip_item.purpose|truncatewords:15|default:"-" }}</td>
+                    {# <td><a href="#" class="btn btn-sm btn-outline-primary">Деталі</a></td> #}
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
-        
-        {% include "../includes/pagination.html" %}
+    </div>
+
+    {% if page_obj %}
+        {% include "../includes/pagination.html" with page_obj=page_obj sort_by=current_sort_by sort_order=current_sort_order_is_desc|yesno:"desc,asc" filter_unit=current_filter_unit_id filter_person=current_filter_person_id filter_date_from=current_filter_date_from filter_date_to=current_filter_date_to search_query=current_search_query %}
+    {% endif %}
 
     {% else %}
-        <p>Заплановані відрядження не знайдено.</p>
+    <p>Заплановані відрядження не знайдено (або не відповідають критеріям фільтрації).</p>
+     {% if current_filter_unit_id or current_filter_person_id or current_filter_date_from or current_filter_date_to or current_search_query %}
+         <a href="{% url 'oids:list_trips' %}" class="btn btn-primary">Скинути всі фільтри</a>
+        {% endif %}
     {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectsToInitializeTrip = ['filter_unit_trip', 'filter_person_trip'];
+    
+    if (typeof TomSelect !== 'undefined') {
+        selectsToInitializeTrip.forEach(function(selectId) {
+            const element = document.getElementById(selectId);
+            if (element) {
+                new TomSelect(element, {
+                    create: false,
+                    placeholder: element.querySelector('option[value=""]').textContent || "Оберіть...",
+                    allowEmptyOption: true,
+                });
+            }
+        });
+    } else {
+        console.log("TomSelect library not found for Trip list. Filters will use standard select fields.");
+    }
+
+    const dateFromInputTrip = document.getElementById('filter_date_from_trip');
+    const dateToInputTrip = document.getElementById('filter_date_to_trip');
+
+    if (dateFromInputTrip && dateToInputTrip) {
+        dateFromInputTrip.addEventListener('change', function() {
+            if (this.value) {
+                dateToInputTrip.min = this.value;
+            }
+        });
+        dateToInputTrip.addEventListener('change', function() {
+            if (this.value) {
+                dateFromInputTrip.max = this.value;
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

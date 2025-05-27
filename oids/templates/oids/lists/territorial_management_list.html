@@ -26,8 +26,7 @@
                         <td>{{ tm.note|default:"-" }}</td>
                         <td>{{ tm.units.count }}</td> {# Потребує related_name='units' в моделі Unit для territorial_management #}
                         {# <td>
-                            <a href="#" class="btn btn-sm btn-warning">Редагувати</a>
-                            <a href="{% url 'oids:main_dashboard' %}?tm={{ tm.id }}" class="btn btn-sm btn-info">Фільтр на панелі</a>
+                            <a href="#" class="btn btn-sm btn-warning">Редагувати</a>                            
                         </td> #}
                     </tr>
                 {% endfor %}

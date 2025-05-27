@@ -35,9 +35,10 @@ class WorkTypeChoices(models.TextChoices):
     IK = 'ІК', 'ІК'
 
 class DocumentReviewResultChoices(models.TextChoices): 
+    READ = 'працювати', 'Опрацювати'
+    AWAITING_DOCS = 'очікує в папері', 'Очікує в папері'
     APPROVED = 'погоджено', 'Погоджено'
     FOR_REVISION = 'на доопрацювання', 'На доопрацювання'
-    AWAITING_DOCS = 'очікує в папері', 'Очікує в папері'
 
 # --- Models ---
 
@@ -141,7 +142,6 @@ class OID(models.Model):
     class Meta:
         verbose_name = "Об’єкт інформаційної діяльності (ОІД)"
         verbose_name_plural = "Об’єкти інформаційної діяльності (ОІД)"
-
 
 class Person(models.Model):
     """
@@ -257,7 +257,6 @@ class WorkRequestItem(models.Model):
         else:
             self.request.status = WorkRequestStatusChoices.PENDING # За замовчуванням
         self.request.save()
-
 
 class DocumentType(models.Model):
     """
@@ -577,6 +576,7 @@ class TechnicalTask(models.Model):
     )
     input_number = models.CharField(max_length=50, verbose_name="Вхідний номер")
     input_date = models.DateField(verbose_name="Вхідна дата")
+    read_till_date = models.DateField(verbose_name="Опрацювати до")
     reviewed_by = models.ForeignKey(
         Person, 
         on_delete=models.SET_NULL, 
@@ -597,5 +597,3 @@ class TechnicalTask(models.Model):
 
     def __str__(self):
         return f"ТЗ №{self.input_number} для {self.oid.cipher}"
-    
-	

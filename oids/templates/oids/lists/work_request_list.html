@@ -1,3 +1,4 @@
+{# oids/templates/oids/lists/work_request_list.html #}
 {% extends "oids/base.html" %}
 
 {% block title %}{{ page_title }}{% endblock %}
@@ -5,56 +6,181 @@
 {% block content %}
 <div class="container-fluid">
     <h2 class="mb-4">{{ page_title }}</h2>
-    <a href="{% url 'oids:add_work_request_view_name' %}" class="btn btn-primary mb-3">Додати нову Заявку</a> {# Заміни на реальний URL name #}
+    <a href="{% url 'oids:add_work_request_view_name' %}" class="btn btn-primary mb-3">Додати нову Заявку</a>
+
+    {# Форма для фільтрації Заявок #}
+    <form method="GET" action="{% url 'oids:list_work_requests' %}" class="mb-4 p-3 border bg-light rounded">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label for="filter_unit_wr" class="form-label">Військова частина:</label>
+                <select name="filter_unit" id="filter_unit_wr" class="form-select tomselect-field">
+                    <option value="">Всі ВЧ</option>
+                    {% for unit_choice in units_for_filter %}
+                        <option value="{{ unit_choice.id }}" {% if current_filter_unit_id == unit_choice.id %}selected{% endif %}>
+                            {{ unit_choice.code }} - {{ unit_choice.name|default_if_none:unit_choice.city }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="filter_status_wr" class="form-label">Статус заявки:</label>
+                <select name="filter_status" id="filter_status_wr" class="form-select tomselect-field">
+                    <option value="">Всі статуси</option>
+                    {% for value, text in status_choices_for_filter %}
+                        <option value="{{ value }}" {% if current_filter_status == value %}selected{% endif %}>{{ text }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="filter_date_from_wr" class="form-label">Дата заявки (з):</label>
+                <input type="date" name="filter_date_from" id="filter_date_from_wr" class="form-control" value="{{ current_filter_date_from|default:'' }}">
+            </div>
+            <div class="col-md-2">
+                <label for="filter_date_to_wr" class="form-label">Дата заявки (по):</label>
+                <input type="date" name="filter_date_to" id="filter_date_to_wr" class="form-control" value="{{ current_filter_date_to|default:'' }}">
+            </div>
+            <div class="col-md-2">
+                <label for="search_query_filter_wr" class="form-label">Пошук:</label>
+                <input type="text" name="search_query" id="search_query_filter_wr" class="form-control" value="{{ current_search_query|default:'' }}">
+            </div>
+        </div>
+        <div class="row g-3 mt-2">
+            <div class="col-md-auto">
+                <button type="submit" class="btn btn-primary">Фільтрувати</button>
+            </div>
+            <div class="col-md-auto">
+                <a href="{% url 'oids:list_work_requests' %}" class="btn btn-secondary">Скинути фільтри</a>
+            </div>
+        </div>
+        {% if current_sort_by %}
+            <input type="hidden" name="sort_by" value="{{ current_sort_by }}">
+            {% if current_sort_order_is_desc %}
+                 <input type="hidden" name="sort_order" value="desc">
+            {% else %}
+                 <input type="hidden" name="sort_order" value="asc">
+            {% endif %}
+        {% endif %}
+    </form>
 
     {% if object_list %}
-        <table class="table table-striped table-bordered table-hover">
-            <thead class="thead-dark">
-                <tr>
-                    <th>ВЧ (+ТУ)</th> {# Перший стовпчик - ВЧ, до якої заявка #}
-                    <th>Номер заявки</th>
-                    <th>Дата заявки</th>
-                    <th>Статус заявки</th>
-                    <th>ОІДи в заявці (Тип робіт / Статус по ОІД)</th>
-                    <th>Примітки</th>
-                    <th>Дії</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for wr in object_list %}
+        <div class="table-responsive">
+            <table class="table table-striped table-bordered table-hover">
+                <thead class="thead-dark">
                     <tr>
-                        <td>
-                            <a href="{% url 'oids:main_dashboard' %}?unit={{ wr.unit.id }}">
-                                {{ wr.unit.code }} ({{ wr.unit.territorial_management.name|default:"ТУ не вказано" }})
+                        {% url 'oids:list_work_requests' as list_url %}
+                        {% with unit_param=current_filter_unit_id|default_if_none:""|stringformat:"s" status_param=current_filter_status|default_if_none:"" date_from_param=current_filter_date_from|default_if_none:"" date_to_param=current_filter_date_to|default_if_none:"" search_param=current_search_query|default_if_none:"" %}
+                        {% with base_filter_params="filter_unit="|add:unit_param|add:"&filter_status="|add:status_param|add:"&filter_date_from="|add:date_from_param|add:"&filter_date_to="|add:date_to_param|add:"&search_query="|add:search_param %}
+                        <th>
+                            <a href="{{ list_url }}?sort_by=unit&sort_order={% if current_sort_by == 'unit' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+                                ВЧ {% if current_sort_by == 'unit' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
                             </a>
-                        </td>
-                        <td>{{ wr.incoming_number }}</td>
-                        <td>{{ wr.incoming_date|date:"d.m.Y" }}</td>
-                        <td>{{ wr.get_status_display }}</td>
-                        <td>
-                            <ul>
-                                {% for item in wr.items.all %} {# items - це related_name з WorkRequestItem до WorkRequest #}
-                                    <li>
-                                        <a href="{% url 'oids:oid_detail_view_name' item.oid.id %}">{{ item.oid.cipher }}</a>
-                                        ({{ item.get_work_type_display }} / {{ item.get_status_display }})
-                                    </li>
-                                {% empty %}
-                                    <li>Немає ОІД</li>
-                                {% endfor %}
-                            </ul>
-                        </td>
-                        <td>{{ wr.note|truncatewords:10|default:"-" }}</td>
-                        <td>
-                            {# <a href="URL_ДЛЯ_ДЕТАЛЕЙ_ЗАЯВКИ" class="btn btn-sm btn-info">Деталі</a> #}
-                            {# <a href="#" class="btn btn-sm btn-warning">Редагувати</a> #}
-                        </td>
+                        </th>
+                        <th>
+                            <a href="{{ list_url }}?sort_by=number&sort_order={% if current_sort_by == 'number' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+                                Номер заявки {% if current_sort_by == 'number' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ list_url }}?sort_by=date&sort_order={% if current_sort_by == 'date' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+                                Дата заявки {% if current_sort_by == 'date' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ list_url }}?sort_by=status&sort_order={% if current_sort_by == 'status' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+                                Статус {% if current_sort_by == 'status' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                            </a>
+                        </th>
+                        <th>ОІДи в заявці (Тип робіт / Статус по ОІД)</th>
+                        <th>Примітки</th>
+                        <th>Дії</th>
+                        {% endwith %}
+                        {% endwith %}
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% include "../includes/pagination.html" %}
+                </thead>
+                <tbody>
+                    {% for wr in object_list %}
+                        <tr>
+                            <td>
+                                {% if wr.unit %}
+                                <a href="{% url 'oids:main_dashboard' %}?unit={{ wr.unit.id }}">
+                                    {{ wr.unit.code }}
+                                </a>
+                                {% else %} N/A {% endif %}
+                            </td>
+                            <td>{{ wr.incoming_number }}</td>
+                            <td>{{ wr.incoming_date|date:"d.m.Y" }}</td>
+                            <td><span class="badge bg-{{ wr.status|lower }}">{{ wr.get_status_display }}</span></td> {# Додав трохи стилю для статусу #}
+                            <td>
+                                {% if wr.items.all %}
+                                <ul class="list-unstyled mb-0">
+                                    {% for item in wr.items.all %}
+                                        <li>
+                                            <a href="{% url 'oids:oid_detail_view_name' item.oid.id %}">{{ item.oid.cipher }}</a>
+                                            <small class="text-muted">({{ item.get_work_type_display }} / {{ item.get_status_display }})</small>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                                {% else %}
+                                    <small class="text-muted">Немає ОІД</small>
+                                {% endif %}
+                            </td>
+                            <td>{{ wr.note|truncatewords:10|default:"-" }}</td>
+                            <td>
+                                 <a href="#" class="btn btn-sm btn-outline-primary">Деталі</a> {# TODO: Потрібен URL для деталей заявки #}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if page_obj %}
+            {% include "../includes/pagination.html" with page_obj=page_obj sort_by=current_sort_by sort_order=current_sort_order_is_desc|yesno:"desc,asc" filter_unit=current_filter_unit_id filter_status=current_filter_status filter_date_from=current_filter_date_from filter_date_to=current_filter_date_to search_query=current_search_query %}
+        {% endif %}
     {% else %}
-        <p>Заявки на проведення робіт не знайдено.</p>
+        <p>Заявки на проведення робіт не знайдено (або не відповідають критеріям фільтрації).</p>
+        {% if current_filter_unit_id or current_filter_status or current_filter_date_from or current_filter_date_to or current_search_query %}
+         <a href="{% url 'oids:list_work_requests' %}" class="btn btn-primary">Скинути всі фільтри</a>
+        {% endif %}
     {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectsToInitializeWR = ['filter_unit_wr', 'filter_status_wr'];
+    
+    if (typeof TomSelect !== 'undefined') {
+        selectsToInitializeWR.forEach(function(selectId) {
+            const element = document.getElementById(selectId);
+            if (element) {
+                new TomSelect(element, {
+                    create: false,
+                    placeholder: element.querySelector('option[value=""]').textContent || "Оберіть...",
+                    allowEmptyOption: true,
+                });
+            }
+        });
+    } else {
+        console.log("TomSelect library not found for Work Request list. Filters will use standard select fields.");
+    }
+
+    // Логіка для обмеження дат "з" і "по" (якщо потрібно)
+    const dateFromInput = document.getElementById('filter_date_from_wr');
+    const dateToInput = document.getElementById('filter_date_to_wr');
+
+    if (dateFromInput && dateToInput) {
+        dateFromInput.addEventListener('change', function() {
+            if (this.value) {
+                dateToInput.min = this.value;
+            }
+        });
+        dateToInput.addEventListener('change', function() {
+            if (this.value) {
+                dateFromInput.max = this.value;
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

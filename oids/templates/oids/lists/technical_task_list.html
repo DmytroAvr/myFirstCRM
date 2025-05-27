@@ -1,3 +1,4 @@
+{# oids/templates/oids/lists/technical_task_list.html #}
 {% extends "oids/base.html" %}
 
 {% block title %}{{ page_title }}{% endblock %}
@@ -5,48 +6,263 @@
 {% block content %}
 <div class="container-fluid">
     <h2 class="mb-4">{{ page_title }}</h2>
+
+    {# Форма для фільтрації Технічних Завдань #}
+    <form method="GET" action="{% url 'oids:list_technical_tasks' %}" class="mb-4 p-3 border bg-light rounded">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label for="filter_unit_tt" class="form-label">Військова частина:</label>
+                <select name="filter_unit" id="filter_unit_tt" class="form-select tomselect-field">
+                    <option value="">Всі ВЧ</option>
+                    {% for unit_choice in units_for_filter %}
+                        <option value="{{ unit_choice.id }}" {% if current_filter_unit_id == unit_choice.id %}selected{% endif %}>
+                            {{ unit_choice.code }} - {{ unit_choice.name|default_if_none:unit_choice.city }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="filter_oid_tt" class="form-label">ОІД:</label>
+                <select name="filter_oid" id="filter_oid_tt" class="form-select tomselect-field">
+                    <option value="">Всі ОІДи</option>
+                    {% for oid_choice in oids_for_filter %}
+                        <option value="{{ oid_choice.id }}" {% if current_filter_oid_id == oid_choice.id %}selected{% endif %} data-unit-id="{{ oid_choice.unit_id }}">
+                            {{ oid_choice.cipher }} (ВЧ: {{ oid_choice.unit.code }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="filter_review_result_tt" class="form-label">Результат розгляду:</label>
+                <select name="filter_review_result" id="filter_review_result_tt" class="form-select tomselect-field">
+                    <option value="">Всі результати</option>
+                    {% for value, text in review_result_choices_for_filter %}
+                        <option value="{{ value }}" {% if current_filter_review_result == value %}selected{% endif %}>{{ text }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="filter_reviewed_by_tt" class="form-label">Хто ознайомився:</label>
+                <select name="filter_reviewed_by" id="filter_reviewed_by_tt" class="form-select tomselect-field">
+                    <option value="">Всі особи</option>
+                    {% for person_choice in persons_for_filter %}
+                        <option value="{{ person_choice.id }}" {% if current_filter_reviewed_by_id == person_choice.id %}selected{% endif %}>
+                            {{ person_choice.full_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="row g-3 mt-2">
+            <div class="col-md-3">
+                <label for="filter_input_date_from_tt" class="form-label">Вхідна дата (з):</label>
+                <input type="date" name="filter_input_date_from" id="filter_input_date_from_tt" class="form-control" value="{{ current_filter_input_date_from|default:'' }}">
+            </div>
+            <div class="col-md-3">
+                <label for="filter_input_date_to_tt" class="form-label">Вхідна дата (по):</label>
+                <input type="date" name="filter_input_date_to" id="filter_input_date_to_tt" class="form-control" value="{{ current_filter_input_date_to|default:'' }}">
+            </div>
+            <div class="col-md-3">
+                <label for="filter_read_till_date_from_tt" class="form-label">Опрацювати до (з):</label>
+                <input type="date" name="filter_read_till_date_from" id="filter_read_till_date_from_tt" class="form-control" value="{{ current_filter_read_till_date_from|default:'' }}">
+            </div>
+            <div class="col-md-3">
+                <label for="filter_read_till_date_to_tt" class="form-label">Опрацювати до (по):</label>
+                <input type="date" name="filter_read_till_date_to" id="filter_read_till_date_to_tt" class="form-control" value="{{ current_filter_read_till_date_to|default:'' }}">
+            </div>
+        </div>
+         <div class="row g-3 mt-2">
+            <div class="col-md-6">
+                <label for="search_query_filter_tt" class="form-label">Пошук (номер ТЗ, шифр/назва ОІД, прим.):</label>
+                <input type="text" name="search_query" id="search_query_filter_tt" class="form-control" value="{{ current_search_query|default:'' }}">
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">Фільтрувати</button>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <a href="{% url 'oids:list_technical_tasks' %}" class="btn btn-secondary w-100">Скинути фільтри</a>
+            </div>
+        </div>
+        {# Приховані поля для збереження поточного сортування при фільтрації #}
+        {% if current_sort_by %}
+            <input type="hidden" name="sort_by" value="{{ current_sort_by }}">
+            {% if current_sort_order_is_desc %}
+                 <input type="hidden" name="sort_order" value="desc">
+            {% else %}
+                 <input type="hidden" name="sort_order" value="asc">
+            {% endif %}
+        {% endif %}
+    </form>
+
     {# <a href="URL_ДЛЯ_ДОДАВАННЯ_ТЗ" class="btn btn-primary mb-3">Додати нове Технічне Завдання</a> #}
 
     {% if object_list %}
+    <div class="table-responsive">
         <table class="table table-striped table-bordered table-hover">
             <thead class="thead-dark">
                 <tr>
-                    <th>ВЧ + ОІД (Шифр)</th>
-                    <th>Вхідний номер ТЗ</th>
-                    <th>Вхідна дата ТЗ</th>
-                    <th>Результат розгляду</th>
-                    <th>Хто ознайомився</th>
-                    <th>Дата внесення запису</th>
-                    <th>Примітки</th>
-                    <th>Дії</th>
+                    {% url 'oids:list_technical_tasks' as list_url %}
+                    {% with unit_param=current_filter_unit_id|default_if_none:""|stringformat:"s" oid_param=current_filter_oid_id|default_if_none:""|stringformat:"s" result_param=current_filter_review_result|default_if_none:"" person_param=current_filter_reviewed_by_id|default_if_none:""|stringformat:"s" input_df_param=current_filter_input_date_from|default_if_none:"" input_dt_param=current_filter_input_date_to|default_if_none:"" read_df_param=current_filter_read_till_date_from|default_if_none:"" read_dt_param=current_filter_read_till_date_to|default_if_none:"" search_param=current_search_query|default_if_none:"" %}
+                    {% with base_filter_params="filter_unit="|add:unit_param|add:"&filter_oid="|add:oid_param|add:"&filter_review_result="|add:result_param|add:"&filter_reviewed_by="|add:person_param|add:"&filter_input_date_from="|add:input_df_param|add:"&filter_input_date_to="|add:input_dt_param|add:"&filter_read_till_date_from="|add:read_df_param|add:"&filter_read_till_date_to="|add:read_dt_param|add:"&search_query="|add:search_param %}
+                        <th>
+                            <a href="{{ list_url }}?sort_by=oid_loc&sort_order={% if current_sort_by == 'oid_loc' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+                                ВЧ / ОІД (Шифр) {% if current_sort_by == 'oid_loc' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ list_url }}?sort_by=input_number&sort_order={% if current_sort_by == 'input_number' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+                                Вхідний № ТЗ {% if current_sort_by == 'input_number' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ list_url }}?sort_by=input_date&sort_order={% if current_sort_by == 'input_date' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+                                Вхідна дата {% if current_sort_by == 'input_date' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ list_url }}?sort_by=read_till_date&sort_order={% if current_sort_by == 'read_till_date' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+                                Опрацювати ДО {% if current_sort_by == 'read_till_date' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ list_url }}?sort_by=review_result&sort_order={% if current_sort_by == 'review_result' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+                                Результат {% if current_sort_by == 'review_result' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ list_url }}?sort_by=reviewed_by&sort_order={% if current_sort_by == 'reviewed_by' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+                                Хто ознайомився {% if current_sort_by == 'reviewed_by' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ list_url }}?sort_by=created_at&sort_order={% if current_sort_by == 'created_at' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+                                Дата внесення {% if current_sort_by == 'created_at' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                            </a>
+                        </th>
+                        <th>Примітки</th>
+                        <th>Дії</th>
+                    {% endwith %}
+                    {% endwith %}
                 </tr>
             </thead>
             <tbody>
                 {% for task in object_list %}
-                    <tr>
-                        <td>
-                            <a href="{% url 'oids:oid_detail_view_name' task.oid.id %}">
-                                {{ task.oid.unit.code }} / {{ task.oid.cipher }}
-                            </a>
-                        </td>
-                        <td>{{ task.input_number }}</td>
-                        <td>{{ task.input_date|date:"d.m.Y" }}</td>
-                        <td>{{ task.get_review_result_display }}</td>
-                        <td>{{ task.reviewed_by.full_name|default:"-" }}</td>
-                        <td>{{ task.created_at|date:"d.m.Y H:i" }}</td>
-                        <td>{{ task.note|truncatewords:10|default:"-" }}</td>
-                        <td>
-                            <a href="{% url 'oids:oid_detail_view_name' task.oid.id %}#task-{{task.id}}" class="btn btn-sm btn-info">До ОІД</a> 
-                            {# Припускаючи, що на сторінці деталей ОІД буде якір #task-ID_завдання #}
-                            {# <a href="#" class="btn btn-sm btn-warning">Редагувати</a> #}
-                        </td>
-                    </tr>
+                <tr>
+                    <td>
+                        {% if task.oid %}
+                        <a href="{% url 'oids:oid_detail_view_name' task.oid.id %}">
+                            {{ task.oid.unit.code }} / {{ task.oid.cipher }}
+                        </a>
+                        {% else %}
+                        N/A
+                        {% endif %}
+                    </td>
+                    <td>{{ task.input_number }}</td>
+                    <td>{{ task.input_date|date:"d.m.Y" }}</td>
+                    <td>{{ task.read_till_date|date:"d.m.Y"|default:"-" }}</td>
+                    <td>{{ task.get_review_result_display }}</td>
+                    <td>{{ task.reviewed_by.full_name|default:"-" }}</td>
+                    <td>{{ task.created_at|date:"d.m.Y H:i" }}</td>
+                    <td>{{ task.note|truncatewords:10|default:"-" }}</td>
+                    <td>
+                        <a href="{% url 'oids:oid_detail_view_name' task.oid.id %}#task-{{task.id}}" class="btn btn-sm btn-info">До ОІД</a>
+                    </td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
-        {% include "../includes/pagination.html" %}
+    </div>
+    {% if page_obj %}
+        {% include "../includes/pagination.html" with page_obj=page_obj sort_by=current_sort_by sort_order=current_sort_order_is_desc|yesno:"desc,asc" filter_unit=current_filter_unit_id filter_oid=current_filter_oid_id filter_review_result=current_filter_review_result filter_reviewed_by=current_filter_reviewed_by_id filter_input_date_from=current_filter_input_date_from filter_input_date_to=current_filter_input_date_to filter_read_till_date_from=current_filter_read_till_date_from filter_read_till_date_to=current_filter_read_till_date_to search_query=current_search_query %}
+    {% endif %}
     {% else %}
-        <p>Технічні завдання не знайдено.</p>
+    <p>Технічні завдання не знайдено (або не відповідають критеріям фільтрації).</p>
+     {% if current_filter_unit_id or current_filter_oid_id or current_filter_review_result or current_filter_reviewed_by_id or current_filter_input_date_from or current_filter_input_date_to or current_filter_read_till_date_from or current_filter_read_till_date_to or current_search_query %}
+         <a href="{% url 'oids:list_technical_tasks' %}" class="btn btn-primary">Скинути всі фільтри</a>
+        {% endif %}
     {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectsToInitializeTT = ['filter_unit_tt', 'filter_oid_tt', 'filter_review_result_tt', 'filter_reviewed_by_tt'];
+    
+    if (typeof TomSelect !== 'undefined') {
+        selectsToInitializeTT.forEach(function(selectId) {
+            const element = document.getElementById(selectId);
+            if (element) {
+                let tomSelectOptions = {
+                    create: false,
+                    placeholder: element.querySelector('option[value=""]').textContent || "Оберіть...",
+                    allowEmptyOption: true,
+                };
+                // Для поля ОІД можна додати пошук, якщо опцій багато, або залишити стандартним
+                if (selectId === 'filter_oid_tt') {
+                    // tomSelectOptions.searchField = ['text']; // або більш складні налаштування
+                    // tomSelectOptions.preload = true; // якщо опції завантажуються одразу
+                }
+                new TomSelect(element, tomSelectOptions);
+            }
+        });
+    } else {
+        console.log("TomSelect library not found for Technical Task list. Filters will use standard select fields.");
+    }
+
+    // Динамічне оновлення списку ОІДів при зміні ВЧ (приклад, якщо потрібно)
+    const unitSelectTT = document.getElementById('filter_unit_tt');
+    const oidSelectTT = document.getElementById('filter_oid_tt');
+
+    if (unitSelectTT && oidSelectTT && oidSelectTT.tomselect) {
+        unitSelectTT.addEventListener('change', function() {
+            const selectedUnitId = this.value;
+            const oidTomSelect = oidSelectTT.tomselect;
+            oidTomSelect.clearOptions(); // Очистити поточні опції
+            oidTomSelect.addOption({value: "", text: "Всі ОІДи"}); // Додати опцію "Всі ОІДи"
+
+            // Тут можна завантажити ОІДи для обраної ВЧ через AJAX, якщо список великий
+            // Або, якщо всі ОІДи вже є в `oids_for_filter` і передані в шаблон:
+            {% if oids_for_filter %}
+            const allOids = [
+                {% for oid_opt in oids_for_filter %}
+                { value: "{{ oid_opt.id }}", text: "{{ oid_opt.cipher }} (ВЧ: {{ oid_opt.unit.code }})", unitId: "{{ oid_opt.unit_id }}" },
+                {% endfor %}
+            ];
+            
+            allOids.forEach(function(oidOption) {
+                if (!selectedUnitId || oidOption.unitId === selectedUnitId) {
+                    oidTomSelect.addOption(oidOption);
+                }
+            });
+            {% endif %}
+            oidTomSelect.refreshOptions(false); // Оновити відображення опцій
+            // Встановити значення, якщо воно було раніше обране для цієї ВЧ
+            // (потребує збереження current_filter_oid_id)
+            {% if current_filter_oid_id %}
+            // oidTomSelect.setValue("{{ current_filter_oid_id }}", true); // true - не викликати onchange
+            {% endif %}
+        });
+        // Можливо, викликати 'change' при завантаженні, щоб відфільтрувати ОІДи, якщо ВЧ вже обрана
+        // if (unitSelectTT.value) {
+        //     unitSelectTT.dispatchEvent(new Event('change'));
+        // }
+    }
+
+
+    // Обмеження для полів дат
+    const dateFieldsTT = [
+        {from: 'filter_input_date_from_tt', to: 'filter_input_date_to_tt'},
+        {from: 'filter_read_till_date_from_tt', to: 'filter_read_till_date_to_tt'}
+    ];
+    dateFieldsTT.forEach(function(pair) {
+        const fromInput = document.getElementById(pair.from);
+        const toInput = document.getElementById(pair.to);
+        if (fromInput && toInput) {
+            fromInput.addEventListener('change', function() { if (this.value) toInput.min = this.value; });
+            toInput.addEventListener('change', function() { if (this.value) fromInput.max = this.value; });
+        }
+    });
+});
+</script>
 {% endblock %}
