@@ -93,25 +93,26 @@ def ajax_load_oids_for_unit_categorized(request):
 # AJAX view для завантаження ОІДів для Select2 у формах (якщо потрібно)
 # Цей view НЕ використовується для оновлення списків ОІД на головній панелі в цьому сценарії
 def ajax_load_oids_for_unit(request):
-    unit_id = request.GET.get('unit_id') # Або 'unit', залежно від JS
+    unit_id = request.GET.get('unit_id')
     oids_data = []
     if unit_id:
         try:
-            oids = OID.objects.filter(
-                unit__id=unit_id,
-                status__in=[OIDStatusChoices.ACTIVE, OIDStatusChoices.NEW, 
-                            OIDStatusChoices.RECEIVED_REQUEST, OIDStatusChoices.RECEIVED_TZ]
-            ).order_by('cipher')
+            # Обираємо активні або ті, що створюються, якщо є таке бізнес-правило
+            oids = OID.objects.filter(unit_id=unit_id).order_by('cipher') 
             for oid in oids:
                 oids_data.append({
-                    'id': oid.id, 
-                    # 'name' або 'text' - залежно від того, що очікує transformItem або Select2
-                    'name': f"{oid.cipher} ({oid.get_oid_type_display()}) - {oid.full_name or oid.unit.city}" 
+                    'id': oid.id,
+                    'cipher': oid.cipher, # Для відображення
+                    'full_name': oid.full_name, # Може бути корисним
+                    'unit__city': oid.unit.city # Якщо потрібно
+                    # Додайте інші поля, якщо вони потрібні для відображення в TomSelect
                 })
-        except ValueError:
-            pass # unit_id не є числом
+        except (ValueError, Unit.DoesNotExist):
+            pass 
     return JsonResponse(list(oids_data), safe=False)
 
+# oids/urls.py - не забудьте додати:
+# path('ajax/load-oids-for-unit/', views.ajax_load_oids_for_unit, name='ajax_load_oids_for_unit'),
 
 def main_dashboard(request):
     """
@@ -332,40 +333,38 @@ def add_document_processing_view(request, oid_id=None, work_request_item_id=None
     })
 
 def add_work_request_view(request):
+    # Можна передати початкове значення для ВЧ, якщо воно є в GET-запиті
+    initial_data = {}
+    unit_id_from_get = request.GET.get('unit')
+    if unit_id_from_get:
+        initial_data['unit'] = unit_id_from_get
+
     if request.method == 'POST':
         form = WorkRequestForm(request.POST)
         if form.is_valid():
-            work_request = form.save(commit=False) 
-            # Тут можна додати логіку перед збереженням, якщо потрібно
-            # наприклад, встановити автора work_request.created_by = request.user
-            work_request.save()
-            form.save_m2m() # Важливо для збереження ManyToMany полів (oids)
-
-            # Створюємо WorkRequestItem для кожного обраного ОІД у заявці
-            # Цю логіку можна перенести в метод save() самої форми WorkRequestForm
-            # як було показано в одному з попередніх прикладів форм.
-            # Якщо ти вже додав це в save() форми, то тут це не потрібно.
-            selected_oids = form.cleaned_data.get('oids')
-            selected_work_type = form.cleaned_data.get('request_work_type') # Якщо є таке поле у формі
-            for oid in selected_oids:
-                WorkRequestItem.objects.create(
-                    request=work_request,
-                    oid=oid,
-                    work_type=selected_work_type # Або визначати інакше
-                )
-
-            messages.success(request, f'Заявку №{work_request.incoming_number} успішно створено!')
-            return redirect('oids:main_dashboard') # Або на сторінку деталей заявки
+            form.save() # Метод save форми тепер сам створює WorkRequestItems
+            messages.success(request, f'Заявку №{form.instance.incoming_number} успішно створено!')
+            return redirect('oids:list_work_requests') # Або на сторінку деталей заявки, або main_dashboard
         else:
             messages.error(request, 'Будь ласка, виправте помилки у формі.')
     else:
-        form = WorkRequestForm()
+        form = WorkRequestForm(initial=initial_data)
+
+    # Передаємо choices для OIDType та OIDStatus, якщо вони потрібні для модального вікна створення OID
+    # (якщо модалка рендериться на цій сторінці, а не в base.html)
+    # context_data = {
+    #     'view': { # Щоб імітувати доступ як у base.html, якщо потрібно
+    #         'get_oid_type_choices': OIDTypeChoices.choices,
+    #         'get_oid_status_choices': OIDStatusChoices.choices,
+    #         'get_sec_level_choices': SecLevelChoices.choices,
+    #     }
+    # }
 
     return render(request, 'oids/forms/add_work_request_form.html', {
         'form': form,
-        'page_title': 'Створення нової заявки на проведення робіт'
+        'page_title': 'Створення нової заявки на проведення робіт',
+        # **context_data # Якщо передаєте choices
     })
-
 # 
 # 
 # list info 
@@ -753,7 +752,7 @@ def work_request_list_view(request):
         'current_sort_order_is_desc': actual_sort_order_is_desc,
     }
     return render(request, 'oids/lists/work_request_list.html', context)
-
+ 
 
 def trip_list_view(request):
     trip_list_queryset = Trip.objects.prefetch_related(

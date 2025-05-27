@@ -163,7 +163,7 @@ function addDocumentForm() {
                 el.tomselect.clear();
             }
         }
-   
+
         // Очистити поля, які можуть бути ініціалізовані TomSelect
         // Це потрібно, щоб при клонуванні не копіювався стан TomSelect
         // TomSelect буде ініціалізований для нової форми окремо
@@ -352,79 +352,109 @@ function closeOidAside() {
  * Обробляє відправку форми створення ОІД через AJAX.
  * @param {Event} event - Подію відправки форми.
  */
+// oids/static/oids/js/main.js
+// ... (інший код вашого main.js) ...
+
+/**
+ * Обробляє відправку форми створення ОІД через AJAX.
+ * @param {Event} event - Подію відправки форми.
+ */
 async function handleOidCreateFormSubmit(event) {
     event.preventDefault();
 
-    const form = event.target; // Це #oid-create-form
+    const form = event.target; // Це #oid-create-form або #ajaxOidCreateForm з base.html
     const formData = new FormData(form);
+    const oidModalElement = document.getElementById("createOidModal"); // ID модального вікна з base.html
 
-    // CSRF токен вже повинен бути в formData, якщо він є hidden input у формі
-    // const csrfToken = formData.get("csrfmiddlewaretoken"); // Або отримати його інакше, якщо потрібно
-
-    // unit_id вже додано до formData в openOidAside
-    // const unitSelect = document.querySelector(SELECTORS.UNIT_SELECT);
-    // const unitId = unitSelect ? unitSelect.value : null;
-    // if (!unitId) {
-    //     alert("Помилка: Не обрано військову частину для створення ОІД.");
-    //     return;
+    // Переконайтесь, що unit_id додається до formData, якщо ваш AJAX endpoint 'ajax_create_oid' його очікує.
+    // Це вже мало б відбуватися при відкритті модалки (запис у hidden input)
+    // або ви можете додати його тут, якщо це потрібно:
+    // const unitIdForNewOid = form.querySelector('input[name="unit"]'); // Припускаючи, що є поле unit
+    // if (unitIdForNewOid && unitIdForNewOid.value) {
+    //     formData.append('unit', unitIdForNewOid.value); // Або та назва, яку очікує view
     // }
-    // formData.append("unit_for_new_oid", unitId); // Ім'я поля згідно views.py ajax_create_oid_view
 
     try {
-        const response = await fetch(form.action, {
-            // Використовуємо action з HTML форми
+        // Переконайтесь, що URL правильний. Якщо form.action порожній, отримайте URL з window.AJAX_CREATE_OID_URL
+        const actionUrl = form.action || window.AJAX_CREATE_OID_URL;
+        if (!actionUrl) {
+            console.error("URL для створення ОІД не знайдено!");
+            alert("Помилка: URL для створення ОІД не визначено.");
+            return;
+        }
+
+        const response = await fetch(actionUrl, {
             method: "POST",
             body: formData,
             headers: {
-                "X-CSRFToken": formData.get("csrfmiddlewaretoken"), // Переконайтеся, що CSRF токен присутній у формі
-                "X-Requested-With": "XMLHttpRequest", // Часто потрібно для Django AJAX
+                "X-CSRFToken": formData.get("csrfmiddlewaretoken"),
+                "X-Requested-With": "XMLHttpRequest",
             },
         });
-        const data = await response.json();
+        const data = await response.json(); // {status: 'success', oid_id: ..., oid_name: ..., unit_id: ...} АБО {status: 'error', errors: ...}
 
         if (data.status === "success" && data.oid_id && data.oid_name) {
-            alert("✅ ОІД успішно створено!");
-            form.reset();
-            closeOidAside();
-
-            if (targetOidSelect) {
-                const newOptionData = {
-                    value: data.oid_id,
-                    text: data.oid_name, // data.oid_name - це str(oid) з сервера
-                };
-
-                // Якщо Tom Select ініціалізований на targetOidSelect
-                if (targetOidSelect.tomselect) {
-                    targetOidSelect.tomselect.addOption(newOptionData);
-                    targetOidSelect.tomselect.addItem(data.oid_id);
-                    // targetOidSelect.tomselect.refreshOptions(false); // Може не знадобитися, якщо addOption оновлює кеш
-                } else {
-                    // Стандартний select
-                    const optionElement = new Option(newOptionData.text, newOptionData.value, false, true); // selected = true
-                    targetOidSelect.appendChild(optionElement);
-                    targetOidSelect.value = newOptionData.value; // Встановлюємо значення
-                }
+            // Успіх! Генеруємо подію.
+            if (oidModalElement) {
+                const successEvent = new CustomEvent("oid.created.success", {
+                    detail: {
+                        oid_id: data.oid_id,
+                        oid_name: data.oid_name,
+                        unit_id: data.unit_id, // Важливо, щоб ваш AJAX view повертав unit_id
+                    },
+                });
+                oidModalElement.dispatchEvent(successEvent);
             }
-
-            // TODO: Оновлення інших select-ів OID на сторінці, якщо вони залежать від тієї ж ВЧ.
-            // Це може вимагати більш складної логіки або сповіщення інших компонентів про новий ОІД.
-            // Наприклад, можна пройтися по всіх select-ах для ОІД і, якщо вони не мають нового значення,
-            // викликати для них метод TomSelect для оновлення джерела даних (якщо вони завантажуються через AJAX)
-            // або просто додати нову опцію, якщо вони статичні.
-        } else if (data.errors) {
-            let errorMessages = "Помилка валідації:\n";
-            for (const field in data.errors) {
-                errorMessages += `${field}: ${data.errors[field].join(", ")}\n`;
+            form.reset(); // Очищаємо форму модалки
+            // Закриття модалки тепер обробляється слухачем події в add_work_request_form.html
+            // або може бути тут, якщо це глобальна поведінка:
+            // const modalInstance = bootstrap.Modal.getInstance(oidModalElement);
+            // if (modalInstance) modalInstance.hide();
+        } else if (data.status === "error" && data.errors) {
+            // Помилка валідації. Генеруємо подію.
+            if (oidModalElement) {
+                const errorEvent = new CustomEvent("oid.created.error", {
+                    detail: { errors: data.errors },
+                });
+                oidModalElement.dispatchEvent(errorEvent);
             }
-            alert("❌ " + errorMessages);
         } else {
-            alert("❌ Відбулася невідома помилка при створенні ОІД.");
+            // Інша невідома помилка з сервера
+            console.error("Невідома помилка сервера при створенні ОІД:", data);
+            if (oidModalElement) {
+                const errorEvent = new CustomEvent("oid.created.error", {
+                    detail: { errors: { global: ["Невідома помилка сервера."] } },
+                });
+                oidModalElement.dispatchEvent(errorEvent);
+            }
         }
     } catch (err) {
-        console.error("❌ Помилка зв'язку з сервером при створенні ОІД:", err);
-        alert("⚠️ Помилка зв’язку з сервером. Перевірте консоль для деталей.");
+        console.error("Помилка зв'язку з сервером при створенні ОІД:", err);
+        if (oidModalElement) {
+            const errorEvent = new CustomEvent("oid.created.error", {
+                detail: { errors: { global: ["Помилка зв’язку з сервером."] } },
+            });
+            oidModalElement.dispatchEvent(errorEvent);
+        }
     }
 }
+
+// ... (решта вашого main.js, включаючи setupOidAsideLogic, яка має вішати submit на форму модалки)
+
+// Переконайтесь, що setupOidAsideLogic правильно знаходить форму в модалці з base.html
+// і призначає handleOidCreateFormSubmit як обробник події submit.
+// Наприклад, в setupOidAsideLogic:
+// const oidCreateFormElement = document.getElementById('ajaxOidCreateForm'); // ID форми з base.html
+// if (oidCreateFormElement) {
+//    oidCreateFormElement.addEventListener('submit', handleOidCreateFormSubmit);
+// }
+// Або, якщо кнопка submit модалки має окремий ID, то вішати 'click' на неї і викликати handleOidCreateFormSubmit
+// з передачею форми. Поточний ваш main.js [cite: 1] мав:
+// const oidCreateForm = aside.querySelector(SELECTORS.OID_CREATE_FORM); -> (це була #oid-create-form)
+// if (oidCreateForm) {
+//    oidCreateForm.addEventListener("submit", handleOidCreateFormSubmit);
+// }
+// Потрібно оновити SELECTORS.OID_CREATE_FORM на 'ajaxOidCreateForm' або той ID, що є у формі в base.html.
 
 /**
  * Ініціалізує логіку для бічного вікна створення ОІД.

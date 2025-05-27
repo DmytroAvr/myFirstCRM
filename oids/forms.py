@@ -10,161 +10,96 @@ from django_tomselect.forms import TomSelectModelChoiceField, TomSelectConfig
 # --- Форми для панелі керування ---
 
 class WorkRequestForm(forms.ModelForm):
-    # Поля, які будуть відображатися у формі
-    # OIDs повинні бути MultiSelect, оскільки заявка може стосуватися кількох ОІД
+    unit = forms.ModelChoiceField(
+        queryset=Unit.objects.all().order_by('code'),
+        label="Військова частина",
+        widget=forms.Select(attrs={'class': 'form-select tomselect-field-defer'}) # Клас для TomSelect
+    )
+    # Поле для вибору ОІДів. Будемо покращувати за допомогою Tom Select.
+    # Важливо: queryset тут може бути порожнім або містити всі ОІДи, 
+    # оскільки реальне наповнення буде динамічним (залежно від обраної ВЧ).
     oids = forms.ModelMultipleChoiceField(
-        queryset=OID.objects.all().order_by('cipher'),
-        widget=forms.CheckboxSelectMultiple, # або forms.SelectMultiple
-        label="Оберіть ОІД, які стосуються заявки",
-        required=False # Якщо заявка може бути загальною без конкретних ОІД на початку
+        queryset=OID.objects.none(), # Початково порожній, заповнюється JS
+        label="Оберіть ОІД (будуть відфільтровані після вибору ВЧ)",
+        widget=forms.SelectMultiple(attrs={'class': 'form-control tomselect-field-oids', 'size': '10'}), # Клас для TomSelect
+        required=True # Або False, якщо заявка може бути без ОІДів на початку
+    )
+    # Поле для вибору типу робіт, яке буде застосовано до всіх обраних ОІДів
+    request_work_type = forms.ChoiceField(
+        choices=WorkTypeChoices.choices,
+        label="Запитуваний тип роботи для обраних ОІД",
+        widget=forms.Select(attrs={'class': 'form-select'})
     )
 
     class Meta:
         model = WorkRequest
-        fields = ['unit', 'incoming_number', 'incoming_date', 'oids', 'note']
+        fields = ['unit', 'incoming_number', 'incoming_date', 'request_work_type', 'oids', 'note']
         widgets = {
-            'incoming_date': forms.DateInput(attrs={'type': 'date'}),
+            'incoming_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'incoming_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'note': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
         }
         labels = {
             'unit': 'Військова частина',
             'incoming_number': 'Вхідний обліковий номер заявки',
             'incoming_date': 'Вхідна дата заявки',
-            'note': 'Примітки',
+            'note': 'Примітки до заявки',
         }
 
-    # Логіка для створення WorkRequestItem після збереження WorkRequest
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Якщо форма редагується і вже є обрана ВЧ, можна одразу завантажити ОІДи для неї.
+        # Але для нової форми це краще робити через JS.
+        if self.instance and self.instance.unit_id:
+             self.fields['oids'].queryset = OID.objects.filter(unit=self.instance.unit).order_by('cipher')
+        else:
+            # Якщо є початкове значення для unit (наприклад, з GET-параметра)
+            initial_unit = self.initial.get('unit')
+            if initial_unit:
+                try:
+                    unit_instance = Unit.objects.get(pk=initial_unit)
+                    self.fields['oids'].queryset = OID.objects.filter(unit=unit_instance).order_by('cipher')
+                except Unit.DoesNotExist:
+                    self.fields['oids'].queryset = OID.objects.none() # Або всі, якщо ВЧ не знайдено
+            else:
+                 self.fields['oids'].queryset = OID.objects.none() # Для нової форми без обраної ВЧ
+
     def save(self, commit=True):
         instance = super().save(commit=False)
+        
+        # Логіка збереження самої заявки (WorkRequest)
         if commit:
-            instance.save()
-            # Створюємо WorkRequestItem для кожного обраного ОІД
-            for oid in self.cleaned_data['oids']:
-                WorkRequestItem.objects.create(
-                    request=instance,
-                    oid=oid,
-                    work_type=WorkTypeChoices.ATTESTATION, # Або визначити через форму, який тип роботи
-                    status=WorkRequestStatusChoices.PENDING
-                )
+            instance.save() # Спочатку зберігаємо WorkRequest, щоб отримати її ID
+
+            # Тепер створюємо WorkRequestItem для кожного обраного ОІД
+            # Ця логіка тепер централізована тут.
+            selected_oids = self.cleaned_data.get('oids')
+            selected_work_type = self.cleaned_data.get('request_work_type')
+            
+            if selected_oids and selected_work_type:
+                # Видаляємо старі елементи, якщо це редагування і склад OID змінився (опційно, залежить від логіки)
+                # instance.items.all().delete() 
+                
+                items_to_create = []
+                for oid in selected_oids:
+                    # Перевіряємо, чи такий елемент вже існує, щоб уникнути дублів (якщо потрібно)
+                    # if not WorkRequestItem.objects.filter(request=instance, oid=oid, work_type=selected_work_type).exists():
+                    items_to_create.append(
+                        WorkRequestItem(
+                            request=instance,
+                            oid=oid,
+                            work_type=selected_work_type,
+                            status=WorkRequestStatusChoices.PENDING # Початковий статус для нового елемента
+                        )
+                    )
+                if items_to_create:
+                    WorkRequestItem.objects.bulk_create(items_to_create)
+            
+            # Збереження m2m даних форми, якщо вони є (в нашому випадку oids обробляються через WorkRequestItem)
+            # self.save_m2m() 
+            
         return instance
 
-# class TripForm(forms.ModelForm):
-#     # Тут можна додати фільтрацію для OID залежно від обраних Unit
-#     # Це вимагає JS на фронтенді, але для початку можна вивести всі
-#     oids = forms.ModelMultipleChoiceField(
-#         queryset=OID.objects.all().order_by('cipher'),
-#         widget=forms.CheckboxSelectMultiple,
-#         label="Оберіть ОІД, що будуть задіяні у відрядженні",
-#         required=False
-#     )
-#     units = forms.ModelMultipleChoiceField(
-#         queryset=Unit.objects.all().order_by('name'),
-#         widget=forms.CheckboxSelectMultiple,
-#         label="Військові частини призначення",
-#     )
-#     persons = forms.ModelMultipleChoiceField(
-#         queryset=Person.objects.filter(is_active=True).order_by('full_name'),
-#         widget=forms.CheckboxSelectMultiple,
-#         label="Особи у відрядженні",
-#     )
-#     work_requests = forms.ModelMultipleChoiceField(
-#         queryset=WorkRequest.objects.filter(status=WorkRequestStatusChoices.PENDING),
-#         widget=forms.CheckboxSelectMultiple,
-#         label="Пов'язані заявки (статус 'Очікує')",
-#         required=False
-#     )
-
-
-#     class Meta:
-#         model = Trip
-#         fields = ['start_date', 'end_date', 'units', 'oids', 'persons', 'work_requests', 'purpose']
-#         widgets = {
-#             'start_date': forms.DateInput(attrs={'type': 'date'}),
-#             'end_date': forms.DateInput(attrs={'type': 'date'}),
-#         }
-#         labels = {
-#             'start_date': 'Дата початку',
-#             'end_date': 'Дата завершення',
-#             'purpose': 'Мета відрядження',
-#         }
-
-# class DocumentForm(forms.ModelForm):
-#     # Додаємо поля, які допоможуть динамічно вибрати DocumentType
-#     # Це поле буде заповнюватися JavaScript'ом на фронтенді
-#     # або можна використовувати ModelChoiceField з queryset, який фільтрується
-#     # в залежності від обраних oid та work_type
-#     document_type_id = forms.ModelChoiceField(
-#         queryset=DocumentType.objects.all(),
-#         label="Тип документа",
-#         required=True,
-#         empty_label="Оберіть тип документа"
-#     )
-
-#     class Meta:
-#         model = Document
-#         fields = ['oid', 'work_request_item', 'document_type_id', 'document_number', 'process_date', 'work_date', 'author', 'note']
-#         widgets = {
-#             'process_date': forms.DateInput(attrs={'type': 'date'}),
-#             'work_date': forms.DateInput(attrs={'type': 'date'}),
-#         }
-#         labels = {
-#             'oid': 'Об’єкт інформаційної діяльності',
-#             'work_request_item': 'Елемент заявки (якщо документ за заявкою)',
-#             'document_number': 'Підготовлений № документа',
-#             'process_date': 'Дата опрацювання',
-#             'work_date': 'Дата проведення робіт',
-#             'author': 'Виконавець (ПІБ)',
-#             'note': 'Примітки',
-#         }
-
-#     def __init__(self, *args, **kwargs):
-#         super().__init__(*args, **kwargs)
-#         # Динамічно фільтруємо work_request_item залежно від oid
-#         if 'oid' in self.initial:
-#             oid_instance = self.initial['oid']
-#             self.fields['work_request_item'].queryset = WorkRequestItem.objects.filter(oid=oid_instance)
-#         elif self.instance.pk:
-#             self.fields['work_request_item'].queryset = WorkRequestItem.objects.filter(oid=self.instance.oid)
-#         else:
-#             self.fields['work_request_item'].queryset = WorkRequestItem.objects.none() # За замовчуванням пусто
-
-#         # Оптимізуємо вибір DocumentType
-#         # У реальному проекті тут потрібен JS, щоб фільтрувати типи документів
-#         # залежно від обраного OID (OIDType) та WorkType (з WorkRequestItem)
-#         # Наразі показуємо всі
-#         self.fields['document_type_id'].label_from_instance = lambda obj: f"{obj.name} ({obj.get_oid_type_display()}, {obj.get_work_type_display()})"
-
-#     def clean(self):
-#         cleaned_data = super().clean()
-#         document_type = cleaned_data.get('document_type_id')
-#         oid = cleaned_data.get('oid')
-
-#         if document_type and oid:
-#             # Тут можна додати перевірки, чи відповідає обраний DocumentType
-#             # типу ОІД та виду робіт (якщо потрібно).
-#             # Наприклад, якщо DocumentType.oid_type не 'Спільний', він має відповідати oid.oid_type
-#             if document_type.oid_type != 'Спільний' and document_type.oid_type != oid.oid_type:
-#                 self.add_error('document_type_id', 'Обраний тип документа не відповідає типу ОІД.')
-            
-#             # Якщо work_request_item обрано, можна додатково перевірити work_type
-#             work_request_item = cleaned_data.get('work_request_item')
-#             if work_request_item and document_type.work_type != 'Спільний' and document_type.work_type != work_request_item.work_type:
-#                 self.add_error('document_type_id', 'Обраний тип документа не відповідає виду робіт в заявці.')
-#         return cleaned_data
-    
-#     def save(self, commit=True):
-#         # Передаємо вибраний DocumentType до моделі Document
-#         self.instance.document_type = self.cleaned_data['document_type_id']
-#         return super().save(commit=commit)
-    
-
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
 class TripForm(forms.ModelForm):
     # Використовуємо ModelMultipleChoiceField для ManyToMany зв'язків,
     # Select2 зробить їх зручнішими у шаблоні.
