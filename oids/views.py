@@ -1,10 +1,11 @@
 # :\myFirstCRM\oids\views.py
 from django.shortcuts import render, get_object_or_404, redirect
+from django_tomselect.autocompletes import AutocompleteModelView
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.http import JsonResponse
 from django.urls import reverse_lazy, reverse
 from django.contrib import messages
-from django.db.models import Q, Max, Prefetch
+from django.db.models import Q, Max, Prefetch, Count
 from .models import (
     Unit, UnitGroup, OID, OIDStatusChange, TerritorialManagement, 
     OIDStatusChoices, WorkTypeChoices, Document, DocumentType,
@@ -479,21 +480,66 @@ def document_list_view(request):
     return render(request, 'oids/lists/document_list.html', context)
 
 def unit_list_view(request):
-    units_list = Unit.objects.select_related(
+    units_list_qs = Unit.objects.select_related(
         'territorial_management'
     ).prefetch_related(
         'unit_groups', 
-        'oids' # Для підрахунку кількості ОІД, якщо потрібно
-    ).order_by('territorial_management__name', 'name') # Сортування за ТУ, потім за назвою ВЧ
+        'oids' 
+    ).annotate(
+        oid_count=Count('oids')
+    )
 
-    paginator = Paginator(units_list, 25) 
+    # --- Фільтрація ---
+    selected_tm_id_str = request.GET.get('territorial_management')
+    current_tm_id_int = None # Буде None або int
+    if selected_tm_id_str and selected_tm_id_str.isdigit():
+        current_tm_id_int = int(selected_tm_id_str)
+        units_list_qs = units_list_qs.filter(territorial_management__id=current_tm_id_int)
+    
+    search_query = request.GET.get('search_query')
+    if search_query:
+        units_list_qs = units_list_qs.filter(
+            Q(code__icontains=search_query) | 
+            Q(name__icontains=search_query) | 
+            Q(city__icontains=search_query)
+        )
+
+    # --- Сортування ---
+    sort_by = request.GET.get('sort_by', 'territorial_management__name')
+    sort_order = request.GET.get('sort_order', 'asc')
+
+    valid_sort_fields = {
+        'code': 'code',
+        'name': 'name',
+        'city': 'city',
+        'tm': 'territorial_management__name',
+        'oid_count': 'oid_count',
+        'distance': 'distance_from_gu'
+    }
+    
+    order_by_field = valid_sort_fields.get(sort_by, 'territorial_management__name')
+
+    if sort_order == 'desc':
+        order_by_field = f'-{order_by_field}'
+    
+    units_list_qs = units_list_qs.order_by(order_by_field, 'name' if order_by_field != 'name' else 'code')
+
+    paginator = Paginator(units_list_qs, 25) 
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+
+    territorial_managements_for_filter = TerritorialManagement.objects.all().order_by('name')
 
     context = {
         'page_title': 'Список військових частин',
         'units': page_obj,
-        'page_obj': page_obj
+        'page_obj': page_obj,
+        'territorial_managements_for_filter': territorial_managements_for_filter,
+        'current_tm_id': current_tm_id_int, # Передаємо int або None
+        'current_search_query': search_query,
+        'current_sort_by': sort_by,
+        'current_sort_order': sort_order,
+        'is_sorted_desc': sort_order == 'desc',
     }
     return render(request, 'oids/lists/unit_list.html', context)
 

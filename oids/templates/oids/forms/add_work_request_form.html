@@ -80,49 +80,6 @@
 
 {% block page_specific_js %}
 <script>
-	$(document).ready(function () {
-		// Ініціалізація Select2 для полів цієї форми, якщо вони мають клас .select2
-		// (або інший клас, який ти використовуєш для ініціалізації в select2-init.js)
-		// Наприклад, якщо форма має ID 'addWorkRequestForm':
-		// if (typeof initSelect2Fields === 'function') {
-		//     initSelect2Fields($('#addWorkRequestForm')); 
-		// }
-		// Або якщо initSelect2Fields вже викликається глобально для всіх .select2, то це не потрібно.
-
-		// Динамічна фільтрація ОІДів на основі обраної Військової частини
-		// Якщо поле "Військова частина" має id 'id_unit' (з WorkRequestForm)
-		// а поле "ОІДи" має id 'id_oids' (з WorkRequestForm)
-		// і на #id_unit додано data-ajax-url="{% url 'oids:ajax_load_oids_for_unit' %}"
-
-		// Це лише приклад, як можна було б налаштувати filtering_dynamic.js для цієї форми.
-		// Переконайся, що відповідна конфігурація є в initializeDynamicFilters().
-		// if (typeof initializeDynamicFilters === 'function' && typeof setupDynamicFilter === 'function') {
-		//     const $unitSelectInForm = $('#id_unit'); // ID поля Unit у формі
-		//     const $oidsSelectInForm = $('#id_oids'); // ID поля OIDs у формі
-
-		//     if ($unitSelectInForm.length && $oidsSelectInForm.length) {
-		//         const ajaxUrlForOids = $unitSelectInForm.data('ajax-url-oids-for-form'); // Потрібно додати цей data-атрибут до HTML поля Unit
-
-		//         if (ajaxUrlForOids) {
-		//             console.log("Налаштування фільтра для форми: Unit -> OIDs");
-		//             setupDynamicFilter({
-		//                 sourceSelectSelector: '#id_unit', // ID поля Unit у формі
-		//                 targetSelectSelector: '#id_oids',   // ID поля OIDs у формі
-		//                 url: ajaxUrlForOids, 
-		//                 paramName: 'unit_id', 
-		//                 placeholder: { default: 'Спочатку оберіть ВЧ', loading: 'Завантаження ОІД...', error: 'Помилка', empty: 'Немає ОІД для цієї ВЧ'},
-		//                 transformItem: item => ({ id: item.id, text: item.name }), // name - це те, що повертає ajax_load_oids_for_unit
-		//                 clearTargetsSelectors: ['#id_oids'] 
-		//             });
-		//         } else {
-		//             console.warn("Не знайдено data-ajax-url-oids-for-form на #id_unit для динамічного завантаження ОІДів у формі.");
-		//         }
-		//     }
-		// }
-	});
-
-</script>
-<script>
 
 	$(document).ready(function () {
 		const createOidModal = new bootstrap.Modal(document.getElementById('createOidModal'));

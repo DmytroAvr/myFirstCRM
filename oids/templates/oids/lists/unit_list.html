@@ -1,57 +1,137 @@
+{# oids/templates/oids/lists/unit_list.html #}
 {% extends "oids/base.html" %}
 
 {% block title %}{{ page_title }}{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
-    <h2 class="mb-4">{{ page_title }}</h2>
-    
-    {# <a href="#" class="btn btn-primary mb-3">Додати нову військову частину</a> #}
+	<h2 class="mb-4">{{ page_title }}</h2>
 
-    {% if units %}
-        <table class="table table-striped table-bordered table-hover">
-            <thead class="thead-dark">
-                <tr>
-                    <th>Код ВЧ</th>
-                    <th>Назва / Місто</th>
-                    <th>Територіальне управління</th>
-                    <th>Групи</th>
-                    <th>К-ть ОІД</th>
-                    <th>Відстань від ГУ (км)</th>
-                    <th>Примітки</th>
-                    <th>Дії</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for unit in units %}
-                    <tr>
-                        <td>{{ unit.code }}</td>
-                        <td>{{ unit.name|default_if_none:unit.city }}</td>
-                        <td>{{ unit.territorial_management.name|default:"Не вказано" }}</td>
-                        <td>
-                            {% for group in unit.unit_groups.all %}
-                                {{ group.name }}{% if not forloop.last %}, {% endif %}
-                            {% empty %}
-                                -
-                            {% endfor %}
-                        </td>
-                        <td>{{ unit.oids.count }}</td> {# Кількість ОІД для цієї ВЧ #}
-                        <td>{{ unit.distance_from_gu|default:"-" }}</td>
-                        <td>{{ unit.note|truncatewords:10|default:"-" }}</td>
-                        <td>
-                            <a href="{% url 'oids:main_dashboard' %}?unit={{ unit.id }}" class="btn btn-sm btn-info">Переглянути ОІДи</a>
-                            {# <a href="#" class="btn btn-sm btn-warning">Редагувати</a> #}
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        
-        {% include "../includes/pagination.html" %}
+	<form method="GET" action="{% url 'oids:list_units' %}" class="mb-4">
+		<div class="row g-3 align-items-end">
+			      <div class="col-md-4">
+                <label for="territorial_management_filter" class="form-label">Територіальне управління:</label>
+                <select name="territorial_management" id="territorial_management_filter" class="form-select tomselect-field">
+                    <option value="">Всі ТУ</option>
+                    {% for tm_filter_item in territorial_managements_for_filter %}
+                        {# Увага на пробіли навколо "==" в наступному рядку! #}
+                        <option value="{{ tm_filter_item.id }}" {% if current_tm_id == tm_filter_item.id %}selected{% endif %}>
+                            {{ tm_filter_item.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+			<div class="col-md-4">
+				<label for="search_query_filter" class="form-label">Пошук (код, назва, місто):</label>
+				<input type="text" name="search_query" id="search_query_filter" class="form-control" value="{{ current_search_query|default:'' }}">
+			</div>
+			<div class="col-md-2">
+				<button type="submit" class="btn btn-primary w-100">Фільтрувати</button>
+			</div>
+			<div class="col-md-2">
+				<a href="{% url 'oids:list_units' %}" class="btn btn-secondary w-100">Скинути</a>
+			</div>
+		</div>
+		{% if current_sort_by %}
+		<input type="hidden" name="sort_by" value="{{ current_sort_by }}">
+		<input type="hidden" name="sort_order" value="{{ current_sort_order }}">
+		{% endif %}
+	</form>
 
-    {% else %}
-        <p>Немає військових частин.</p>
-    {% endif %}
+	{% if units %}
+	<div class="table-responsive">
+		<table class="table table-striped table-bordered table-hover">
+			<thead class="thead-dark">
+				<tr>
+					{% url 'oids:list_units' as list_url %}
+					{% with tm_param_str=current_tm_id|default_if_none:""|stringformat:"s" search_param_str=current_search_query|default_if_none:"" %}
+					{% with base_params="territorial_management="|add:tm_param_str|add:"&search_query="|add:search_param_str %}
+					<th>
+						<a href="{{ list_url }}?sort_by=code&sort_order={% if current_sort_by == 'code' and not is_sorted_desc %}desc{% else %}asc{% endif %}&{{ base_params }}">
+							Код ВЧ {% if current_sort_by == 'code' %}{% if is_sorted_desc %}▼{% else %}▲{% endif %}{% endif %}
+						</a>
+					</th>
+					<th>
+						<a href="{{ list_url }}?sort_by=name&sort_order={% if current_sort_by == 'name' and not is_sorted_desc %}desc{% else %}asc{% endif %}&{{ base_params }}">
+							Назва / Місто {% if current_sort_by == 'name' %}{% if is_sorted_desc %}▼{% else %}▲{% endif %}{% endif %}
+						</a>
+					</th>
+					<th>
+						<a href="{{ list_url }}?sort_by=tm&sort_order={% if current_sort_by == 'tm' and not is_sorted_desc %}desc{% else %}asc{% endif %}&{{ base_params }}">
+							ТУ {% if current_sort_by == 'tm' %}{% if is_sorted_desc %}▼{% else %}▲{% endif %}{% endif %}
+						</a>
+					</th>
+					<th>Групи</th>
+					<th>
+						<a href="{{ list_url }}?sort_by=oid_count&sort_order={% if current_sort_by == 'oid_count' and not is_sorted_desc %}desc{% else %}asc{% endif %}&{{ base_params }}">
+							К-ть ОІД {% if current_sort_by == 'oid_count' %}{% if is_sorted_desc %}▼{% else %}▲{% endif %}{% endif %}
+						</a>
+					</th>
+					<th>
+						<a href="{{ list_url }}?sort_by=distance&sort_order={% if current_sort_by == 'distance' and not is_sorted_desc %}desc{% else %}asc{% endif %}&{{ base_params }}">
+							Відстань (км) {% if current_sort_by == 'distance' %}{% if is_sorted_desc %}▼{% else %}▲{% endif %}{% endif %}
+						</a>
+					</th>
+					<th>Примітки</th>
+					<th>Дії</th>
+					{% endwith %}
+					{% endwith %}
+				</tr>
+			</thead>
+			<tbody>
+				{% for unit in units %}
+				<tr>
+					<td>{{ unit.code }}</td>
+					<td>{{ unit.city }}</td>
+					<td>{{ unit.territorial_management.name|default:"Не вказано" }}</td>
+					<td>
+						{% for group in unit.unit_groups.all %}
+						<span class="badge bg-light text-dark">{{ group.name }}</span>{% if not forloop.last %} {% endif %}
+						{% empty %}
+						-
+						{% endfor %}
+					</td>
+					<td>{{ unit.oid_count }}</td>
+					<td>{{ unit.distance_from_gu|default:"-" }}</td>
+					<td>{{ unit.note|truncatewords:10|default:"-" }}</td>
+					<td>
+						<a href="{% url 'oids:main_dashboard' %}?unit={{ unit.id }}" class="btn btn-sm btn-info mb-1 d-block">ОІДи</a>
+					</td>
+				</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	</div>
+
+	{% if page_obj %}
+	{% include "../includes/pagination.html" with page_obj=page_obj sort_by=current_sort_by sort_order=current_sort_order territorial_management=current_tm_id search_query=current_search_query %}
+	{% endif %}
+
+	{% else %}
+	<p>Немає військових частин, що відповідають вашим критеріям фільтрації.</p>
+	<a href="{% url 'oids:list_units' %}" class="btn btn-primary">Скинути фільтри</a>
+	{% endif %}
 </div>
 {% endblock %}
 
+{% block extra_js %}
+<script>
+	document.addEventListener('DOMContentLoaded', function () {
+		const tmSelect = document.getElementById('territorial_management_filter');
+		if (tmSelect && typeof TomSelect !== 'undefined') {
+			new TomSelect(tmSelect, {
+				create: false,
+				sortField: { // Якщо потрібно сортувати опції в TomSelect
+					field: "text",
+					direction: "asc"
+				},
+				placeholder: "Оберіть ТУ...",
+				allowEmptyOption: true // Дозволяє опцію "Всі ТУ" (value="")
+			});
+		} else if (tmSelect) {
+			console.log("TomSelect not found, TM filter will be a standard select.");
+		}
+	});
+</script>
+{% endblock %}

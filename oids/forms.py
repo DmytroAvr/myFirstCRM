@@ -5,6 +5,7 @@ from .models import (
     WorkRequest, WorkRequestItem, OID, Unit, Person, Trip, Document, DocumentType,
     WorkRequestStatusChoices, WorkTypeChoices, OIDTypeChoices, OIDStatusChoices, 
 )
+from django_tomselect.forms import TomSelectModelChoiceField, TomSelectConfig
 
 # --- Форми для панелі керування ---
 

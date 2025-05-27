@@ -94,21 +94,5 @@
 {% endblock %}
 
 {% block page_specific_js %}
-<script>
-    // $(document).ready(function() {
-    //     // Ініціалізація Select2 для #id_unit_filter (якщо select2-init.js цього не робить)
-    //     // $('#id_unit_filter').select2({
-    //     //     placeholder: "Оберіть ВЧ...",
-    //     //     allowClear: true,
-    //     //     language: "uk"
-    //     // });
-    // });
-    // filtering_dynamic.js зараз не потрібен для основного функціоналу цієї сторінки,
-    // оскільки фільтрація відбувається перезавантаженням.
-    // Він знадобиться, якщо ти захочеш додати AJAX для оновлення списків ОІД
-    // або для динамічних select-ів у формах, на які ведуть кнопки.
-</script>
+
 {% endblock %}
-<!-- 
-{# Припускаючи, що oid_data['id'] містить ID ОІДа #}
-<a href="{% url 'oids:add_document_for_oid_view_name' oid_id=oid_data.id %}">Додати документ</a> -->

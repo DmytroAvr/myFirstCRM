@@ -26,7 +26,7 @@ const SELECTORS = {
     INSERT_UNIT_SPAN: "#insert_unit", // Span для відображення назви військової частини
     UNIT_SELECT: "#id_unit", // Основний select для військової частини (один на сторінці)
     OID_ASIDE_CLOSE_BUTTON: "#oid-aside-close",
-    OID_CREATE_FORM: "#oid-create-form",
+    OID_CREATE_FORM: "#oid-create-form", // ID форми створення ОІД
     OID_SELECT_NAME_SUFFIX: "-oid", // Для полів OID у формсеті (e.g., form-0-oid)
     OID_SELECT_MAIN_NAME: "oid", // Для основного поля OID, якщо воно не в формсеті (e.g., id_oid)
 };
@@ -52,12 +52,8 @@ function setupThemeToggle() {
     if (themeToggleButton) {
         themeToggleButton.addEventListener("click", () => {
             document.body.classList.toggle("dark-theme");
-            // Можливо, потрібно буде оновити тему Select2 після зміни теми
-            if (typeof initSelect2Fields === "function") {
-                // Перевіряємо, чи функція існує
-                // Переініціалізувати Select2 з новою темою
-                initSelect2Fields();
-            }
+            // TODO: Якщо Tom Select має теми, які залежать від класів body,
+            // можливо, потрібно буде оновити/переініціалізувати екземпляри Tom Select тут.
         });
     }
 }
@@ -102,12 +98,12 @@ function setupDateRangeFilter() {
 
 /**
  * Оновлює атрибути name, id та htmlFor для елементів у новій/перенумерованій формі.
- * @param {HTMLElement} form - DOM-елемент форми.
+ * @param {HTMLElement} formElement - DOM-елемент форми.
  * @param {number} index - Новий індекс форми.
  */
-function updateFormElementAttributes(form, index) {
-    form.dataset.formIndex = index; // Оновлюємо data-атрибут форми
-    form.querySelectorAll("input, select, textarea, label").forEach((el) => {
+function updateFormElementAttributes(formElement, index) {
+    formElement.dataset.formIndex = index; // Оновлюємо data-атрибут форми
+    formElement.querySelectorAll("input, select, textarea, label").forEach((el) => {
         const nameAttr = el.getAttribute("name");
         const idAttr = el.getAttribute("id");
         const htmlForAttr = el.getAttribute("htmlFor");
@@ -128,14 +124,28 @@ function updateFormElementAttributes(form, index) {
  * Додає нову форму до формосета.
  */
 function addDocumentForm() {
-    const formset = document.querySelector(SELECTORS.FORMSET_CONTAINER);
+    const formsetContainer = document.querySelector(SELECTORS.FORMSET_CONTAINER);
     const totalFormsInput = document.querySelector(SELECTORS.TOTAL_FORMS_INPUT);
-    const currentForms = formset.querySelectorAll(SELECTORS.DOCUMENT_FORM_CLASS);
+
+    if (!formsetContainer || !totalFormsInput) {
+        console.warn("Контейнер формсету або поле totalFormsInput не знайдено.");
+        return;
+    }
+
+    const currentForms = formsetContainer.querySelectorAll(SELECTORS.DOCUMENT_FORM_CLASS);
 
     // Перевіряємо, чи є хоча б одна базова форма для клонування
     if (currentForms.length === 0) {
-        console.warn("Не знайдено базової форми для клонування. Переконайтеся, що є '.document-form' елементи.");
-        return;
+        const templateForm = document.getElementById("empty-form-template"); // Припускаємо, що у вас є шаблон
+        if (!templateForm) {
+            console.warn("Не знайдено базової форми для клонування ('" + SELECTORS.DOCUMENT_FORM_CLASS + "') та шаблону ('#empty-form-template').");
+            return;
+        }
+        // Клонуємо з шаблону, якщо форм немає
+        // Ця частина залежить від того, як ви реалізуєте 'empty-form-template'
+        // Наприклад: const newForm = templateForm.content.cloneNode(true).firstElementChild;
+        console.warn("Логіка клонування з шаблону ще не реалізована повністю.");
+        return; // Тимчасово виходимо, якщо немає форм і шаблон не оброблений
     }
 
     const newForm = currentForms[0].cloneNode(true);
@@ -143,28 +153,40 @@ function addDocumentForm() {
 
     // Очищаємо значення інпутів у новій формі
     newForm.querySelectorAll("input, select, textarea").forEach((el) => {
-        if (el.type !== "hidden") {
+        if (el.type !== "hidden" && el.tagName !== "SELECT") {
+            // Для select очищення значення може бути іншим
             el.value = "";
+        } else if (el.tagName === "SELECT") {
+            el.selectedIndex = 0; // Скидаємо select на перший варіант (зазвичай порожній)
+            // TODO: Якщо select був Tom Select, його потрібно буде очистити/скинути через API Tom Select
+            if (el.tomselect) {
+                el.tomselect.clear();
+            }
+        }
+   
+        // Очистити поля, які можуть бути ініціалізовані TomSelect
+        // Це потрібно, щоб при клонуванні не копіювався стан TomSelect
+        // TomSelect буде ініціалізований для нової форми окремо
+        if (el.classList.contains("tomselect-hidden-input")) {
+            // Приклад, якщо TomSelect додає такий клас
+            el.remove(); // Видаляємо залишки від попереднього TomSelect
         }
     });
 
-    // Оновлюємо атрибути name, id, htmlFor
+    // Видаляємо контейнер TomSelect, якщо він був скопійований
+    const tomSelectWrapper = newForm.querySelector(".ts-wrapper");
+    if (tomSelectWrapper) {
+        tomSelectWrapper.remove();
+    }
+
     updateFormElementAttributes(newForm, newIndex);
-
-    // Додаємо нову форму до DOM
-    formset.appendChild(newForm);
-
-    // Оновлюємо TOTAL_FORMS
+    formsetContainer.appendChild(newForm);
     totalFormsInput.value = newIndex + 1;
 
-    // Оновлюємо стан кнопок видалення
-    updateDeleteButtonsVisibility();
+    // TODO: Ініціалізувати Tom Select для select елементів у `newForm`
+    // Наприклад: initializeTomSelectForForm(newForm);
 
-    // Якщо використовуються Select2, перевикликаємо ініціалізацію для нової форми
-    if (typeof initSelect2Fields === "function") {
-        initSelect2Fields(newForm); // Ініціалізуємо Select2 тільки для нової форми
-        console.log(`select2 init fo new form ${newForm}`);
-    }
+    updateDeleteButtonsVisibility();
 }
 
 /**
@@ -175,14 +197,21 @@ function removeDocumentForm(event) {
     const formDiv = event.target.closest(SELECTORS.DOCUMENT_FORM_CLASS);
     if (!formDiv) return;
 
+    // TODO: Якщо на елементах форми був ініціалізований Tom Select, його потрібно знищити
+    // formDiv.querySelectorAll('select').forEach(select => {
+    //   if (select.tomselect) {
+    //     select.tomselect.destroy();
+    //   }
+    // });
+
     formDiv.remove();
 
-    // Оновлюємо TOTAL_FORMS
     const totalFormsInput = document.querySelector(SELECTORS.TOTAL_FORMS_INPUT);
     const formsAfterRemoval = document.querySelectorAll(SELECTORS.DOCUMENT_FORM_CLASS);
-    totalFormsInput.value = formsAfterRemoval.length;
+    if (totalFormsInput) {
+        totalFormsInput.value = formsAfterRemoval.length;
+    }
 
-    // Перенумеровуємо залишені форми
     formsAfterRemoval.forEach((form, index) => {
         updateFormElementAttributes(form, index);
     });
@@ -196,13 +225,13 @@ function removeDocumentForm(event) {
  */
 function updateDeleteButtonsVisibility() {
     const forms = document.querySelectorAll(SELECTORS.DOCUMENT_FORM_CLASS);
-    const deleteButtons = document.querySelectorAll(SELECTORS.REMOVE_FORM_BUTTON);
-
-    if (forms.length <= 1) {
-        deleteButtons.forEach((btn) => (btn.style.display = "none"));
-    } else {
-        deleteButtons.forEach((btn) => (btn.style.display = "block"));
-    }
+    // Оновлюємо для кожної форми окремо, оскільки кнопка видалення всередині форми
+    forms.forEach((form) => {
+        const deleteButton = form.querySelector(SELECTORS.REMOVE_FORM_BUTTON);
+        if (deleteButton) {
+            deleteButton.style.display = forms.length <= 1 ? "none" : "block";
+        }
+    });
 }
 
 /**
@@ -212,25 +241,23 @@ function setupDocumentFormsetLogic() {
     const addFormBtn = document.querySelector(SELECTORS.ADD_FORM_BUTTON);
     const formsetContainer = document.querySelector(SELECTORS.FORMSET_CONTAINER);
 
-    if (addFormBtn && formsetContainer) {
+    if (addFormBtn) {
+        // Ініціалізуємо, тільки якщо є кнопка додавання
         addFormBtn.addEventListener("click", addDocumentForm);
+    }
 
-        // Делегування подій для кнопок видалення форми та кнопок додавання ОІД
+    if (formsetContainer) {
+        // Делегування подій, якщо є контейнер
         formsetContainer.addEventListener("click", function (event) {
             if (event.target.closest(SELECTORS.REMOVE_FORM_BUTTON)) {
                 removeDocumentForm(event);
             }
-            if (event.target.closest(SELECTORS.ADD_OID_BUTTON)) {
-                openOidAside(event);
-            }
+            // Кнопка додавання ОІД тепер обробляється глобально, не тільки в формсеті
+            // if (event.target.closest(SELECTORS.ADD_OID_BUTTON)) {
+            //     openOidAside(event);
+            // }
         });
-
-        // Ініціалізація видимості кнопок видалення при завантаженні сторінки
-        updateDeleteButtonsVisibility();
-    } else if (addFormBtn) {
-        console.warn("Кнопка додавання форми знайдена, але контейнер формсету (id='formset') відсутній.");
-    } else if (formsetContainer) {
-        console.warn("Контейнер формсету знайдений, але кнопка додавання форми (id='add-form') відсутня.");
+        updateDeleteButtonsVisibility(); // Початкове налаштування видимості кнопок
     }
 }
 
@@ -245,8 +272,8 @@ let targetOidSelect = null; // Буде посилатися на select еле�
  * @param {Event} event - Подію кліку по кнопці додавання ОІД.
  */
 function openOidAside(event) {
-    const unitSelect = document.querySelector(SELECTORS.UNIT_SELECT);
-    const unitId = unitSelect ? unitSelect.value : null;
+    const unitSelectField = document.querySelector(SELECTORS.UNIT_SELECT); // Головний селект ВЧ на сторінці
+    const unitId = unitSelectField ? unitSelectField.value : null;
 
     if (!unitId) {
         alert("Будь ласка, спочатку оберіть військову частину.");
@@ -255,34 +282,58 @@ function openOidAside(event) {
 
     const aside = document.querySelector(SELECTORS.OID_ASIDE);
     const overlay = document.querySelector(SELECTORS.OVERLAY);
-    const unitSpan = document.querySelector(SELECTORS.INSERT_UNIT_SPAN);
+    const unitSpan = document.querySelector(SELECTORS.INSERT_UNIT_SPAN); // Span для назви ВЧ в aside
 
     if (!aside || !overlay || !unitSpan) {
-        console.error("Один або декілька необхідних елементів для OID Aside відсутні.");
+        console.error("Один або декілька необхідних елементів для OID Aside відсутні: OID_ASIDE, OVERLAY, INSERT_UNIT_SPAN.");
         return;
     }
 
-    // Знаходимо відповідний select для OID у поточній формі або основній формі
-    const formDiv = event.target.closest(SELECTORS.DOCUMENT_FORM_CLASS);
-    if (formDiv) {
-        // Якщо кнопка всередині формсету
-        targetOidSelect = formDiv.querySelector(`select[name$="${SELECTORS.OID_SELECT_NAME_SUFFIX}"]`);
+    const clickedButton = event.target.closest(SELECTORS.ADD_OID_BUTTON);
+    if (!clickedButton) return;
+
+    // Визначаємо цільовий select для ОІД
+    // Це може бути select поруч з кнопкою "Додати ОІД" або вказаний через data-атрибут
+    const targetSelectId = clickedButton.dataset.targetSelect; // Наприклад, data-target-select="#id_form-0-oid"
+    if (targetSelectId) {
+        targetOidSelect = document.querySelector(targetSelectId);
     } else {
-        // Якщо кнопка OID поза формсетом (у головній формі)
-        targetOidSelect = document.querySelector(`select[name="${SELECTORS.OID_SELECT_MAIN_NAME}"]`);
+        // Якщо data-атрибут не вказано, шукаємо найближчий select з типовим іменем
+        const formRow = clickedButton.closest(".form-row, .document-form, form"); // Шукаємо батьківський контейнер поля
+        if (formRow) {
+            targetOidSelect = formRow.querySelector(`select[name$="${SELECTORS.OID_SELECT_NAME_SUFFIX}"], select[name="${SELECTORS.OID_SELECT_MAIN_NAME}"]`);
+        }
     }
 
     if (!targetOidSelect) {
-        console.error("Не знайдено SELECT елемент для OID у формі, з якої було відкрито aside.");
+        console.error("Не знайдено SELECT елемент для OID, асоційований з кнопкою.");
+        // Можливо, варто пройтися по всіх select, що відповідають патерну, і якщо він один - використати його.
+        // Або зробити зв'язок кнопки та select більш явним, наприклад, через data-attributes.
         return;
     }
 
-    if (unitSelect.selectedIndex > -1) {
-        unitSpan.textContent = unitSelect.options[unitSelect.selectedIndex].text;
+    if (unitSelectField.selectedIndex > -1) {
+        unitSpan.textContent = unitSelectField.options[unitSelectField.selectedIndex].text;
+    } else {
+        unitSpan.textContent = "ВЧ не обрано";
+    }
+
+    // Передаємо ID основної ВЧ у приховане поле форми створення ОІД
+    const oidCreateForm = document.querySelector(SELECTORS.OID_CREATE_FORM);
+    if (oidCreateForm) {
+        let unitHiddenInput = oidCreateForm.querySelector('input[name="unit"]'); // Припускаємо, що поле називається 'unit'
+        if (!unitHiddenInput) {
+            unitHiddenInput = document.createElement("input");
+            unitHiddenInput.type = "hidden";
+            unitHiddenInput.name = "unit"; // Це поле має відповідати назві поля в OIDForm в Django
+            oidCreateForm.appendChild(unitHiddenInput);
+        }
+        unitHiddenInput.value = unitId;
     }
 
     aside.style.display = "block";
     overlay.style.display = "block";
+    document.body.classList.add("overflow-hidden"); // Заборонити прокрутку основної сторінки
 }
 
 /**
@@ -293,6 +344,7 @@ function closeOidAside() {
     const overlay = document.querySelector(SELECTORS.OVERLAY);
     if (aside) aside.style.display = "none";
     if (overlay) overlay.style.display = "none";
+    document.body.classList.remove("overflow-hidden");
     targetOidSelect = null; // Очищаємо посилання на select
 }
 
@@ -303,65 +355,105 @@ function closeOidAside() {
 async function handleOidCreateFormSubmit(event) {
     event.preventDefault();
 
-    const form = event.target;
+    const form = event.target; // Це #oid-create-form
     const formData = new FormData(form);
-    const unitSelect = document.querySelector(SELECTORS.UNIT_SELECT);
-    const unitId = unitSelect ? unitSelect.value : null;
 
-    if (!unitId) {
-        alert("Помилка: Не обрано військову частину для створення ОІД.");
-        return;
-    }
-    formData.append("unit_id", unitId);
+    // CSRF токен вже повинен бути в formData, якщо він є hidden input у формі
+    // const csrfToken = formData.get("csrfmiddlewaretoken"); // Або отримати його інакше, якщо потрібно
+
+    // unit_id вже додано до formData в openOidAside
+    // const unitSelect = document.querySelector(SELECTORS.UNIT_SELECT);
+    // const unitId = unitSelect ? unitSelect.value : null;
+    // if (!unitId) {
+    //     alert("Помилка: Не обрано військову частину для створення ОІД.");
+    //     return;
+    // }
+    // formData.append("unit_for_new_oid", unitId); // Ім'я поля згідно views.py ajax_create_oid_view
 
     try {
-        const response = await fetch("/oids/ajax/create/", {
-            // Переконайтеся, що це правильний URL
+        const response = await fetch(form.action, {
+            // Використовуємо action з HTML форми
             method: "POST",
             body: formData,
             headers: {
-                "X-CSRFToken": formData.get("csrfmiddlewaretoken"),
+                "X-CSRFToken": formData.get("csrfmiddlewaretoken"), // Переконайтеся, що CSRF токен присутній у формі
+                "X-Requested-With": "XMLHttpRequest", // Часто потрібно для Django AJAX
             },
         });
         const data = await response.json();
 
-        if (data.success) {
+        if (data.status === "success" && data.oid_id && data.oid_name) {
             alert("✅ ОІД успішно створено!");
             form.reset();
             closeOidAside();
 
-            // Оновлюємо Select2 поле у формі, з якої було відкрито aside
             if (targetOidSelect) {
-                const newOption = new Option(data.oid.name, data.oid.id, true, true);
-                if ($(targetOidSelect).data("select2")) {
-                    $(targetOidSelect).append(newOption).trigger("change");
+                const newOptionData = {
+                    value: data.oid_id,
+                    text: data.oid_name, // data.oid_name - це str(oid) з сервера
+                };
+
+                // Якщо Tom Select ініціалізований на targetOidSelect
+                if (targetOidSelect.tomselect) {
+                    targetOidSelect.tomselect.addOption(newOptionData);
+                    targetOidSelect.tomselect.addItem(data.oid_id);
+                    // targetOidSelect.tomselect.refreshOptions(false); // Може не знадобитися, якщо addOption оновлює кеш
                 } else {
-                    targetOidSelect.appendChild(newOption);
+                    // Стандартний select
+                    const optionElement = new Option(newOptionData.text, newOptionData.value, false, true); // selected = true
+                    targetOidSelect.appendChild(optionElement);
+                    targetOidSelect.value = newOptionData.value; // Встановлюємо значення
                 }
             }
 
-            // Додатково: Можливо, вам потрібно оновити інші Select2 поля OID на сторінці
-            // наприклад, якщо вони залежать від однієї і тієї ж військової частини
-            // (цей функціонал може вимагає додаткової логіки на бекенді для AJAX оновлення Select2)
-            document.querySelectorAll(`select[name$="${SELECTORS.OID_SELECT_NAME_SUFFIX}"], select[name="${SELECTORS.OID_SELECT_MAIN_NAME}"]`).forEach((selectElement) => {
-                if ($(selectElement).data("select2") && selectElement !== targetOidSelect) {
-                    // Якщо Select2 вже ініціалізовано, потрібно оновити його дані.
-                    // Це може бути зроблено через AJAX знову, або якщо Select2
-                    // вже підключений до AJAX-джерела, достатньо оновити його.
-                    // Це дуже специфічно для вашої конфігурації Select2.
-                    // Можливо, вам просто потрібно оновити всі select2, що пов'язані з OID,
-                    // якщо їхні дані залежать від `unitId`.
-                    // Якщо Select2 використовує AJAX, то він сам завантажить дані при пошуку,
-                    // тому можливо, нічого тут не потрібно робити, крім додавання нової опції.
-                }
-            });
+            // TODO: Оновлення інших select-ів OID на сторінці, якщо вони залежать від тієї ж ВЧ.
+            // Це може вимагати більш складної логіки або сповіщення інших компонентів про новий ОІД.
+            // Наприклад, можна пройтися по всіх select-ах для ОІД і, якщо вони не мають нового значення,
+            // викликати для них метод TomSelect для оновлення джерела даних (якщо вони завантажуються через AJAX)
+            // або просто додати нову опцію, якщо вони статичні.
+        } else if (data.errors) {
+            let errorMessages = "Помилка валідації:\n";
+            for (const field in data.errors) {
+                errorMessages += `${field}: ${data.errors[field].join(", ")}\n`;
+            }
+            alert("❌ " + errorMessages);
         } else {
-            alert("❌ Помилка:\n" + JSON.stringify(data.errors, null, 2));
+            alert("❌ Відбулася невідома помилка при створенні ОІД.");
         }
     } catch (err) {
-        console.error("❌ Помилка зв'язку з сервером:", err);
+        console.error("❌ Помилка зв'язку з сервером при створенні ОІД:", err);
         alert("⚠️ Помилка зв’язку з сервером. Перевірте консоль для деталей.");
     }
+}
+
+/**
+ * Ініціалізує логіку для бічного вікна створення ОІД.
+ */
+function setupOidAsideLogic() {
+    const aside = document.querySelector(SELECTORS.OID_ASIDE);
+    if (!aside) return;
+
+    const closeButton = aside.querySelector(SELECTORS.OID_ASIDE_CLOSE_BUTTON);
+    const overlay = document.querySelector(SELECTORS.OVERLAY);
+    const oidCreateForm = aside.querySelector(SELECTORS.OID_CREATE_FORM);
+
+    if (closeButton) {
+        closeButton.addEventListener("click", closeOidAside);
+    }
+    if (overlay) {
+        overlay.addEventListener("click", closeOidAside); // Закриття по кліку на оверлей
+    }
+    if (oidCreateForm) {
+        oidCreateForm.addEventListener("submit", handleOidCreateFormSubmit);
+    }
+
+    // Глобальний слухач для кнопок "Додати ОІД" (делегування подій)
+    // Це дозволяє кнопкам, доданим динамічно (наприклад, у формсетах), також працювати.
+    document.body.addEventListener("click", function (event) {
+        if (event.target.closest(SELECTORS.ADD_OID_BUTTON)) {
+            openOidAside(event);
+        }
+    });
 }
 
 // =====================================================================================================
@@ -369,32 +461,23 @@ async function handleOidCreateFormSubmit(event) {
 // =====================================================================================================
 
 document.addEventListener("DOMContentLoaded", function () {
-    // Запускаємо загальні функції, які потрібні на всіх сторінках
     disableFormsAutocomplete();
     setupThemeToggle();
     hideMessages();
+    setupDateRangeFilter();
 
-    // Запускаємо функції, які потребують наявності конкретних елементів
-    setupDateRangeFilter(); // Запуститься, якщо знайдуться поля дати
-
-    // Важливо: перевіряємо, чи є елементи формсету, перед тим як ініціалізувати логіку формсету.
-    // Якщо є контейнер формсету або кнопка додавання, тоді ініціалізуємо.
+    // Ініціалізація логіки формсету, якщо є відповідні елементи
     if (document.querySelector(SELECTORS.FORMSET_CONTAINER) || document.querySelector(SELECTORS.ADD_FORM_BUTTON)) {
         setupDocumentFormsetLogic();
     }
 
-    // Запускаємо логіку aside, якщо є елементи aside
-    if (document.querySelector(SELECTORS.OID_ASIDE)) {
-        setupOidAsideLogic();
-    }
-    // initSelect2Fields();
+    // Ініціалізація логіки aside для створення ОІД
+    setupOidAsideLogic(); // Ця функція тепер також налаштовує глобальний слухач для кнопок .add-oid-button
 
-    // Виклик для ініціалізації динамічних фільтрів
-    // initializeDynamicFilters();
-    // Примітки:
-    // -  викликається в `select2-init.js`, який підключений раніше.
-    // - Логіка Select2 для динамічного оновлення OID-ів при зміні UnitId повинна бути
-    //   в `select2-init.js` або викликатися звідти.
-    // - Якщо Select2 ініціалізується для динамічних полів, переконайтеся,
-    //   що ви перевикликаєте `initSelect2Fields` для нових форм у `addDocumentForm`.
+    // TODO: Тут буде місце для ініціалізації Tom Select для всіх потрібних полів <select>
+    // Наприклад:
+    // document.querySelectorAll('select.tomselect-field').forEach(selectEl => {
+    //   new TomSelect(selectEl, { /* options */ });
+    // });
+    // Або виклик більш специфічної функції, яка знаходить і налаштовує Tom Select.
 });
