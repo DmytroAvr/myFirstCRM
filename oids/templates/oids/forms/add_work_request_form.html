@@ -8,339 +8,579 @@
 <div class="container form-container">
     <h2 class="mb-4">{{ page_title|default:"Нова заявка на проведення робіт" }}</h2>
 
-    <form method="post" novalidate id="mainWorkRequestForm"> {# Додав ID формі #}
+    <form method="post" novalidate id="workRequestFormWithItems">
         {% csrf_token %}
 
-        {% if form.non_field_errors %}
-        <div class="alert alert-danger" role="alert">
-            {% for error in form.non_field_errors %}
-            <p>{{ error }}</p>
+        {# === Основна інформація про заявку (WorkRequestForm) === #}
+        <fieldset class="mb-4 p-3 border rounded">
+            <legend class="w-auto px-2 h5">Загальна інформація</legend>
+            {% if main_form.non_field_errors %}
+            <div class="alert alert-danger" role="alert">
+                {% for error in main_form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+            </div>
+            {% endif %}
+
+            {% for field in main_form %}
+            <div class="row mb-3 align-items-center">
+                <label for="{{ field.id_for_label }}" class="col-sm-3 col-form-label text-sm-end fw-bold">
+                    {{ field.label }}{% if field.field.required %}<span class="text-danger">*</span>{% endif %}:
+                </label>
+                <div class="col-sm-9">
+                    {{ field }}
+                    {% if field.help_text %}<small class="form-text text-muted d-block">{{ field.help_text }}</small>{% endif %}
+                    {% for error in field.errors %}
+                    <div class="alert alert-danger mt-1 p-1 py-0" role="alert" style="font-size: 0.9em;">{{ error }}</div>
+                    {% endfor %}
+                </div>
+            </div>
             {% endfor %}
-        </div>
-        {% endif %}
+        </fieldset>
 
-        <div class="table-like-form">
-            {# Поле Військова частина (Unit) #}
-            {% with field=form.unit %}
-            <div class="form-row mb-3">
-                <div class="form-group-label" style="font-weight: bold; padding-right: 10px; min-width: 250px; display: inline-block; vertical-align: top;">
-                    <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
-                    {% if field.field.required %}<span style="color: red;">*</span>{% endif %}
-                </div>
-                <div class="form-group-field" style="display: inline-block; width: calc(100% - 270px);">
-                    {{ field }} {# Віджет вже має клас 'form-select tomselect-field-defer' з форми #}
-                    {% if field.help_text %}<br><small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}
-                    {% for error in field.errors %}<div class="alert alert-danger mt-1 p-1" role="alert" style="font-size: 0.9em;">{{ error }}</div>{% endfor %}
-                </div>
-            </div>
-            {% endwith %}
-
-            {# Поле Вхідний номер заявки #}
-            {% with field=form.incoming_number %}
-             <div class="form-row mb-3">
-                <div class="form-group-label" style="font-weight: bold; padding-right: 10px; min-width: 250px; display: inline-block; vertical-align: top;">
-                    <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
-                    {% if field.field.required %}<span style="color: red;">*</span>{% endif %}
-                </div>
-                <div class="form-group-field" style="display: inline-block; width: calc(100% - 270px);">
-                    {{ field }}
-                    {% if field.help_text %}<br><small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}
-                    {% for error in field.errors %}<div class="alert alert-danger mt-1 p-1" role="alert" style="font-size: 0.9em;">{{ error }}</div>{% endfor %}
-                </div>
-            </div>
-            {% endwith %}
-
-            {# Поле Вхідна дата заявки #}
-            {% with field=form.incoming_date %}
-             <div class="form-row mb-3">
-                <div class="form-group-label" style="font-weight: bold; padding-right: 10px; min-width: 250px; display: inline-block; vertical-align: top;">
-                    <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
-                    {% if field.field.required %}<span style="color: red;">*</span>{% endif %}
-                </div>
-                <div class="form-group-field" style="display: inline-block; width: calc(100% - 270px);">
-                    {{ field }}
-                    {% if field.help_text %}<br><small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}
-                    {% for error in field.errors %}<div class="alert alert-danger mt-1 p-1" role="alert" style="font-size: 0.9em;">{{ error }}</div>{% endfor %}
-                </div>
-            </div>
-            {% endwith %}
+        {# === Елементи заявки (WorkRequestItemFormSet) === #}
+		<legend class="w-auto px-2 h5">ОІДи та роботи в заявці</legend>
+        <fieldset class="mb-4 p-3 border rounded">
+            {{ formset.management_form }} {# Дуже важливо для роботи формсетів! #}
             
-            {# Поле Запитуваний тип роботи #}
-            {% with field=form.request_work_type %}
-             <div class="form-row mb-3">
-                <div class="form-group-label" style="font-weight: bold; padding-right: 10px; min-width: 250px; display: inline-block; vertical-align: top;">
-                    <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
-                    {% if field.field.required %}<span style="color: red;">*</span>{% endif %}
-                </div>
-                <div class="form-group-field" style="display: inline-block; width: calc(100% - 270px);">
-                    {{ field }}
-                    {% if field.help_text %}<br><small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}
-                    {% for error in field.errors %}<div class="alert alert-danger mt-1 p-1" role="alert" style="font-size: 0.9em;">{{ error }}</div>{% endfor %}
-                </div>
+            {% if formset.non_form_errors %}
+            <div class="alert alert-danger" role="alert">
+                {% for error in formset.non_form_errors %}<p>{{ error }}</p>{% endfor %}
             </div>
-            {% endwith %}
+            {% endif %}
 
-            {# Поле ОІДи #}
-            {% with field=form.oids %}
-            <div class="form-row mb-3">
-                <div class="form-group-label" style="font-weight: bold; padding-right: 10px; min-width: 250px; display: inline-block; vertical-align: top;">
-                    <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
-                    {% if field.field.required %}<span style="color: red;">*</span>{% endif %}
-                </div>
-                <div class="form-group-field" style="display: inline-block; width: calc(100% - 270px);">
-                    {{ field }} {# Віджет вже має клас 'form-control tomselect-field-oids' з форми #}
-                    <button type="button" class="btn btn-sm btn-success ms-2" id="showCreateOidModalBtnForRequest">
-                        <i class="fas fa-plus"></i> Створити новий ОІД
-                    </button>
-                    {% if field.help_text %}<br><small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}
-                    {% for error in field.errors %}<div class="alert alert-danger mt-1 p-1" role="alert" style="font-size: 0.9em;">{{ error }}</div>{% endfor %}
-                </div>
-            </div>
-            {% endwith %}
+            <div id="work-request-items-container">
+                {% for item_form in formset.forms %}
+                <div class="work-request-item-form mb-3 p-2 border rounded" {% if forloop.first and not item_form.initial %}style="background-color: #f8f9fa;"{% endif %}>
+                    {% if item_form.non_field_errors %}
+                    <div class="alert alert-danger" role="alert">
+                        {% for error in item_form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+                    </div>
+                    {% endif %}
+                    
+                    <div class="row g-2">
+                        {% for hidden_field in item_form.hidden_fields %}{{ hidden_field }}{% endfor %}
+                        
+                        {% with field=item_form.oid %}
+                        <div class="col-md-5">
+                            <label for="{{ field.id_for_label }}" class="form-label visually-hidden">{{ field.label }}</label>
+                            {{ field }} {# віджет вже має клас 'form-select tomselect-oid-item' #}
+                            {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                        </div>
+                        {% endwith %}
 
-            {# Поле Примітки #}
-            {% with field=form.note %}
-            <div class="form-row mb-3">
-                <div class="form-group-label" style="font-weight: bold; padding-right: 10px; min-width: 250px; display: inline-block; vertical-align: top;">
-                    <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
-                    {% if field.field.required %}<span style="color: red;">*</span>{% endif %}
+                        {% with field=item_form.work_type %}
+                        <div class="col-md-4">
+                             <label for="{{ field.id_for_label }}" class="form-label visually-hidden">{{ field.label }}</label>
+                            {{ field }} {# віджет вже має клас 'form-select' #}
+                            {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                        </div>
+                        {% endwith %}
+                        
+                        <div class="col-md-2">
+                             {% if item_form.instance.pk or formset.forms|length > 1 and formset.can_delete %} 
+                                {% with field=item_form.DELETE %}
+                                <div class="form-check mt-3">
+                                    {{ field }}
+                                    <label for="{{ field.id_for_label }}" class="form-check-label">{{ field.label }}</label>
+                                </div>
+                                {% endwith %}
+                            {% endif %}
+                        </div>
+                        <div class="col-md-1">
+                             <button type="button" class="btn btn-sm btn-success add-oid-modal-per-row" title="Створити новий ОІД для цієї ВЧ">
+                                <i class="fas fa-plus"></i> +
+                            </button>
+                        </div>
+                    </div>
+                     {% if item_form.oid.help_text or item_form.work_type.help_text %}
+                        <small class="form-text text-muted d-block mt-1">
+                            {% if item_form.oid.help_text %} {{ item_form.oid.help_text }} {% endif %}
+                            {% if item_form.work_type.help_text %} {{ item_form.work_type.help_text }} {% endif %}
+                        </small>
+                    {% endif %}
                 </div>
-                <div class="form-group-field" style="display: inline-block; width: calc(100% - 270px);">
-                    {{ field }}
-                    {% if field.help_text %}<br><small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}
-                    {% for error in field.errors %}<div class="alert alert-danger mt-1 p-1" role="alert" style="font-size: 0.9em;">{{ error }}</div>{% endfor %}
-                </div>
+                {% endfor %}
             </div>
-            {% endwith %}
-        </div>
+            <button type="button" id="add-work-request-item" class="btn btn-outline-success btn-sm mt-2">
+                <i class="fas fa-plus"></i> Додати ще ОІД/роботу
+            </button>
+        </fieldset>
 
         <div class="form-actions mt-4">
             <button type="submit" class="btn btn-primary">Зберегти заявку</button>
-            <a href="{% url 'oids:list_work_requests' %}" class="btn btn-secondary">Скасувати</a> {# Або main_dashboard #}
+            <a href="{% url 'oids:list_work_requests' %}" class="btn btn-secondary">Скасувати</a>
         </div>
     </form>
+
+    {# Шаблон для нової форми формсету (буде використовуватися JavaScript) #}
+    <template id="work-request-item-empty-form-template">
+        {% spaceless %}
+        {% with item_form=formset.empty_form %}
+        <div class="work-request-item-form mb-3 p-2 border rounded" style="background-color: #f8f9fa;">
+            <div class="row g-2 ">
+                {% for hidden_field in item_form.hidden_fields %}{{ hidden_field }}{% endfor %}
+                {% with field=item_form.oid %}
+                <div class="col-md-5">
+                    <label for="{{ field.id_for_label }}" class="form-label visually-hidden">{{ field.label }}</label>
+                    {{ field }}
+                </div>
+                {% endwith %}
+                {% with field=item_form.work_type %}
+                <div class="col-md-4">
+                    <label for="{{ field.id_for_label }}" class="form-label visually-hidden">{{ field.label }}</label>
+                    {{ field }}
+                </div>
+                {% endwith %}
+                <div class="col-md-2 form-item-delete-button-container">
+                    {# Кнопка видалення з'явиться, якщо форм більше однієї #}
+					{# Сюди JavaScript додасть кнопку "Видалити" або поле DELETE #}
+                </div>			
+                <div class="col-md-1">
+                     <button type="button" class="btn btn-sm btn-success add-oid-modal-per-row" title="Створити новий ОІД для цієї ВЧ">
+                        <i class="fas fa-plus"></i> +
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endwith %}
+        {% endspaceless %}
+    </template>
 </div>
-
-{# Модальне вікно для створення ОІД вже є в base.html, ми будемо його використовувати #}
-
 {% endblock %}
 
-{% block extra_js %} {# Замінив page_specific_js на extra_js для відповідності base.html #}
+{# oids/templates/oids/forms/add_work_request_form.html #}
+{# ... (початок вашого шаблону) ... #}
+
+{% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    console.log('Work Request Form JS: DOMContentLoaded. V3 Debugging (Direct Fetch).');
+// JavaScript модуль для управління формсетом WorkRequestItem
+const WorkRequestItemFormsetManager = (function() {
+    // ... (початок вашого модуля WorkRequestItemFormsetManager, як і раніше) ...
+    let unitSelectElement;
+    let itemsContainer;
+    let addButton;
+    let emptyFormTemplateHtml;
+    let totalFormsInput;
+    let formsetPrefix;
+    let maxFormsCount;
+    let minFormsCount;
+    let canDeleteForms;
+    let currentSelectedUnitId = null;
+    let oidCreateModalInstance = null;
+    let targetOidSelectForModal = null;
 
-    const unitSelectElement = document.getElementById('{{ form.unit.id_for_label }}');
-    const oidsSelectElement = document.getElementById('{{ form.oids.id_for_label }}');
-    const showCreateOidModalButton = document.getElementById('showCreateOidModalBtnForRequest'); 
-    
-    const oidCreateModalElement = document.getElementById('createOidModal');
-    let oidCreateModalInstance = oidCreateModalElement ? new bootstrap.Modal(oidCreateModalElement) : null;
-    const modalSelectedUnitNameElement = document.getElementById('modalSelectedUnitName'); 
-    const modalHiddenUnitIdInput = document.getElementById('id_modal_hidden_unit_id'); 
+    const OID_SELECT_CLASS = 'tomselect-oid-item';
 
-    let tomSelectUnits = null;
-    let tomSelectOids = null;
-
-    if (typeof TomSelect === 'undefined') {
-        console.error('Work Request Form JS: TomSelect library is NOT loaded!');
-        return;
-    } else {
-        console.log('Work Request Form JS: TomSelect library is loaded.');
-    }
-
-    if (unitSelectElement && unitSelectElement.classList.contains('tomselect-field-defer')) {
-        tomSelectUnits = new TomSelect(unitSelectElement, {
+    function getTomSelectDefaultOptions(placeholderText = 'Оберіть...') {
+        return {
             create: false,
-            placeholder: 'Оберіть ВЧ...',
-            allowEmptyOption: true,
-        });
-        console.log('Work Request Form JS: TomSelect for Unit initialized.');
-    } else {
-        console.warn('Work Request Form JS: TomSelect for Unit NOT initialized.');
-    }
-
-    if (oidsSelectElement && oidsSelectElement.classList.contains('tomselect-field-oids')) {
-        tomSelectOids = new TomSelect(oidsSelectElement, {
-            create: false,
-            plugins: ['remove_button'],
-            placeholder: 'Спочатку оберіть ВЧ...',
+            placeholder: placeholderText,
             valueField: 'id',
             labelField: 'text',
             searchField: ['text'],
+            disabled: true,
             options: [],
-            disabled: !unitSelectElement?.value,
-        });
-        oidsSelectElement.tomselectInstance = tomSelectOids;
-        console.log('Work Request Form JS: TomSelect for OIDs initialized.');
-        if (!unitSelectElement || !unitSelectElement.value) {
-             if(tomSelectOids) tomSelectOids.disable();
-        }
-    } else {
-        console.warn('Work Request Form JS: TomSelect for OIDs NOT initialized.');
+            allowEmptyOption: true,
+        };
     }
 
-    if (unitSelectElement && tomSelectOids) {
-        console.log('Work Request Form JS: Attaching "change" listener to Unit select.');
-        unitSelectElement.addEventListener('change', function () {
-            const unitId = this.value;
-            console.log(`Work Request Form JS: Unit changed. Selected Unit ID: [${unitId}]`);
+    function initializeTomSelectForOid(selectElement, unitId) {
+        if (!selectElement || typeof TomSelect === 'undefined') {
+            console.warn("Formset JS: TomSelect library not loaded or selectElement missing for OID init.");
+            return null;
+        }
+        let placeholder = 'Спочатку оберіть ВЧ';
+        let isDisabled = true;
+        if (unitId) {
+            placeholder = 'Оберіть ОІД...';
+            isDisabled = false;
+        }
+        const config = getTomSelectDefaultOptions(placeholder);
+        config.disabled = isDisabled;
 
-            if (!tomSelectOids) {
-                console.error('Work Request Form JS: tomSelectOids is not initialized in unit change listener!');
-                return;
+        if (selectElement.tomselectInstance) {
+            console.log("Formset JS: Destroying existing TomSelect for OID:", selectElement.id);
+            selectElement.tomselectInstance.destroy();
+        }
+        const tomSelect = new TomSelect(selectElement, config);
+        selectElement.tomselectInstance = tomSelect;
+        console.log(`Formset JS: Initialized TomSelect for OID: [${selectElement.id}] for Unit ID: [${unitId || 'None'}]`);
+
+        if (unitId) {
+            loadOidOptions(tomSelect, unitId, selectElement.dataset.currentOidValue || null);
+        }
+        return tomSelect;
+    }
+
+    function loadOidOptions(tomSelectInstance, unitId, selectedOidValue = null) {
+        if (!tomSelectInstance || !unitId) {
+            if (tomSelectInstance) {
+                tomSelectInstance.clear(); tomSelectInstance.clearOptions();
+                tomSelectInstance.disable(); tomSelectInstance.placeholder = 'Спочатку оберіть ВЧ';
+                tomSelectInstance.sync();
             }
+            console.warn("Formset JS: loadOidOptions - No TomSelect instance or no Unit ID. Unit ID:", unitId);
+            return;
+        }
+        console.log(`Formset JS: (Direct Fetch) Loading OID options for TomSelect (ID: ${tomSelectInstance.input.id}), Unit ID: [${unitId}]`);
 
-            // Очищаємо TomSelect для ОІДів
-            tomSelectOids.clear();        // Очистити обрані значення
-            tomSelectOids.clearOptions(); // Очистити всі опції
-            tomSelectOids.sync();         // Синхронізувати стан
+        tomSelectInstance.enable();
+        tomSelectInstance.placeholder = 'Завантаження ОІДів...';
+        tomSelectInstance.clear(); tomSelectInstance.clearOptions(); tomSelectInstance.sync();
 
-            if (unitId) {
-                console.log('Work Request Form JS: Unit ID is present. Enabling OID select and starting fetch.');
-                tomSelectOids.enable();
-                tomSelectOids.placeholder = 'Завантаження ОІДів...';
-                
-                let ajaxUrl = window.AJAX_LOAD_OIDS_FOR_UNIT_URL;
-                if (!ajaxUrl) {
-                    ajaxUrl = "{% url 'oids:ajax_load_oids_for_unit' %}";
-                    console.log("Work Request Form JS: Using fallback Django URL for OIDs: [" + ajaxUrl + "]");
-                } else {
-                    console.log("Work Request Form JS: Using global URL for OIDs: [" + ajaxUrl + "]");
+        let ajaxUrl = window.AJAX_LOAD_OIDS_FOR_UNIT_URL || "{% url 'oids:ajax_load_oids_for_unit' %}";
+        console.log(`Formset JS: (Direct Fetch) FINAL ajaxUrl for fetch: [${ajaxUrl}], unit_id: [${unitId}]`);
+
+        if (!ajaxUrl || ajaxUrl.includes("None") || ajaxUrl.trim() === "" || ajaxUrl.trim() === "null" || ajaxUrl.startsWith('{')) {
+            console.error('Formset JS: AJAX URL for OIDs is invalid or not resolved:', ajaxUrl);
+            tomSelectInstance.placeholder = 'Помилка: Невірний URL';
+            return;
+        }
+
+        fetch(`${ajaxUrl}?unit_id=${unitId}`)
+            .then(response => {
+                console.log('Formset JS: (Direct Fetch) Fetch response status for OIDs:', response.status);
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(`Network error (OIDs): ${response.status} ${response.statusText}. Server: ${text}`);
+                    });
                 }
-                
-                if (!ajaxUrl || ajaxUrl.includes("None") || ajaxUrl.trim() === "" || ajaxUrl.trim() === "null") {
-                    console.error('Work Request Form JS: AJAX URL for OIDs is invalid or not resolved:', ajaxUrl);
-                    tomSelectOids.placeholder = 'Помилка: Невірний URL';
+                return response.json();
+            })
+            .then(data => {
+                console.log('Formset JS: (Direct Fetch) AJAX data received for OIDs:', data);
+                if (!Array.isArray(data)) {
+                    console.error('Formset JS: (Direct Fetch) Expected array from AJAX (OIDs), got:', typeof data, data);
+                    tomSelectInstance.placeholder = 'Помилка: невірний формат даних';
                     return;
                 }
+                const options = data.map(oid => ({
+                    id: oid.id.toString(),
+                    text: `${oid.cipher} (${oid.full_name || 'Без назви'})`
+                }));
+                console.log('Formset JS: (Direct Fetch) Mapped options for OID TomSelect:', options);
+                
+                tomSelectInstance.addOptions(options); // Додаємо опції
+                console.log(`Formset JS: (Direct Fetch) ${options.length} options ADDED to TomSelect [${tomSelectInstance.input.id}].`);
 
-                fetch(`${ajaxUrl}?unit_id=${unitId}`)
-                    .then(response => {
-                        console.log('Work Request Form JS: Fetch response status for OIDs:', response.status);
-                        if (!response.ok) {
-                            return response.text().then(text => {
-                                console.error('Work Request Form JS: Network error response text (OIDs):', text);
-                                throw new Error(`Network error (OIDs): ${response.status} ${response.statusText}. Server: ${text}`);
-                            });
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log('Work Request Form JS: AJAX data successfully received for OIDs:', data);
-                        if (!Array.isArray(data)) {
-                            console.error('Work Request Form JS: Expected array from AJAX (OIDs), got:', typeof data, data);
-                            tomSelectOids.placeholder = 'Помилка: невірний формат даних';
-                            return;
-                        }
-                        const options = data.map(oid => ({
-                            id: oid.id.toString(), 
-                            text: `${oid.cipher} (${oid.full_name || 'Без назви'})` 
-                        }));
-                        console.log('Work Request Form JS: Mapped options for OID TomSelect:', options);
-                        
-                        tomSelectOids.addOptions(options); // Додаємо нові опції
-                        // tomSelectOids.refreshOptions(false); // Можливо, не потрібно після addOptions
+                // Після додавання опцій, перевіримо, чи вони дійсно є в TomSelect
+                const currentTomSelectOptions = tomSelectInstance.options;
+                console.log(`Formset JS: (Direct Fetch) Options currently IN TomSelect [${tomSelectInstance.input.id}]:`, JSON.parse(JSON.stringify(currentTomSelectOptions)));
 
-                        tomSelectOids.placeholder = options.length > 0 ? 'Оберіть ОІД(и)...' : 'ОІДи для цієї ВЧ не знайдено';
-                    })
-                    .catch((error) => {
-                        console.error("Work Request Form JS: CATCH block - Error during AJAX load for OIDs:", error);
-                        tomSelectOids.placeholder = 'Помилка завантаження ОІДів';
-                    });
 
+                tomSelectInstance.placeholder = options.length > 0 ? 'Оберіть ОІД...' : 'ОІДи для цієї ВЧ не знайдено';
+                if (selectedOidValue) {
+                    console.log("Formset JS: (Direct Fetch) Attempting to restore OID selection:", selectedOidValue, "for TomSelect:", tomSelectInstance.input.id);
+                    tomSelectInstance.addItem(selectedOidValue.toString(), true); // true - silent
+                }
+                 tomSelectInstance.refreshOptions(false); // Примусове оновлення може допомогти
+                 tomSelectInstance.refreshItems();      // І оновлення обраних елементів
+            })
+            .catch((error) => {
+                console.error("Formset JS: (Direct Fetch) CATCH block - Error during AJAX load for OIDs:", error);
+                tomSelectInstance.placeholder = 'Помилка завантаження ОІДів';
+            });
+    }
+
+    function updateAllOidSelects(unitId) {
+        console.log("Formset JS: Updating all OID selects for Unit ID:", unitId);
+        currentSelectedUnitId = unitId;
+        const oidSelects = itemsContainer.querySelectorAll(`select.${OID_SELECT_CLASS}`);
+        oidSelects.forEach(select => {
+            const currentValue = select.tomselectInstance ? select.tomselectInstance.getValue() : select.dataset.currentOidValue;
+            // Переініціалізація може бути надмірною, спробуємо просто завантажити опції
+            if (select.tomselectInstance) {
+                 loadOidOptions(select.tomselectInstance, unitId, currentValue);
             } else {
-                console.log('Work Request Form JS: No Unit ID selected, disabling and clearing OID select.');
-                tomSelectOids.disable();
-                // tomSelectOids.clear(); // Вже зроблено на початку обробника
-                // tomSelectOids.clearOptions(); // Вже зроблено на початку обробника
-                // tomSelectOids.sync(); // Вже зроблено на початку обробника
-                tomSelectOids.placeholder = 'Спочатку оберіть ВЧ...';
+                initializeTomSelectForOid(select, unitId); // Якщо ще не було ініціалізовано
             }
         });
-        console.log('Work Request Form JS: "change" listener attached to Unit select.');
+    }
 
-        if (unitSelectElement.value) {
-            console.log('Work Request Form JS: Unit already selected on page load (value: ' + unitSelectElement.value + '), dispatching "change" event.');
-            unitSelectElement.dispatchEvent(new Event('change'));
-        } else {
-            console.log('Work Request Form JS: Unit not selected on page load. OID select remains disabled.');
-            if(tomSelectOids) tomSelectOids.disable();
+    function addForm() {
+        console.log("Formset JS: Add button clicked.");
+        const currentFormCount = itemsContainer.querySelectorAll('.work-request-item-form').length;
+        
+        if (maxFormsCount && currentFormCount >= maxFormsCount) {
+            alert(`Максимальна кількість елементів (${maxFormsCount}) вже досягнута.`);
+            return;
         }
-    } else {
-        console.warn('Work Request Form JS: Not attaching unit "change" listener. Check Unit select or OID TomSelect availability.');
+
+        const newFormHtml = emptyFormTemplateHtml.replace(/__prefix__/g, currentFormCount);
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = newFormHtml;
+        const newFormElement = tempDiv.firstElementChild;
+
+        itemsContainer.appendChild(newFormElement);
+        totalFormsInput.value = currentFormCount + 1;
+        console.log("Formset JS: New form added. Total forms now:", totalFormsInput.value);
+
+        const newOidSelect = newFormElement.querySelector(`select.${OID_SELECT_CLASS}`);
+        if (newOidSelect) {
+            initializeTomSelectForOid(newOidSelect, currentSelectedUnitId);
+        }
+        
+        addDeleteButtonIfNeeded(newFormElement, currentFormCount);
+        updateDeleteButtonsVisibility();
+
+        const newCreateOidBtn = newFormElement.querySelector('.add-oid-modal-per-row');
+        if (newCreateOidBtn) {
+            newCreateOidBtn.addEventListener('click', handleShowCreateOidModalForRow);
+        }
+    }
+    
+    function addDeleteButtonIfNeeded(formElement, formIndex) {
+        const deleteButtonContainer = formElement.querySelector('.form-item-delete-button-container');
+        if (!deleteButtonContainer) {
+            console.warn("Formset JS: Delete button container not found in form for index:", formIndex, formElement);
+            return;
+        }
+        deleteButtonContainer.innerHTML = ''; 
+        
+        const removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.classList.add('btn', 'btn-danger', 'btn-sm', 'remove-item-button'); // Додав mt-3 для відступу
+        removeButton.innerHTML = '<i class="fas fa-trash" aria-hidden="true"></i>видалити'; // Тільки іконка для компактності
+        removeButton.title = 'Видалити цей елемент';
+        deleteButtonContainer.appendChild(removeButton);
+        console.log("Formset JS: Added delete button to form index:", formIndex);
+
+        // Коректне формування імені для поля DELETE
+        const deleteInputName = `${formsetPrefix}-${formIndex}-DELETE`;
+        // console.log("Formset JS: Searching for DELETE input with name:", deleteInputName); // DEBUG
+        let deleteInput = formElement.querySelector(`input[name="${deleteInputName}"]`);
+        if (deleteInput) {
+            // console.log("Formset JS: Found DELETE input:", deleteInput); // DEBUG
+            deleteInput.style.display = 'none'; // Приховуємо стандартний чекбокс, якщо він рендериться Django
+        } else {
+            // console.log("Formset JS: DELETE input not found by Django, could be created if needed for new forms not yet saved.");
+        }
     }
 
-    // ... (решта вашого JS для модального вікна, як було) ...
-    // Обробник для кнопки "Створити новий ОІД"
-    if (showCreateOidModalButton && oidCreateModalInstance && unitSelectElement) {
-        showCreateOidModalButton.addEventListener('click', function () {
-            console.log('Work Request Form JS: "Create new OID" button clicked.');
-            const selectedUnitValue = unitSelectElement.value;
-            if (!selectedUnitValue) {
-                alert('Будь ласка, спочатку оберіть Військову частину.');
-                return;
-            }
-            // ... (решта логіки відкриття модалки)
-             const oidCreateFormElement = document.getElementById('ajaxOidCreateForm');
-            const oidCreateFormAlertsElement = document.getElementById('oidCreateFormAlertsBootstrap');
+    function removeForm(event) {
+        // ... (код функції removeForm, як був, але переконайтесь, що він правильно оновлює TOTAL_FORMS та індекси) ...
+        // Основна зміна в removeForm - це перенумерація після видалення НОВОЇ форми
+        const clickedButton = event.target.closest('.remove-item-button');
+        if (!clickedButton) return;
 
-            if (oidCreateFormElement) oidCreateFormElement.reset();
-            if (oidCreateFormAlertsElement) oidCreateFormAlertsElement.innerHTML = '';
+        console.log("Formset JS: Remove button clicked.");
+        const itemFormToRemove = clickedButton.closest('.work-request-item-form');
+        if (itemFormToRemove) {
+            const deleteInput = itemFormToRemove.querySelector('input[type="checkbox"][name$="-DELETE"]');
             
-            if (modalSelectedUnitNameElement) {
-                 const selectedUnitOption = unitSelectElement.options[unitSelectElement.selectedIndex];
-                 modalSelectedUnitNameElement.textContent = selectedUnitOption ? selectedUnitOption.text : 'не обрано';
-            }
-            if (modalHiddenUnitIdInput) { 
-                modalHiddenUnitIdInput.value = selectedUnitValue;
-            }
-            
-            if (oidCreateFormElement) {
-                oidCreateFormElement.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
-                oidCreateFormElement.querySelectorAll('.invalid-feedback[data-field-errors-bs]').forEach(el => el.textContent = '');
-            }
-            oidCreateModalInstance.show();
-        });
-    }
-    // Слухачі подій 'oid.created.success' та 'oid.created.error'
-    if (oidCreateModalElement && oidsSelectElement && oidsSelectElement.tomselectInstance) {
-        oidCreateModalElement.addEventListener('oid.created.success', function (event) {
-            const newOidData = event.detail; 
-            console.log('Work Request Form JS: "oid.created.success" event received:', newOidData);
-            const currentUnitId = unitSelectElement.value;
-            if (newOidData && newOidData.oid_id && newOidData.oid_name && newOidData.unit_id && newOidData.unit_id.toString() === currentUnitId) {
-                const tsOids = oidsSelectElement.tomselectInstance;
-                tsOids.addOption({ 
-                    id: newOidData.oid_id.toString(),
-                    text: newOidData.oid_name 
-                });
-                tsOids.addItem(newOidData.oid_id.toString());
-                console.log('Work Request Form JS: New OID added and selected.');
-                 if (oidCreateModalInstance) oidCreateModalInstance.hide();
+            if (deleteInput && itemFormToRemove.dataset.isSaved === 'true') {
+                console.log("Formset JS: Marking existing form for deletion.");
+                deleteInput.checked = true;
+                itemFormToRemove.style.display = 'none'; // Приховуємо форму
             } else {
-                 console.warn('Work Request Form JS: New OID does not belong to current unit or data invalid. Event detail:', newOidData, 'Current unit:', currentUnitId);
-                 if (oidCreateModalInstance) oidCreateModalInstance.hide(); // Все одно закрити модалку
+                console.log("Formset JS: Removing new/unsaved form from DOM.");
+                const oidSelect = itemFormToRemove.querySelector(`select.${OID_SELECT_CLASS}`);
+                if (oidSelect && oidSelect.tomselectInstance) {
+                    console.log("Formset JS: Destroying TomSelect for OID in removed form:", oidSelect.id);
+                    oidSelect.tomselectInstance.destroy();
+                }
+                itemFormToRemove.remove();
+                
+                // Перенумерувати форми та оновити TOTAL_FORMS
+                let currentVisibleFormIndex = 0;
+                itemsContainer.querySelectorAll('.work-request-item-form').forEach((form) => {
+                    // Оновлюємо тільки ті форми, які ще не позначені на видалення (не мають deleteInput.checked)
+                    // або ті, які не мають deleteInput (нові, ще не збережені)
+                    const currentDeleteInput = form.querySelector('input[type="checkbox"][name$="-DELETE"]');
+                    if (!currentDeleteInput || !currentDeleteInput.checked) {
+                        const oldPrefixPattern = new RegExp(`${formsetPrefix}-\\d+`, 'g');
+                        const newPrefix = `${formsetPrefix}-${currentVisibleFormIndex}`;
+                        
+                        form.querySelectorAll('input, select, textarea, label').forEach(el => {
+                            ['name', 'id', 'for'].forEach(attr => {
+                                const currentAttrVal = el.getAttribute(attr);
+                                if (currentAttrVal && currentAttrVal.includes(`${formsetPrefix}-`)) {
+                                    el.setAttribute(attr, currentAttrVal.replace(oldPrefixPattern, newPrefix));
+                                }
+                            });
+                         });
+                        currentVisibleFormIndex++;
+                    }
+                });
+                totalFormsInput.value = currentVisibleFormIndex; // Кількість НЕ видалених форм
+                console.log("Formset JS: TOTAL_FORMS updated after DOM removal to:", totalFormsInput.value);
+            }
+            updateDeleteButtonsVisibility();
+        }
+    }
+    
+    function updateDeleteButtonsVisibility() {
+        const visibleForms = Array.from(itemsContainer.querySelectorAll('.work-request-item-form'))
+                                 .filter(form => {
+                                     const deleteInput = form.querySelector('input[type="checkbox"][name$="-DELETE"]');
+                                     return !deleteInput || !deleteInput.checked; // Видимі, якщо не позначені на видалення
+                                 });
+        console.log("Formset JS: Updating delete buttons. Visible forms:", visibleForms.length, "Min forms:", minFormsCount);
+        
+        visibleForms.forEach((form) => {
+            const deleteButton = form.querySelector('.remove-item-button');
+            if (deleteButton) {
+                if (visibleForms.length > minFormsCount) {
+                    deleteButton.style.display = 'inline-block';
+                } else {
+                    deleteButton.style.display = 'none';
+                }
             }
         });
-        oidCreateModalElement.addEventListener('oid.created.error', function(event) {
-             console.log('Work Request Form JS: "oid.created.error" event received:', event.detail.errors);
-            // ... (код обробки помилки) ...
-        });
+         // Додатково, якщо є форми, позначені на видалення, але minFormsCount вимагає їх наявності,
+         // то кнопка видалення на останній видимій формі теж має бути прихована.
+         // Це складніший сценарій, поки що зосередимось на базовій логіці.
+    }
+    
+    function handleShowCreateOidModalForRow(event) {
+        // ... (код функції, як був, але перевірте targetOidSelectForModal) ...
+        const button = event.target.closest('.add-oid-modal-per-row');
+        const itemFormElement = button.closest('.work-request-item-form');
+        const oidSelectInRow = itemFormElement.querySelector(`select.${OID_SELECT_CLASS}`);
+        targetOidSelectForModal = oidSelectInRow ? oidSelectInRow.tomselectInstance : null; // МАЄ БУТИ ЕКЗЕМПЛЯР TOMSELECT
+        
+        console.log("Formset JS: Opening OID creation modal for a specific row. Target TomSelect INSTANCE:", targetOidSelectForModal ? "Found" : "NOT Found", "Target select element ID was:", oidSelectInRow ? oidSelectInRow.id : "N/A");
+
+        const selectedUnitValue = unitSelectElement.value;
+        if (!selectedUnitValue) {
+            alert('Будь ласка, спочатку оберіть Військову частину в основній формі.');
+            return;
+        }
+        
+        const oidCreateModalElem = document.getElementById('createOidModal');
+        if (!oidCreateModalElem) return;
+        const modalInstanceToUse = bootstrap.Modal.getInstance(oidCreateModalElem) || new bootstrap.Modal(oidCreateModalElem);
+        
+        const oidCreateFormElem = document.getElementById('ajaxOidCreateForm');
+        if (oidCreateFormElem) oidCreateFormElem.reset();
+        document.getElementById('oidCreateFormAlertsBootstrap').innerHTML = '';
+        document.getElementById('modalSelectedUnitName').textContent = unitSelectElement.options[unitSelectElement.selectedIndex]?.text || 'не обрано';
+        document.getElementById('id_modal_hidden_unit_id').value = selectedUnitValue;
+        
+        if (oidCreateFormElem){
+            oidCreateFormElem.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+            oidCreateFormElem.querySelectorAll('.invalid-feedback[data-field-errors-bs]').forEach(el => el.textContent = '');
+        }
+        modalInstanceToUse.show();
     }
 
+    function init() {
+        // ... (код init, як був, але переконайтесь, що minFormsCount та canDeleteForms встановлюються правильно) ...
+        console.log("Formset JS: Initializing WorkRequestItemFormsetManager.");
+        unitSelectElement = document.getElementById('{{ main_form.unit.id_for_label }}');
+        itemsContainer = document.getElementById('work-request-items-container');
+        addButton = document.getElementById('add-work-request-item');
+        const templateElement = document.getElementById('work-request-item-empty-form-template');
+        
+        if (!itemsContainer || !addButton || !templateElement || !unitSelectElement) {
+            console.warn("Formset JS: Required elements for formset management not found.");
+            return;
+        }
+        emptyFormTemplateHtml = templateElement.innerHTML;
+        
+        formsetPrefix = '{{ formset.prefix }}'; // 'items'
+        totalFormsInput = document.getElementById(`id_${formsetPrefix}-TOTAL_FORMS`);
+        const minFormsInputElement = document.getElementById(`id_${formsetPrefix}-MIN_NUM_FORMS`);
+        const maxFormsInputElement = document.getElementById(`id_${formsetPrefix}-MAX_NUM_FORMS`);
+        
+        minFormsCount = minFormsInputElement ? parseInt(minFormsInputElement.value) : 0;
+        maxFormsCount = maxFormsInputElement ? parseInt(maxFormsInputElement.value) : 1000; 
+        canDeleteForms = "{{ formset.can_delete|yesno:'true,false' }}" === 'true';
+
+        console.log(`Formset JS: Prefix: [${formsetPrefix}], TOTAL_FORMS_INPUT:`, totalFormsInput, `MIN_NUM: [${minFormsCount}], MAX_NUM: [${maxFormsCount}], CAN_DELETE: [${canDeleteForms}]`);
+        if (!totalFormsInput) {
+            console.error("Formset JS: TOTAL_FORMS input not found!");
+            return;
+        }
+
+        itemsContainer.querySelectorAll('.work-request-item-form').forEach((form, index) => {
+            const oidSelect = form.querySelector(`select.${OID_SELECT_CLASS}`);
+            if (oidSelect) {
+                oidSelect.dataset.currentOidValue = oidSelect.value;
+                initializeTomSelectForOid(oidSelect, unitSelectElement.value);
+            }
+            const createOidBtn = form.querySelector('.add-oid-modal-per-row');
+            if (createOidBtn) {
+                createOidBtn.addEventListener('click', handleShowCreateOidModalForRow);
+            }
+            if (form.querySelector(`input[name$="-id"][value]`)) {
+                form.dataset.isSaved = 'true';
+            }
+            addDeleteButtonIfNeeded(form, index);
+        });
+
+        addButton.addEventListener('click', addForm);
+        itemsContainer.addEventListener('click', removeForm); 
+        
+        if (unitSelectElement) {
+            currentSelectedUnitId = unitSelectElement.value;
+            unitSelectElement.addEventListener('change', function() {
+                updateAllOidSelects(this.value);
+            });
+            if (currentSelectedUnitId) {
+                updateAllOidSelects(currentSelectedUnitId);
+            }
+        }
+        updateDeleteButtonsVisibility();
+
+        // Слухачі на події модального вікна
+        const oidCreateModalElem = document.getElementById('createOidModal');
+        if (oidCreateModalElem) {
+            oidCreateModalElem.addEventListener('oid.created.success', function (event) {
+                const newOidData = event.detail;
+                console.log("Formset JS: Global 'oid.created.success' received by formset manager. Target:", targetOidSelectForModal, "Data:", newOidData);
+                if (targetOidSelectForModal && newOidData && newOidData.oid_id && newOidData.oid_name && newOidData.unit_id) {
+                    if (newOidData.unit_id.toString() === currentSelectedUnitId) {
+                        targetOidSelectForModal.addOption({ 
+                            id: newOidData.oid_id.toString(),
+                            text: newOidData.oid_name 
+                        });
+                        targetOidSelectForModal.addItem(newOidData.oid_id.toString());
+                        console.log("Formset JS: New OID added to target TomSelect (from modal event).");
+                    } else {
+                         console.warn("Formset JS: Created OID's unit via modal does not match current main form unit.");
+                    }
+                    const modalToHide = bootstrap.Modal.getInstance(oidCreateModalElem);
+                    if (modalToHide) modalToHide.hide();
+                    targetOidSelectForModal = null; 
+                } else {
+                     console.warn("Formset JS: 'oid.created.success' received by formset, but target/data incomplete. Target:", targetOidSelectForModal, "Data:", newOidData);
+                }
+            });
+             oidCreateModalElem.addEventListener('oid.created.error', function(event) {
+                console.error("Formset JS: Global 'oid.created.error' event from modal:", event.detail.errors);
+             });
+        }
+    } // Кінець init
+
+    return {
+        init: init
+    };
+})(); // Кінець WorkRequestItemFormsetManager
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("Add Work Request Form JS: DOMContentLoaded - Starting initializations. V3");
+    const mainUnitSelect = document.getElementById('{{ main_form.unit.id_for_label }}');
+    if (mainUnitSelect && mainUnitSelect.classList.contains('tomselect-main-unit') && typeof TomSelect !== 'undefined') {
+        new TomSelect(mainUnitSelect, {
+            create: false, placeholder: 'Оберіть ВЧ...', allowEmptyOption: true,
+        });
+        console.log("Add Work Request Form JS: TomSelect for main Unit initialized.");
+    } else {
+        console.warn("Add Work Request Form JS: TomSelect for main Unit NOT initialized.");
+    }
+    
+    WorkRequestItemFormsetManager.init(); // Запускаємо менеджер формсету
 
     if (typeof window.AJAX_LOAD_OIDS_FOR_UNIT_URL === 'undefined') {
         let djangoUrl = "{% url 'oids:ajax_load_oids_for_unit' %}";
-        if (djangoUrl && !djangoUrl.includes("None") && djangoUrl.trim() !== "") {
+        if (djangoUrl && !djangoUrl.includes("None") && djangoUrl.trim() !== "" && !djangoUrl.startsWith('{')) {
             window.AJAX_LOAD_OIDS_FOR_UNIT_URL = djangoUrl;
-            console.log("Work Request Form JS: AJAX_LOAD_OIDS_FOR_UNIT_URL set by fallback to: [" + window.AJAX_LOAD_OIDS_FOR_UNIT_URL + "]");
         } else {
-            console.error("Work Request Form JS: Fallback Django URL for AJAX_LOAD_OIDS_FOR_UNIT_URL is invalid!");
+            console.error("Add Work Request Form JS: Fallback Django URL for AJAX_LOAD_OIDS_FOR_UNIT_URL is invalid! Value: " + djangoUrl);
         }
-    } else {
-        console.log("Work Request Form JS: AJAX_LOAD_OIDS_FOR_UNIT_URL is globally defined: [" + window.AJAX_LOAD_OIDS_FOR_UNIT_URL + "]");
     }
+    console.log("Add Work Request Form JS: AJAX_LOAD_OIDS_FOR_UNIT_URL is:", window.AJAX_LOAD_OIDS_FOR_UNIT_URL);
 });
 </script>
+
 {% endblock %}

@@ -1,6 +1,7 @@
 # C:\myFirstCRM\oids\forms.py
 
 from django import forms
+from django.forms import inlineformset_factory
 from .models import (
     WorkRequest, WorkRequestItem, OID, Unit, Person, Trip, Document, DocumentType,
     WorkRequestStatusChoices, WorkTypeChoices, OIDTypeChoices, OIDStatusChoices, 
@@ -13,27 +14,16 @@ class WorkRequestForm(forms.ModelForm):
     unit = forms.ModelChoiceField(
         queryset=Unit.objects.all().order_by('code'),
         label="Військова частина",
-        widget=forms.Select(attrs={'class': 'form-select tomselect-field-defer'}) # Клас для TomSelect
+        # Додаємо клас для ініціалізації TomSelect, якщо потрібно для цього поля
+        widget=forms.Select(attrs={'class': 'form-select tomselect-main-unit'}) 
     )
-    # Поле для вибору ОІДів. Будемо покращувати за допомогою Tom Select.
-    # Важливо: queryset тут може бути порожнім або містити всі ОІДи, 
-    # оскільки реальне наповнення буде динамічним (залежно від обраної ВЧ).
-    oids = forms.ModelMultipleChoiceField(
-        queryset=OID.objects.none(), # Початково порожній, заповнюється JS
-        label="Оберіть ОІД (будуть відфільтровані після вибору ВЧ)",
-        widget=forms.SelectMultiple(attrs={'class': 'form-control tomselect-field-oids', 'size': '10'}), # Клас для TomSelect
-        required=True # Або False, якщо заявка може бути без ОІДів на початку
-    )
-    # Поле для вибору типу робіт, яке буде застосовано до всіх обраних ОІДів
-    request_work_type = forms.ChoiceField(
-        choices=WorkTypeChoices.choices,
-        label="Запитуваний тип роботи для обраних ОІД",
-        widget=forms.Select(attrs={'class': 'form-select'})
-    )
+    # Поля 'oids' та 'request_work_type' видалені звідси,
+    # оскільки вони тепер будуть у формсеті WorkRequestItemForm
 
     class Meta:
         model = WorkRequest
-        fields = ['unit', 'incoming_number', 'incoming_date', 'request_work_type', 'oids', 'note']
+        # 'oids' та 'request_work_type' видалені зі списку полів
+        fields = ['unit', 'incoming_number', 'incoming_date', 'note'] 
         widgets = {
             'incoming_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'incoming_number': forms.TextInput(attrs={'class': 'form-control'}),
@@ -43,62 +33,66 @@ class WorkRequestForm(forms.ModelForm):
             'unit': 'Військова частина',
             'incoming_number': 'Вхідний обліковий номер заявки',
             'incoming_date': 'Вхідна дата заявки',
-            'note': 'Примітки до заявки',
+            'note': 'Примітки до заявки (загальні)',
         }
 
+    # Метод save() тепер не створює WorkRequestItem, це буде робити view через формсет
+    # def save(self, commit=True):
+    #     instance = super().save(commit=commit)
+    #     # ... логіка створення WorkRequestItem видалена ...
+    #     return instance
+
+class WorkRequestItemForm(forms.ModelForm):
+    oid = forms.ModelChoiceField(
+        queryset=OID.objects.none(), # Початково порожній, заповнюється/фільтрується JS
+        label="ОІД",
+        widget=forms.Select(attrs={'class': 'form-select tomselect-oid-item'}), # Клас для TomSelect у формсеті
+        required=True
+    )
+    work_type = forms.ChoiceField(
+        choices=WorkTypeChoices.choices,
+        label="Тип робіт для ОІД",
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        required=True
+    )
+    # Можна додати поле status, якщо його потрібно встановлювати вручну для кожного елемента
+    # status = forms.ChoiceField(choices=WorkRequestStatusChoices.choices, ...)
+
+    class Meta:
+        model = WorkRequestItem
+        fields = ['oid', 'work_type'] # Додайте 'status', якщо потрібно
+        # widgets = {
+        #     'oid': forms.Select(attrs={'class': 'form-select tomselect-oid-item'}),
+        #     'work_type': forms.Select(attrs={'class': 'form-select'}),
+        # }
+
     def __init__(self, *args, **kwargs):
+        # Отримуємо екземпляр WorkRequest (батьківської заявки), якщо він є
+        # Це може бути передано через form_kwargs у view при створенні формсету
+        self.parent_instance_unit = kwargs.pop('parent_instance_unit', None)
         super().__init__(*args, **kwargs)
-        # Якщо форма редагується і вже є обрана ВЧ, можна одразу завантажити ОІДи для неї.
-        # Але для нової форми це краще робити через JS.
-        if self.instance and self.instance.unit_id:
-             self.fields['oids'].queryset = OID.objects.filter(unit=self.instance.unit).order_by('cipher')
+
+        if self.parent_instance_unit:
+            self.fields['oid'].queryset = OID.objects.filter(unit=self.parent_instance_unit).order_by('cipher')
         else:
-            # Якщо є початкове значення для unit (наприклад, з GET-параметра)
-            initial_unit = self.initial.get('unit')
-            if initial_unit:
-                try:
-                    unit_instance = Unit.objects.get(pk=initial_unit)
-                    self.fields['oids'].queryset = OID.objects.filter(unit=unit_instance).order_by('cipher')
-                except Unit.DoesNotExist:
-                    self.fields['oids'].queryset = OID.objects.none() # Або всі, якщо ВЧ не знайдено
-            else:
-                 self.fields['oids'].queryset = OID.objects.none() # Для нової форми без обраної ВЧ
+            # Якщо ВЧ ще не відома (наприклад, при першому завантаженні пустої форми),
+            # queryset залишається порожнім. JS оновить опції.
+            self.fields['oid'].queryset = OID.objects.none()
 
-    def save(self, commit=True):
-        instance = super().save(commit=False)
-        
-        # Логіка збереження самої заявки (WorkRequest)
-        if commit:
-            instance.save() # Спочатку зберігаємо WorkRequest, щоб отримати її ID
 
-            # Тепер створюємо WorkRequestItem для кожного обраного ОІД
-            # Ця логіка тепер централізована тут.
-            selected_oids = self.cleaned_data.get('oids')
-            selected_work_type = self.cleaned_data.get('request_work_type')
-            
-            if selected_oids and selected_work_type:
-                # Видаляємо старі елементи, якщо це редагування і склад OID змінився (опційно, залежить від логіки)
-                # instance.items.all().delete() 
-                
-                items_to_create = []
-                for oid in selected_oids:
-                    # Перевіряємо, чи такий елемент вже існує, щоб уникнути дублів (якщо потрібно)
-                    # if not WorkRequestItem.objects.filter(request=instance, oid=oid, work_type=selected_work_type).exists():
-                    items_to_create.append(
-                        WorkRequestItem(
-                            request=instance,
-                            oid=oid,
-                            work_type=selected_work_type,
-                            status=WorkRequestStatusChoices.PENDING # Початковий статус для нового елемента
-                        )
-                    )
-                if items_to_create:
-                    WorkRequestItem.objects.bulk_create(items_to_create)
-            
-            # Збереження m2m даних форми, якщо вони є (в нашому випадку oids обробляються через WorkRequestItem)
-            # self.save_m2m() 
-            
-        return instance
+# Створюємо формсет для WorkRequestItem
+# extra=1 означає, що за замовчуванням буде одна порожня форма для додавання
+# can_delete=True додасть чекбокс для видалення існуючих елементів (при редагуванні)
+WorkRequestItemFormSet = inlineformset_factory(
+    WorkRequest,
+    WorkRequestItem,
+    form=WorkRequestItemForm,
+    extra=1,
+    can_delete=True,
+    # min_num=1, # Якщо потрібно хоча б один елемент
+    # validate_min=True,
+    # fk_name=None # Django зазвичай сам знаходить ForeignKey
+)
 
 class TripForm(forms.ModelForm):
     # Використовуємо ModelMultipleChoiceField для ManyToMany зв'язків,

@@ -13,7 +13,7 @@ from .models import (
     
     OIDTypeChoices, OIDStatusChoices, SecLevelChoices, WorkRequestStatusChoices, WorkTypeChoices, DocumentReviewResultChoices
 )
-from .forms import ( TripForm, DocumentForm, WorkRequestForm, OIDForm
+from .forms import ( TripForm, DocumentForm, WorkRequestForm, WorkRequestItemFormSet, OIDForm
 )
 
 # Твоя допоміжна функція (залишається без змін, але буде викликатися в AJAX view)
@@ -341,38 +341,73 @@ def add_document_processing_view(request, oid_id=None, work_request_item_id=None
     })
 
 def add_work_request_view(request):
-    # Можна передати початкове значення для ВЧ, якщо воно є в GET-запиті
-    initial_data = {}
+    # Отримуємо екземпляр Unit, якщо ID передано в GET-запиті
+    unit_instance = None
     unit_id_from_get = request.GET.get('unit')
     if unit_id_from_get:
-        initial_data['unit'] = unit_id_from_get
+        try:
+            unit_instance = Unit.objects.get(pk=unit_id_from_get)
+        except Unit.DoesNotExist:
+            messages.error(request, "Обрану військову частину не знайдено.")
+            # Можна перенаправити або показати помилку
+
+    initial_main_form = {}
+    if unit_instance:
+        initial_main_form['unit'] = unit_instance
 
     if request.method == 'POST':
-        form = WorkRequestForm(request.POST)
-        if form.is_valid():
-            form.save() # Метод save форми тепер сам створює WorkRequestItems
-            messages.success(request, f'Заявку №{form.instance.incoming_number} успішно створено!')
-            return redirect('oids:list_work_requests') # Або на сторінку деталей заявки, або main_dashboard
+        main_form = WorkRequestForm(request.POST, request.FILES, prefix='main') # Додаємо префікс для основної форми
+        # Передаємо екземпляр unit у form_kwargs для кожної форми у формсеті
+        selected_unit_id = request.POST.get('main-unit') # Зверніть увагу на префікс 'main-'
+        parent_unit_for_formset = None
+        if selected_unit_id:
+            try:
+                parent_unit_for_formset = Unit.objects.get(pk=selected_unit_id)
+            except Unit.DoesNotExist:
+                pass # Помилка буде оброблена валідацією форми 'main_form'
+        
+        formset = WorkRequestItemFormSet(
+            request.POST, 
+            request.FILES, 
+            prefix='items', # Префікс для формсету
+            form_kwargs={'parent_instance_unit': parent_unit_for_formset} # Передаємо ВЧ у кожну форму формсету
+        )
+
+        if main_form.is_valid() and formset.is_valid():
+            work_request_instance = main_form.save() # Зберігаємо основну заявку
+            
+            formset.instance = work_request_instance # Прив'язуємо формсет до збереженої заявки
+            formset.save() # Зберігаємо елементи заявки (WorkRequestItem)
+
+            messages.success(request, f'Заявку №{work_request_instance.incoming_number} успішно створено!')
+            return redirect('oids:list_work_requests') # Або куди вам потрібно
         else:
             messages.error(request, 'Будь ласка, виправте помилки у формі.')
+            # Якщо помилки, виводимо форми з помилками
     else:
-        form = WorkRequestForm(initial=initial_data)
+        main_form = WorkRequestForm(initial=initial_main_form, prefix='main')
+        formset = WorkRequestItemFormSet(prefix='items', form_kwargs={'parent_instance_unit': unit_instance})
 
-    # Передаємо choices для OIDType та OIDStatus, якщо вони потрібні для модального вікна створення OID
-    # (якщо модалка рендериться на цій сторінці, а не в base.html)
-    # context_data = {
-    #     'view': { # Щоб імітувати доступ як у base.html, якщо потрібно
+    # Для модального вікна створення ОІД (якщо воно використовується з цієї сторінки)
+    # Переконайтеся, що ці choices доступні у base.html або передаються туди
+    # з кожного view, де може бути викликана модалка.
+    # from .models import OIDTypeChoices, OIDStatusChoices, SecLevelChoices (якщо потрібно тут)
+    # context_modal_choices = {
+    #     'view_choices': { 
     #         'get_oid_type_choices': OIDTypeChoices.choices,
     #         'get_oid_status_choices': OIDStatusChoices.choices,
     #         'get_sec_level_choices': SecLevelChoices.choices,
     #     }
     # }
 
-    return render(request, 'oids/forms/add_work_request_form.html', {
-        'form': form,
+    context = {
+        'main_form': main_form,
+        'formset': formset,
         'page_title': 'Створення нової заявки на проведення робіт',
-        # **context_data # Якщо передаєте choices
-    })
+        'selected_unit_instance': unit_instance, # Для JS, щоб знати поточну ВЧ
+        # **context_modal_choices
+    }
+    return render(request, 'oids/forms/add_work_request_form.html', context)
 
 # list info 
 
