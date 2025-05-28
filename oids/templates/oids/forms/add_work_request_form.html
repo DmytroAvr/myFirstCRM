@@ -1,189 +1,346 @@
-{# oids/templates/oids/forms/add_work_request_form.html #} {# ... (початок вашого шаблону до блоку extra_js) ... #} {% block extra_js %}
+{# oids/templates/oids/forms/add_work_request_form.html #}
+{% extends "oids/base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title|default:"Додати заявку на проведення робіт" }}{% endblock %}
+
+{% block content %}
+<div class="container form-container">
+    <h2 class="mb-4">{{ page_title|default:"Нова заявка на проведення робіт" }}</h2>
+
+    <form method="post" novalidate id="mainWorkRequestForm"> {# Додав ID формі #}
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger" role="alert">
+            {% for error in form.non_field_errors %}
+            <p>{{ error }}</p>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="table-like-form">
+            {# Поле Військова частина (Unit) #}
+            {% with field=form.unit %}
+            <div class="form-row mb-3">
+                <div class="form-group-label" style="font-weight: bold; padding-right: 10px; min-width: 250px; display: inline-block; vertical-align: top;">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
+                    {% if field.field.required %}<span style="color: red;">*</span>{% endif %}
+                </div>
+                <div class="form-group-field" style="display: inline-block; width: calc(100% - 270px);">
+                    {{ field }} {# Віджет вже має клас 'form-select tomselect-field-defer' з форми #}
+                    {% if field.help_text %}<br><small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}
+                    {% for error in field.errors %}<div class="alert alert-danger mt-1 p-1" role="alert" style="font-size: 0.9em;">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+            {% endwith %}
+
+            {# Поле Вхідний номер заявки #}
+            {% with field=form.incoming_number %}
+             <div class="form-row mb-3">
+                <div class="form-group-label" style="font-weight: bold; padding-right: 10px; min-width: 250px; display: inline-block; vertical-align: top;">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
+                    {% if field.field.required %}<span style="color: red;">*</span>{% endif %}
+                </div>
+                <div class="form-group-field" style="display: inline-block; width: calc(100% - 270px);">
+                    {{ field }}
+                    {% if field.help_text %}<br><small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}
+                    {% for error in field.errors %}<div class="alert alert-danger mt-1 p-1" role="alert" style="font-size: 0.9em;">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+            {% endwith %}
+
+            {# Поле Вхідна дата заявки #}
+            {% with field=form.incoming_date %}
+             <div class="form-row mb-3">
+                <div class="form-group-label" style="font-weight: bold; padding-right: 10px; min-width: 250px; display: inline-block; vertical-align: top;">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
+                    {% if field.field.required %}<span style="color: red;">*</span>{% endif %}
+                </div>
+                <div class="form-group-field" style="display: inline-block; width: calc(100% - 270px);">
+                    {{ field }}
+                    {% if field.help_text %}<br><small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}
+                    {% for error in field.errors %}<div class="alert alert-danger mt-1 p-1" role="alert" style="font-size: 0.9em;">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+            {% endwith %}
+            
+            {# Поле Запитуваний тип роботи #}
+            {% with field=form.request_work_type %}
+             <div class="form-row mb-3">
+                <div class="form-group-label" style="font-weight: bold; padding-right: 10px; min-width: 250px; display: inline-block; vertical-align: top;">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
+                    {% if field.field.required %}<span style="color: red;">*</span>{% endif %}
+                </div>
+                <div class="form-group-field" style="display: inline-block; width: calc(100% - 270px);">
+                    {{ field }}
+                    {% if field.help_text %}<br><small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}
+                    {% for error in field.errors %}<div class="alert alert-danger mt-1 p-1" role="alert" style="font-size: 0.9em;">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+            {% endwith %}
+
+            {# Поле ОІДи #}
+            {% with field=form.oids %}
+            <div class="form-row mb-3">
+                <div class="form-group-label" style="font-weight: bold; padding-right: 10px; min-width: 250px; display: inline-block; vertical-align: top;">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
+                    {% if field.field.required %}<span style="color: red;">*</span>{% endif %}
+                </div>
+                <div class="form-group-field" style="display: inline-block; width: calc(100% - 270px);">
+                    {{ field }} {# Віджет вже має клас 'form-control tomselect-field-oids' з форми #}
+                    <button type="button" class="btn btn-sm btn-success ms-2" id="showCreateOidModalBtnForRequest">
+                        <i class="fas fa-plus"></i> Створити новий ОІД
+                    </button>
+                    {% if field.help_text %}<br><small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}
+                    {% for error in field.errors %}<div class="alert alert-danger mt-1 p-1" role="alert" style="font-size: 0.9em;">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+            {% endwith %}
+
+            {# Поле Примітки #}
+            {% with field=form.note %}
+            <div class="form-row mb-3">
+                <div class="form-group-label" style="font-weight: bold; padding-right: 10px; min-width: 250px; display: inline-block; vertical-align: top;">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
+                    {% if field.field.required %}<span style="color: red;">*</span>{% endif %}
+                </div>
+                <div class="form-group-field" style="display: inline-block; width: calc(100% - 270px);">
+                    {{ field }}
+                    {% if field.help_text %}<br><small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}
+                    {% for error in field.errors %}<div class="alert alert-danger mt-1 p-1" role="alert" style="font-size: 0.9em;">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+            {% endwith %}
+        </div>
+
+        <div class="form-actions mt-4">
+            <button type="submit" class="btn btn-primary">Зберегти заявку</button>
+            <a href="{% url 'oids:list_work_requests' %}" class="btn btn-secondary">Скасувати</a> {# Або main_dashboard #}
+        </div>
+    </form>
+</div>
+
+{# Модальне вікно для створення ОІД вже є в base.html, ми будемо його використовувати #}
+
+{% endblock %}
+
+{% block extra_js %} {# Замінив page_specific_js на extra_js для відповідності base.html #}
 <script>
-    document.addEventListener("DOMContentLoaded", function () {
-        // Отримуємо ID полів з Django форми
-        const unitSelectElement = document.getElementById("{{ form.unit.id_for_label }}");
-        const oidsSelectElement = document.getElementById("{{ form.oids.id_for_label }}");
-        const showCreateOidModalButton = document.getElementById("showCreateOidModalBtn"); // ID кнопки з вашого шаблону
+document.addEventListener('DOMContentLoaded', function () {
+    console.log('Work Request Form JS: DOMContentLoaded. V3 Debugging (Direct Fetch).');
 
-        // Модальне вікно для створення ОІД (з base.html)
-        const oidCreateModalElement = document.getElementById("createOidModal");
-        let oidCreateModalInstance = null;
-        if (oidCreateModalElement) {
-            oidCreateModalInstance = new bootstrap.Modal(oidCreateModalElement);
+    const unitSelectElement = document.getElementById('{{ form.unit.id_for_label }}');
+    const oidsSelectElement = document.getElementById('{{ form.oids.id_for_label }}');
+    const showCreateOidModalButton = document.getElementById('showCreateOidModalBtnForRequest'); 
+    
+    const oidCreateModalElement = document.getElementById('createOidModal');
+    let oidCreateModalInstance = oidCreateModalElement ? new bootstrap.Modal(oidCreateModalElement) : null;
+    const modalSelectedUnitNameElement = document.getElementById('modalSelectedUnitName'); 
+    const modalHiddenUnitIdInput = document.getElementById('id_modal_hidden_unit_id'); 
+
+    let tomSelectUnits = null;
+    let tomSelectOids = null;
+
+    if (typeof TomSelect === 'undefined') {
+        console.error('Work Request Form JS: TomSelect library is NOT loaded!');
+        return;
+    } else {
+        console.log('Work Request Form JS: TomSelect library is loaded.');
+    }
+
+    if (unitSelectElement && unitSelectElement.classList.contains('tomselect-field-defer')) {
+        tomSelectUnits = new TomSelect(unitSelectElement, {
+            create: false,
+            placeholder: 'Оберіть ВЧ...',
+            allowEmptyOption: true,
+        });
+        console.log('Work Request Form JS: TomSelect for Unit initialized.');
+    } else {
+        console.warn('Work Request Form JS: TomSelect for Unit NOT initialized.');
+    }
+
+    if (oidsSelectElement && oidsSelectElement.classList.contains('tomselect-field-oids')) {
+        tomSelectOids = new TomSelect(oidsSelectElement, {
+            create: false,
+            plugins: ['remove_button'],
+            placeholder: 'Спочатку оберіть ВЧ...',
+            valueField: 'id',
+            labelField: 'text',
+            searchField: ['text'],
+            options: [],
+            disabled: !unitSelectElement?.value,
+        });
+        oidsSelectElement.tomselectInstance = tomSelectOids;
+        console.log('Work Request Form JS: TomSelect for OIDs initialized.');
+        if (!unitSelectElement || !unitSelectElement.value) {
+             if(tomSelectOids) tomSelectOids.disable();
         }
-        const modalSelectedUnitNameElement = document.getElementById("modalSelectedUnitName"); // З base.html
-        const modalHiddenUnitIdInput = document.getElementById("id_modal_hidden_unit_id"); // З base.html
+    } else {
+        console.warn('Work Request Form JS: TomSelect for OIDs NOT initialized.');
+    }
 
-        let tomSelectUnits = null;
-        let tomSelectOids = null;
+    if (unitSelectElement && tomSelectOids) {
+        console.log('Work Request Form JS: Attaching "change" listener to Unit select.');
+        unitSelectElement.addEventListener('change', function () {
+            const unitId = this.value;
+            console.log(`Work Request Form JS: Unit changed. Selected Unit ID: [${unitId}]`);
 
-        // 1. Ініціалізація Tom Select для поля "Військова частина"
-        if (unitSelectElement && unitSelectElement.classList.contains("tomselect-field-defer") && typeof TomSelect !== "undefined") {
-            tomSelectUnits = new TomSelect(unitSelectElement, {
-                create: false,
-                placeholder: "Оберіть ВЧ...",
-                allowEmptyOption: true,
-                // Можна додати опцію завантаження через AJAX, якщо ВЧ дуже багато:
-                // load: function(query, callback) { ... }
-            });
-        }
-
-        // 2. Ініціалізація Tom Select для поля "Оберіть ОІД"
-        if (oidsSelectElement && oidsSelectElement.classList.contains("tomselect-field-oids") && typeof TomSelect !== "undefined") {
-            tomSelectOids = new TomSelect(oidsSelectElement, {
-                create: false, // Створення ОІДів через модальне вікно
-                plugins: ["remove_button"],
-                placeholder: "Спочатку оберіть ВЧ...",
-                valueField: "id",
-                labelField: "text",
-                searchField: ["text"],
-                options: [], // Початково опції порожні
-                disabled: !unitSelectElement?.value, // Деактивовано, якщо ВЧ не обрано
-                render: {
-                    // Можна кастомізувати вигляд опцій, якщо потрібно
-                    // option: function(data, escape) {
-                    //     return `<div>${escape(data.text)}</div>`;
-                    // }
-                },
-            });
-            // Зберігаємо екземпляр для доступу, якщо потрібно
-            oidsSelectElement.tomselectInstance = tomSelectOids;
-        }
-
-        // 3. Динамічне завантаження ОІДів при зміні Військової частини
-        if (unitSelectElement && tomSelectOids) {
-            unitSelectElement.addEventListener("change", function () {
-                const unitId = this.value;
-                tomSelectOids.clear(); // Очистити обрані значення
-                tomSelectOids.clearOptions(); // Очистити всі опції
-                tomSelectOids.sync(); // Синхронізувати стан
-
-                if (unitId) {
-                    tomSelectOids.enable();
-                    tomSelectOids.load(function (callback) {
-                        const ajaxUrl = window.AJAX_LOAD_OIDS_FOR_UNIT_URL || "{% url 'oids:ajax_load_oids_for_unit' %}";
-                        fetch(`${ajaxUrl}?unit_id=${unitId}`)
-                            .then((response) => response.json())
-                            .then((data) => {
-                                // `data` має бути масивом об'єктів {id: ..., cipher: ..., full_name: ...}
-                                // Ми перетворюємо його на формат, очікуваний TomSelect: {id: ..., text: ...}
-                                const options = data.map((oid) => ({
-                                    id: oid.id,
-                                    text: `${oid.cipher} (${oid.full_name || "Без назви"})`,
-                                }));
-                                callback(options);
-                                // Після завантаження можна відновити раніше обрані значення, якщо вони є
-                                // Це важливо, якщо форма повертається з помилкою валідації.
-                                // Потрібно передати старі значення `oids` з Django в JS.
-                            })
-                            .catch(() => {
-                                tomSelectOids.addOption({ id: "", text: "Помилка завантаження ОІДів" });
-                                callback(); // Завершити завантаження, навіть якщо з помилкою
-                            });
-                    });
-                    tomSelectOids.placeholder = "Оберіть ОІД(и)...";
-                } else {
-                    tomSelectOids.disable();
-                    tomSelectOids.placeholder = "Спочатку оберіть ВЧ...";
-                }
-            });
-
-            // Якщо ВЧ вже обрана при завантаженні сторінки (наприклад, при помилці валідації форми),
-            // ініціюємо завантаження ОІДів.
-            if (unitSelectElement.value) {
-                unitSelectElement.dispatchEvent(new Event("change"));
+            if (!tomSelectOids) {
+                console.error('Work Request Form JS: tomSelectOids is not initialized in unit change listener!');
+                return;
             }
-        }
 
-        // 4. Обробка відкриття модального вікна для створення ОІД
-        if (showCreateOidModalButton && oidCreateModalInstance && unitSelectElement) {
-            showCreateOidModalButton.addEventListener("click", function () {
-                const selectedUnitValue = unitSelectElement.value;
-                if (!selectedUnitValue) {
-                    alert("Будь ласка, спочатку оберіть Військову частину.");
+            // Очищаємо TomSelect для ОІДів
+            tomSelectOids.clear();        // Очистити обрані значення
+            tomSelectOids.clearOptions(); // Очистити всі опції
+            tomSelectOids.sync();         // Синхронізувати стан
+
+            if (unitId) {
+                console.log('Work Request Form JS: Unit ID is present. Enabling OID select and starting fetch.');
+                tomSelectOids.enable();
+                tomSelectOids.placeholder = 'Завантаження ОІДів...';
+                
+                let ajaxUrl = window.AJAX_LOAD_OIDS_FOR_UNIT_URL;
+                if (!ajaxUrl) {
+                    ajaxUrl = "{% url 'oids:ajax_load_oids_for_unit' %}";
+                    console.log("Work Request Form JS: Using fallback Django URL for OIDs: [" + ajaxUrl + "]");
+                } else {
+                    console.log("Work Request Form JS: Using global URL for OIDs: [" + ajaxUrl + "]");
+                }
+                
+                if (!ajaxUrl || ajaxUrl.includes("None") || ajaxUrl.trim() === "" || ajaxUrl.trim() === "null") {
+                    console.error('Work Request Form JS: AJAX URL for OIDs is invalid or not resolved:', ajaxUrl);
+                    tomSelectOids.placeholder = 'Помилка: Невірний URL';
                     return;
                 }
 
-                const oidCreateFormElement = document.getElementById("ajaxOidCreateForm"); // з base.html
-                const oidCreateFormAlertsElement = document.getElementById("oidCreateFormAlertsBootstrap"); // з base.html
+                fetch(`${ajaxUrl}?unit_id=${unitId}`)
+                    .then(response => {
+                        console.log('Work Request Form JS: Fetch response status for OIDs:', response.status);
+                        if (!response.ok) {
+                            return response.text().then(text => {
+                                console.error('Work Request Form JS: Network error response text (OIDs):', text);
+                                throw new Error(`Network error (OIDs): ${response.status} ${response.statusText}. Server: ${text}`);
+                            });
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('Work Request Form JS: AJAX data successfully received for OIDs:', data);
+                        if (!Array.isArray(data)) {
+                            console.error('Work Request Form JS: Expected array from AJAX (OIDs), got:', typeof data, data);
+                            tomSelectOids.placeholder = 'Помилка: невірний формат даних';
+                            return;
+                        }
+                        const options = data.map(oid => ({
+                            id: oid.id.toString(), 
+                            text: `${oid.cipher} (${oid.full_name || 'Без назви'})` 
+                        }));
+                        console.log('Work Request Form JS: Mapped options for OID TomSelect:', options);
+                        
+                        tomSelectOids.addOptions(options); // Додаємо нові опції
+                        // tomSelectOids.refreshOptions(false); // Можливо, не потрібно після addOptions
 
-                if (oidCreateFormElement) oidCreateFormElement.reset();
-                if (oidCreateFormAlertsElement) oidCreateFormAlertsElement.innerHTML = "";
+                        tomSelectOids.placeholder = options.length > 0 ? 'Оберіть ОІД(и)...' : 'ОІДи для цієї ВЧ не знайдено';
+                    })
+                    .catch((error) => {
+                        console.error("Work Request Form JS: CATCH block - Error during AJAX load for OIDs:", error);
+                        tomSelectOids.placeholder = 'Помилка завантаження ОІДів';
+                    });
 
-                if (modalSelectedUnitNameElement) {
-                    const selectedUnitOption = unitSelectElement.options[unitSelectElement.selectedIndex];
-                    modalSelectedUnitNameElement.textContent = selectedUnitOption ? selectedUnitOption.text : "не обрано";
-                }
-                if (modalHiddenUnitIdInput) {
-                    modalHiddenUnitIdInput.value = selectedUnitValue;
-                }
+            } else {
+                console.log('Work Request Form JS: No Unit ID selected, disabling and clearing OID select.');
+                tomSelectOids.disable();
+                // tomSelectOids.clear(); // Вже зроблено на початку обробника
+                // tomSelectOids.clearOptions(); // Вже зроблено на початку обробника
+                // tomSelectOids.sync(); // Вже зроблено на початку обробника
+                tomSelectOids.placeholder = 'Спочатку оберіть ВЧ...';
+            }
+        });
+        console.log('Work Request Form JS: "change" listener attached to Unit select.');
 
-                // Очищення попередніх помилок валідації в модальній формі
-                if (oidCreateFormElement) {
-                    oidCreateFormElement.querySelectorAll(".is-invalid").forEach((el) => el.classList.remove("is-invalid"));
-                    oidCreateFormElement.querySelectorAll(".invalid-feedback[data-field-errors-bs]").forEach((el) => (el.textContent = ""));
-                }
-                oidCreateModalInstance.show();
-            });
+        if (unitSelectElement.value) {
+            console.log('Work Request Form JS: Unit already selected on page load (value: ' + unitSelectElement.value + '), dispatching "change" event.');
+            unitSelectElement.dispatchEvent(new Event('change'));
+        } else {
+            console.log('Work Request Form JS: Unit not selected on page load. OID select remains disabled.');
+            if(tomSelectOids) tomSelectOids.disable();
         }
+    } else {
+        console.warn('Work Request Form JS: Not attaching unit "change" listener. Check Unit select or OID TomSelect availability.');
+    }
 
-        // 5. Обробка успішного створення ОІД у модальному вікні
-        // Ми очікуємо, що ваш глобальний main.js (або логіка в base.html для модалки)
-        // згенерує подію на `oidCreateModalElement` після успішного AJAX запиту.
-        if (oidCreateModalElement && tomSelectOids) {
-            oidCreateModalElement.addEventListener("oid.created.success", function (event) {
-                const newOidData = event.detail; // { oid_id: ..., oid_name: ..., unit_id: ... }
+    // ... (решта вашого JS для модального вікна, як було) ...
+    // Обробник для кнопки "Створити новий ОІД"
+    if (showCreateOidModalButton && oidCreateModalInstance && unitSelectElement) {
+        showCreateOidModalButton.addEventListener('click', function () {
+            console.log('Work Request Form JS: "Create new OID" button clicked.');
+            const selectedUnitValue = unitSelectElement.value;
+            if (!selectedUnitValue) {
+                alert('Будь ласка, спочатку оберіть Військову частину.');
+                return;
+            }
+            // ... (решта логіки відкриття модалки)
+             const oidCreateFormElement = document.getElementById('ajaxOidCreateForm');
+            const oidCreateFormAlertsElement = document.getElementById('oidCreateFormAlertsBootstrap');
 
-                if (newOidData && newOidData.oid_id && newOidData.oid_name) {
-                    // Перевіряємо, чи створений ОІД належить до поточно обраної ВЧ
-                    const currentUnitId = unitSelectElement.value;
-                    if (newOidData.unit_id && newOidData.unit_id.toString() === currentUnitId) {
-                        tomSelectOids.addOption({
-                            id: newOidData.oid_id.toString(), // TomSelect очікує id як string
-                            text: newOidData.oid_name,
-                        });
-                        tomSelectOids.addItem(newOidData.oid_id.toString()); // Додати та обрати
-                    } else {
-                        // Якщо ОІД створено для іншої ВЧ (малоймовірно при поточній логіці модалки, але для безпеки)
-                        // або якщо ВЧ не обрана в основній формі, просто оновити список опцій,
-                        // щоб він міг з'явитися, якщо користувач обере відповідну ВЧ.
-                        // Це складніший сценарій, поки що просто інформуємо.
-                        console.warn("Новий ОІД створено, але він не належить до поточно обраної ВЧ або ВЧ не обрано.");
-                        // Можна викликати unitSelectElement.dispatchEvent(new Event('change')); щоб оновити список ОІДів
-                    }
-                    if (oidCreateModalInstance) oidCreateModalInstance.hide();
-                }
-            });
-            // Обробка помилок з модального вікна (якщо main.js генерує подію)
-            oidCreateModalElement.addEventListener("oid.created.error", function (event) {
-                const errors = event.detail.errors;
-                const formInModal = document.getElementById("ajaxOidCreateForm");
-                const alertsInModal = document.getElementById("oidCreateFormAlertsBootstrap");
-                if (formInModal && alertsInModal) {
-                    let errorMessages = "<ul>";
-                    for (const field in errors) {
-                        const fieldElement = formInModal.querySelector(`[name="${field}"]`);
-                        if (fieldElement) fieldElement.classList.add("is-invalid");
-                        const errorContainer = formInModal.querySelector(`.invalid-feedback[data-field-errors-bs="${field}"]`);
-                        if (errorContainer) errorContainer.textContent = errors[field].join(" ");
+            if (oidCreateFormElement) oidCreateFormElement.reset();
+            if (oidCreateFormAlertsElement) oidCreateFormAlertsElement.innerHTML = '';
+            
+            if (modalSelectedUnitNameElement) {
+                 const selectedUnitOption = unitSelectElement.options[unitSelectElement.selectedIndex];
+                 modalSelectedUnitNameElement.textContent = selectedUnitOption ? selectedUnitOption.text : 'не обрано';
+            }
+            if (modalHiddenUnitIdInput) { 
+                modalHiddenUnitIdInput.value = selectedUnitValue;
+            }
+            
+            if (oidCreateFormElement) {
+                oidCreateFormElement.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+                oidCreateFormElement.querySelectorAll('.invalid-feedback[data-field-errors-bs]').forEach(el => el.textContent = '');
+            }
+            oidCreateModalInstance.show();
+        });
+    }
+    // Слухачі подій 'oid.created.success' та 'oid.created.error'
+    if (oidCreateModalElement && oidsSelectElement && oidsSelectElement.tomselectInstance) {
+        oidCreateModalElement.addEventListener('oid.created.success', function (event) {
+            const newOidData = event.detail; 
+            console.log('Work Request Form JS: "oid.created.success" event received:', newOidData);
+            const currentUnitId = unitSelectElement.value;
+            if (newOidData && newOidData.oid_id && newOidData.oid_name && newOidData.unit_id && newOidData.unit_id.toString() === currentUnitId) {
+                const tsOids = oidsSelectElement.tomselectInstance;
+                tsOids.addOption({ 
+                    id: newOidData.oid_id.toString(),
+                    text: newOidData.oid_name 
+                });
+                tsOids.addItem(newOidData.oid_id.toString());
+                console.log('Work Request Form JS: New OID added and selected.');
+                 if (oidCreateModalInstance) oidCreateModalInstance.hide();
+            } else {
+                 console.warn('Work Request Form JS: New OID does not belong to current unit or data invalid. Event detail:', newOidData, 'Current unit:', currentUnitId);
+                 if (oidCreateModalInstance) oidCreateModalInstance.hide(); // Все одно закрити модалку
+            }
+        });
+        oidCreateModalElement.addEventListener('oid.created.error', function(event) {
+             console.log('Work Request Form JS: "oid.created.error" event received:', event.detail.errors);
+            // ... (код обробки помилки) ...
+        });
+    }
 
-                        errors[field].forEach((err) => {
-                            errorMessages += `<li>${field}: ${err}</li>`;
-                        });
-                    }
-                    errorMessages += "</ul>";
-                    alertsInModal.innerHTML = `<div class="alert alert-danger">${errorMessages}</div>`;
-                }
-            });
+
+    if (typeof window.AJAX_LOAD_OIDS_FOR_UNIT_URL === 'undefined') {
+        let djangoUrl = "{% url 'oids:ajax_load_oids_for_unit' %}";
+        if (djangoUrl && !djangoUrl.includes("None") && djangoUrl.trim() !== "") {
+            window.AJAX_LOAD_OIDS_FOR_UNIT_URL = djangoUrl;
+            console.log("Work Request Form JS: AJAX_LOAD_OIDS_FOR_UNIT_URL set by fallback to: [" + window.AJAX_LOAD_OIDS_FOR_UNIT_URL + "]");
+        } else {
+            console.error("Work Request Form JS: Fallback Django URL for AJAX_LOAD_OIDS_FOR_UNIT_URL is invalid!");
         }
-
-        // Переконайтесь, що глобальна змінна AJAX_LOAD_OIDS_FOR_UNIT_URL визначена (наприклад, у base.html)
-        if (typeof window.AJAX_LOAD_OIDS_FOR_UNIT_URL === "undefined") {
-            // Якщо ні, можна встановити її тут як резервний варіант, АЛЕ КРАЩЕ ПЕРЕДАВАТИ З DJANGO
-            console.warn("AJAX_LOAD_OIDS_FOR_UNIT_URL не визначено глобально. Використовується резервний URL.");
-            window.AJAX_LOAD_OIDS_FOR_UNIT_URL = "{% url 'oids:ajax_load_oids_for_unit' %}";
-        }
-    });
+    } else {
+        console.log("Work Request Form JS: AJAX_LOAD_OIDS_FOR_UNIT_URL is globally defined: [" + window.AJAX_LOAD_OIDS_FOR_UNIT_URL + "]");
+    }
+});
 </script>
 {% endblock %}

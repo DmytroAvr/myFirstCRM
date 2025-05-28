@@ -26,7 +26,7 @@ const SELECTORS = {
     INSERT_UNIT_SPAN: "#insert_unit", // Span для відображення назви військової частини
     UNIT_SELECT: "#id_unit", // Основний select для військової частини (один на сторінці)
     OID_ASIDE_CLOSE_BUTTON: "#oid-aside-close",
-    OID_CREATE_FORM: "#oid-create-form", // ID форми створення ОІД
+    OID_CREATE_FORM: "#ajaxOidCreateForm", // ID форми створення ОІД. раніше була #oid-create-form
     OID_SELECT_NAME_SUFFIX: "-oid", // Для полів OID у формсеті (e.g., form-0-oid)
     OID_SELECT_MAIN_NAME: "oid", // Для основного поля OID, якщо воно не в формсеті (e.g., id_oid)
 };
@@ -355,6 +355,11 @@ function closeOidAside() {
 // oids/static/oids/js/main.js
 // ... (інший код вашого main.js) ...
 
+
+
+// !логіка для створення popup "додати ОІД"
+// !логіка для створення popup "додати ОІД"
+// !логіка для створення popup "додати ОІД"
 /**
  * Обробляє відправку форми створення ОІД через AJAX.
  * @param {Event} event - Подію відправки форми.
@@ -455,6 +460,8 @@ async function handleOidCreateFormSubmit(event) {
 //    oidCreateForm.addEventListener("submit", handleOidCreateFormSubmit);
 // }
 // Потрібно оновити SELECTORS.OID_CREATE_FORM на 'ajaxOidCreateForm' або той ID, що є у формі в base.html.
+// !кінець для створення popup "додати ОІД"
+// !кінець логіка для створення popup "додати ОІД"
 
 /**
  * Ініціалізує логіку для бічного вікна створення ОІД.

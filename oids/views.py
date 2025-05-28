@@ -93,23 +93,31 @@ def ajax_load_oids_for_unit_categorized(request):
 # AJAX view для завантаження ОІДів для Select2 у формах (якщо потрібно)
 # Цей view НЕ використовується для оновлення списків ОІД на головній панелі в цьому сценарії
 def ajax_load_oids_for_unit(request):
-    unit_id = request.GET.get('unit_id')
+    unit_id_str = request.GET.get('unit_id')
     oids_data = []
-    if unit_id:
+    if unit_id_str and unit_id_str.isdigit():
+        unit_id = int(unit_id_str)
         try:
-            # Обираємо активні або ті, що створюються, якщо є таке бізнес-правило
-            oids = OID.objects.filter(unit_id=unit_id).order_by('cipher') 
-            for oid in oids:
+            # Отримуємо всі ОІДи для вказаної ВЧ.
+            # Можна додати додаткові фільтри, якщо потрібно (наприклад, тільки активні ОІДи)
+            # OID.objects.filter(unit_id=unit_id, status=OIDStatusChoices.ACTIVE).order_by('cipher')
+            oids_queryset = OID.objects.filter(unit_id=unit_id).order_by('cipher')
+            
+            for oid in oids_queryset:
                 oids_data.append({
                     'id': oid.id,
-                    'cipher': oid.cipher, # Для відображення
-                    'full_name': oid.full_name, # Може бути корисним
-                    'unit__city': oid.unit.city # Якщо потрібно
-                    # Додайте інші поля, якщо вони потрібні для відображення в TomSelect
+                    'cipher': oid.cipher, 
+                    'full_name': oid.full_name or "", # Повертаємо порожній рядок, якщо full_name None
+                    # Додайте інші поля, якщо вони потрібні для відображення в TomSelect у JS:
+                    # наприклад, 'unit_code': oid.unit.code (якщо unit вже завантажено через select_related у запиті)
                 })
-        except (ValueError, Unit.DoesNotExist):
-            pass 
-    return JsonResponse(list(oids_data), safe=False)
+        except ValueError: # На випадок, якщо unit_id не є валідним числом (хоча isdigit вже перевіряє)
+            return JsonResponse({'error': 'Невірний ID військової частини'}, status=400)
+        # except Unit.DoesNotExist: # Якщо ВЧ з таким ID не існує
+            # return JsonResponse({'error': 'Військова частина не знайдена'}, status=404) 
+            # Зазвичай, якщо queryset порожній, повернеться порожній список, що є нормальним.
+    
+    return JsonResponse(oids_data, safe=False) # safe=False, оскільки ми повертаємо список
 
 # oids/urls.py - не забудьте додати:
 # path('ajax/load-oids-for-unit/', views.ajax_load_oids_for_unit, name='ajax_load_oids_for_unit'),
@@ -365,8 +373,7 @@ def add_work_request_view(request):
         'page_title': 'Створення нової заявки на проведення робіт',
         # **context_data # Якщо передаєте choices
     })
-# 
-# 
+
 # list info 
 
 
