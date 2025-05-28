@@ -95,33 +95,32 @@ WorkRequestItemFormSet = inlineformset_factory(
 )
 
 class TripForm(forms.ModelForm):
-    # Використовуємо ModelMultipleChoiceField для ManyToMany зв'язків,
-    # Select2 зробить їх зручнішими у шаблоні.
     units = forms.ModelMultipleChoiceField(
-        queryset=Unit.objects.all().order_by('name'),
-        widget=forms.SelectMultiple(attrs={'class': 'select2'}), # Додаємо клас для Select2
+        queryset=Unit.objects.all().order_by('code'),
         label="Військові частини призначення",
+        widget=forms.SelectMultiple(attrs={'class': 'form-select tomselect-field', 'id': 'id_trip_form_units'}), # Додав ID
         required=True
     )
+    # Поле oids буде заповнюватися динамічно на основі обраних units
     oids = forms.ModelMultipleChoiceField(
-        queryset=OID.objects.filter(status__in=[OIDStatusChoices.ACTIVE, OIDStatusChoices.NEW, OIDStatusChoices.RECEIVED_REQUEST, OIDStatusChoices.RECEIVED_TZ]).order_by('cipher'),
-        widget=forms.SelectMultiple(attrs={'class': 'select2'}),
-        label="ОІД, що задіяні у відрядженні",
-        required=False # Можливо, ОІДи будуть додані пізніше або не всі відомі одразу
+        queryset=OID.objects.none(), # Початково порожній
+        label="ОІДи, що задіяні у відрядженні (відфільтруються після вибору ВЧ)",
+        widget=forms.SelectMultiple(attrs={'class': 'form-select tomselect-field', 'id': 'id_trip_form_oids'}), # Додав ID
+        required=False # Може бути False, якщо ОІДи не завжди відомі одразу
     )
     persons = forms.ModelMultipleChoiceField(
         queryset=Person.objects.filter(is_active=True).order_by('full_name'),
-        widget=forms.SelectMultiple(attrs={'class': 'select2'}),
         label="Особи у відрядженні",
+        widget=forms.SelectMultiple(attrs={'class': 'form-select tomselect-field'}),
         required=True
     )
     work_requests = forms.ModelMultipleChoiceField(
         queryset=WorkRequest.objects.filter(
             status__in=[WorkRequestStatusChoices.PENDING, WorkRequestStatusChoices.IN_PROGRESS]
         ).order_by('-incoming_date'),
-        widget=forms.SelectMultiple(attrs={'class': 'select2'}),
-        label="Пов'язані заявки на проведення робіт (статус 'Очікує' або 'В роботі')",
-        required=False # Відрядження може бути не пов'язане з конкретною заявкою
+        label="Пов'язані заявки (статус 'Очікує' або 'В роботі')",
+        widget=forms.SelectMultiple(attrs={'class': 'form-select tomselect-field'}),
+        required=False
     )
 
     class Meta:
@@ -140,20 +139,43 @@ class TripForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Якщо потрібно динамічно фільтрувати queryset для OID на основі обраних Unit,
-        # це краще робити за допомогою JavaScript на стороні клієнта,
-        # або передавати відфільтрований queryset у view.
-        # Наразі OID завантажуються всі активні/нові.
-        # Приклад: self.fields['oids'].queryset = OID.objects.none() якщо units не обрані спочатку.
         
-        # Додавання data-атрибутів для JavaScript фільтрації (приклад)
-        # Це потрібно, якщо ти хочеш, щоб вибір Unit фільтрував OID *у цій формі*
-        self.fields['units'].widget.attrs.update({'id': 'id_trip_units_form'}) # Даємо унікальний ID
-        self.fields['oids'].widget.attrs.update({'id': 'id_trip_oids_form'})
-        # У filtering_dynamic.js потрібно буде додати конфігурацію для цієї пари,
-        # і на #id_trip_units_form додати data-ajax-url для завантаження OID
-        # data-ajax-url="{% url 'oids:ajax_load_oids_for_unit' %}" (якщо такий URL існує)
+        selected_unit_ids = []
 
+        # Якщо форма зв'язана з даними (POST)
+        if self.is_bound and 'units' in self.data:
+            try:
+                # self.data.getlist('units') поверне список рядкових ID
+                selected_unit_ids = [int(uid) for uid in self.data.getlist('units') if uid.isdigit()]
+            except (ValueError, TypeError):
+                selected_unit_ids = []
+        # Якщо форма не зв'язана, але є initial дані (наприклад, при редагуванні або GET з параметрами)
+        elif 'units' in self.initial:
+            initial_units = self.initial.get('units') # Може бути queryset або список ID
+            if hasattr(initial_units, 'values_list'): # Якщо це queryset
+                selected_unit_ids = list(initial_units.values_list('id', flat=True))
+            elif isinstance(initial_units, list):
+                selected_unit_ids = [int(uid) for uid in initial_units if str(uid).isdigit()]
+        # Якщо форма для існуючого екземпляра (редагування)
+        elif self.instance and self.instance.pk:
+            selected_unit_ids = list(self.instance.units.all().values_list('id', flat=True))
+            # Попередньо заповнюємо поле oids, якщо units вже є
+            if selected_unit_ids:
+                self.fields['oids'].queryset = OID.objects.filter(
+                    unit__id__in=selected_unit_ids,
+                    # Можна додати фільтр по статусу ОІД, наприклад, тільки активні:
+                    # status__in=[OIDStatusChoices.ACTIVE, OIDStatusChoices.NEW] 
+                ).distinct().order_by('unit__code', 'cipher')
+
+
+        # Встановлюємо queryset для поля oids на основі обраних ВЧ (для валідації POST)
+        if selected_unit_ids:
+            self.fields['oids'].queryset = OID.objects.filter(
+                unit__id__in=selected_unit_ids
+            ).distinct().order_by('unit__code', 'cipher')
+        else:
+            self.fields['oids'].queryset = OID.objects.none()
+            
 class DocumentForm(forms.ModelForm): 
     # Поле для вибору типу документа. Фільтрація на основі OID.oid_type та work_type
     # буде реалізована через JavaScript або при ініціалізації форми у view.

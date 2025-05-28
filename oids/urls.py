@@ -11,6 +11,7 @@ urlpatterns = [
     # AJAX URLs
     path('ajax/load-oids-for-unit/', views.ajax_load_oids_for_unit, name='ajax_load_oids_for_unit'),
     path('ajax/load-oids-categorized/', views.ajax_load_oids_for_unit_categorized, name='ajax_load_oids_categorized'), # Новий URL
+    path('ajax/load-oids-for-multiple-units/', views.ajax_load_oids_for_multiple_units, name='ajax_load_oids_for_multiple_units'), # Новий URL
     
     # URLs для форм
     path('trip/plan/', views.plan_trip_view, name='plan_trip_view_name'),

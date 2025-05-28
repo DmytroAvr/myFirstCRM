@@ -1,97 +1,305 @@
+{# oids/templates/oids/forms/plan_trip_form.html #}
 {% extends "oids/base.html" %}
-{% load static %} {# Якщо base.html вже має load static, тут це не обов'язково #}
+{% load static %}
 
 {% block title %}{{ page_title|default:"Запланувати відрядження" }}{% endblock %}
 
 {% block content %}
 <div class="container form-container">
-    <h2 class="mb-4">{{ page_title|default:"Запланувати відрядження" }}</h2>
+    <h2 class="mb-4">{{ page_title|default:"Планування нового відрядження" }}</h2>
     
-    <form method="post" novalidate>
+    <form method="post" novalidate id="planTripForm">
         {% csrf_token %}
         
-        {# {{ form.media }} - Розкоментуй, якщо твої віджети дат використовують JS/CSS #}
-
-        {# Виведення загальних помилок форми #}
         {% if form.non_field_errors %}
             <div class="alert alert-danger" role="alert">
-                {% for error in form.non_field_errors %}
-                    <p>{{ error }}</p>
-                {% endfor %}
+                {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
             </div>
         {% endif %}
 
-        {# Виведення полів форми у вигляді, схожому на таблицю, або просто групами #}
-        {# Варіант 1: Простий рендеринг (as_p, as_table, as_ul) #}
-        {# {{ form.as_p }} #}
-
-        {# Варіант 2: Ручний рендеринг для більшого контролю (схоже на таблицю) #}
-        <div class="table-like-form">
-            {% for field in form %}
-                <div class="form-row mb-3">
-                    <div class="form-group-label" style="font-weight: bold; padding-right: 10px; min-width: 200px; display: inline-block; vertical-align: top;">
-                        <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
-                    </div>
-                    <div class="form-group-field" style="display: inline-block; width: calc(100% - 220px);">
-                        {{ field }}
-                        {% if field.help_text %}
-                            <br><small class="form-text text-muted">{{ field.help_text }}</small>
-                        {% endif %}
-                        {% for error in field.errors %}
-                            <div class="alert alert-danger mt-1 p-1" role="alert" style="font-size: 0.9em;">{{ error }}</div>
-                        {% endfor %}
-                    </div>
+        <fieldset class="mb-3 p-3 border rounded">
+            <legend class="w-auto px-2 h6">Дати відрядження</legend>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="{{ form.start_date.id_for_label }}" class="form-label fw-bold">{{ form.start_date.label }}:</label>
+                    {{ form.start_date }}
+                    {% for error in form.start_date.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
                 </div>
-            {% endfor %}
-        </div>
+                <div class="col-md-6 mb-3">
+                    <label for="{{ form.end_date.id_for_label }}" class="form-label fw-bold">{{ form.end_date.label }}:</label>
+                    {{ form.end_date }}
+                    {% for error in form.end_date.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+        </fieldset>
+
+        <fieldset class="mb-3 p-3 border rounded">
+            <legend class="w-auto px-2 h6">Учасники та об'єкти</legend>
+            <div class="mb-3">
+                <label for="{{ form.units.id_for_label }}" class="form-label fw-bold">{{ form.units.label }}:</label>
+                {{ form.units }}
+                {% if form.units.help_text %}<small class="form-text text-muted d-block">{{ form.units.help_text }}</small>{% endif %}
+                {% for error in form.units.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="mb-3">
+                <label for="{{ form.oids.id_for_label }}" class="form-label fw-bold">{{ form.oids.label }}:</label>
+                {{ form.oids }}
+                {% if form.oids.help_text %}<small class="form-text text-muted d-block">{{ form.oids.help_text }}</small>{% endif %}
+                {% for error in form.oids.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="mb-3">
+                <label for="{{ form.persons.id_for_label }}" class="form-label fw-bold">{{ form.persons.label }}:</label>
+                {{ form.persons }}
+                {% if form.persons.help_text %}<small class="form-text text-muted d-block">{{ form.persons.help_text }}</small>{% endif %}
+                {% for error in form.persons.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+        </fieldset>
+
+        <fieldset class="mb-3 p-3 border rounded">
+            <legend class="w-auto px-2 h6">Додаткова інформація</legend>
+            <div class="mb-3">
+                <label for="{{ form.work_requests.id_for_label }}" class="form-label fw-bold">{{ form.work_requests.label }}:</label>
+                {{ form.work_requests }}
+                {% if form.work_requests.help_text %}<small class="form-text text-muted d-block">{{ form.work_requests.help_text }}</small>{% endif %}
+                {% for error in form.work_requests.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+            
+            <div class="mb-3">
+                <label for="{{ form.purpose.id_for_label }}" class="form-label fw-bold">{{ form.purpose.label }}:</label>
+                {{ form.purpose }}
+                {% if form.purpose.help_text %}<small class="form-text text-muted d-block">{{ form.purpose.help_text }}</small>{% endif %}
+                {% for error in form.purpose.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+        </fieldset>
         
-        <div class="form-actions">
+        <div class="form-actions mt-4">
             <button type="submit" class="btn btn-primary">Зберегти відрядження</button>
-            <a href="{% url 'oids:main_dashboard' %}" class="btn btn-secondary">Скасувати</a>
+            <a href="{% url 'oids:list_trips' %}" class="btn btn-secondary">Скасувати</a> {# Або main_dashboard #}
         </div>
     </form>
 </div>
 {% endblock %}
 
-{% block page_specific_js %}
+{% block extra_js %}
 <script>
-$(document).ready(function() {
-    // Ініціалізація Select2 для полів цієї форми, якщо вони мають клас .select2
-    // initSelect2Fields($('.form-container')); // Передаємо контейнер форми як scope
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("Plan Trip Form JS: DOMContentLoaded.");
 
-    // Якщо ти будеш додавати динамічну фільтрацію ОІДів на основі обраних ВЧ
-    // саме на цій формі, тут потрібно буде налаштувати filtering_dynamic.js.
-    // Наприклад:
-    // if (typeof initializeDynamicFilters === 'function') {
-    //     const tripFormFilterConfig = [
-    //         {
-    //             sourceSelectSelector: '#id_trip_units_form', // ID з TripForm
-    //             targetSelectSelector: '#id_trip_oids_form',   // ID з TripForm
-    //             paramName: 'unit_ids[]', // Якщо units - ModelMultipleChoiceField
-    //             // URL для завантаження ОІДів для кількох ВЧ (потрібен відповідний AJAX view)
-    //             // url: $('#id_trip_units_form').data('ajax-url-oids-for-multiple-units') 
-    //             // Або для однієї ВЧ, якщо логіка інша:
-    //             // url: $('#id_trip_units_form').data('ajax-url-oids-for-unit') 
-    //             placeholder: { default: 'Спочатку оберіть ВЧ', loading: 'Завантаження ОІД...', error: 'Помилка', empty: 'Немає ОІД'},
-    //             transformItem: item => ({ id: item.id, text: `${item.cipher} - ${item.name || ''}` }),
-    //             clearTargetsSelectors: ['#id_trip_oids_form'] 
-    //         }
-    //     ];
-    //     // Потрібно адаптувати initializeDynamicFilters, щоб він міг приймати конфігурації
-    //     // або викликати setupDynamicFilter для кожної конфігурації тут.
-    //     tripFormFilterConfig.forEach(config => {
-    //         if ($(config.sourceSelectSelector).length && $(config.targetSelectSelector).length) {
-    //             // Переконайся, що URL встановлено в data-атрибуті
-    //             const ajaxUrl = $(config.sourceSelectSelector).data('ajax-url-oids-for-multiple-units') || $(config.sourceSelectSelector).data('ajax-url-oids-for-unit');
-    //             if (ajaxUrl) {
-    //                 config.url = ajaxUrl;
-    //                 setupDynamicFilter(config);
-    //             } else {
-    //                 console.warn(`URL для AJAX не знайдено на ${config.sourceSelectSelector}`);
-    //             }
-    //         }
-    //     });
-    // }
+    // Визначаємо URL для AJAX запиту ОІДів
+    let oidsAjaxUrl = "{% url 'oids:ajax_load_oids_for_multiple_units' %}";
+    if (typeof window.AJAX_LOAD_OIDS_FOR_MULTIPLE_UNITS_URL !== 'undefined') {
+        oidsAjaxUrl = window.AJAX_LOAD_OIDS_FOR_MULTIPLE_UNITS_URL;
+    } else if (oidsAjaxUrl && !oidsAjaxUrl.includes("None") && oidsAjaxUrl.trim() !== "" && !oidsAjaxUrl.startsWith('{')) {
+        window.AJAX_LOAD_OIDS_FOR_MULTIPLE_UNITS_URL = oidsAjaxUrl; // Зберігаємо для можливого використання
+    } else {
+        console.error("Plan Trip Form JS: URL for loading OIDs is not defined or invalid!");
+        oidsAjaxUrl = null; // Робимо його невалідним, щоб уникнути помилок fetch
+    }
+    console.log("Plan Trip Form JS: AJAX URL for OIDs set to:", oidsAjaxUrl);
+
+
+    if (typeof TomSelect === 'undefined') {
+        console.error("Plan Trip Form JS: TomSelect library is NOT loaded!");
+        return;
+    }
+    console.log("Plan Trip Form JS: TomSelect library is loaded.");
+
+    // Ініціалізація TomSelect для полів з класом 'tomselect-field'
+    const tomSelectFields = document.querySelectorAll('#planTripForm .tomselect-field');
+    tomSelectFields.forEach(function(selectElement) {
+        let placeholderText = "Оберіть...";
+        if (selectElement.id === 'id_trip_form_units') placeholderText = "Оберіть ВЧ...";
+        else if (selectElement.id === 'id_trip_form_oids') placeholderText = "Спочатку оберіть ВЧ...";
+        else if (selectElement.id === '{{ form.persons.id_for_label }}') placeholderText = "Оберіть осіб...";
+        else if (selectElement.id === '{{ form.work_requests.id_for_label }}') placeholderText = "Оберіть заявки...";
+        
+        const config = {
+            plugins: ['remove_button'],
+            create: false,
+            placeholder: placeholderText,
+            allowEmptyOption: true,
+            // valueField: 'id', // TomSelect зазвичай сам визначає це з <option value="">
+            // labelField: 'text',
+            // searchField: ['text']
+        };
+
+        // Для поля ОІДів робимо його початково деактивованим
+        if (selectElement.id === 'id_trip_form_oids') {
+            config.disabled = true; 
+            config.options = []; // Початково без опцій
+        }
+        
+        const instance = new TomSelect(selectElement, config);
+        selectElement.tomselectInstance = instance; // Зберігаємо екземпляр
+        console.log(`Plan Trip Form JS: TomSelect initialized for #${selectElement.id}`);
+    });
+
+    const unitsSelectElement = document.getElementById('id_trip_form_units');
+    const oidsSelectElement = document.getElementById('id_trip_form_oids');
+
+    if (unitsSelectElement && unitsSelectElement.tomselectInstance && oidsSelectElement && oidsSelectElement.tomselectInstance && oidsAjaxUrl) {
+        console.log("Plan Trip Form JS: Attaching 'change' listener to Units TomSelect.");
+        unitsSelectElement.tomselectInstance.on('change', function(selectedUnitIds) {
+            console.log("Plan Trip Form JS: Units selection changed. Selected Unit IDs:", selectedUnitIds);
+            const oidsTomSelect = oidsSelectElement.tomselectInstance;
+            
+            oidsTomSelect.clear();
+            oidsTomSelect.clearOptions();
+            oidsTomSelect.sync();
+
+            if (selectedUnitIds && selectedUnitIds.length > 0) {
+                oidsTomSelect.enable();
+                oidsTomSelect.placeholder = 'Завантаження ОІДів...';
+
+                // Будуємо query string для кількох ID: unit_ids[]=1&unit_ids[]=2...
+                const params = new URLSearchParams();
+                selectedUnitIds.forEach(id => params.append('unit_ids[]', id));
+                const queryString = params.toString();
+                console.log(`Plan Trip Form JS: Fetching OIDs from: ${oidsAjaxUrl}?${queryString}`);
+
+                // fetch(`${oidsAjaxUrl}?${queryString}`)
+                //     .then(response => {
+                //         console.log("Plan Trip Form JS: OIDs fetch response status:", response.status);
+                //         if (!response.ok) {
+                //             return response.text().then(text => {
+                //                 throw new Error(`Network error (OIDs): ${response.status} ${response.statusText}. Server: ${text}`);
+                //             });
+                //         }
+                //         return response.json();
+                //     })
+                //     .then(data => {
+                //         console.log("Plan Trip Form JS: OIDs data received:", data);
+                //         if (!Array.isArray(data)) {
+                //             console.error('Plan Trip Form JS: Expected array from AJAX (OIDs), got:', typeof data);
+                //             oidsTomSelect.placeholder = 'Помилка формату даних ОІД';
+                //             return;
+                //         }
+                //         const options = data.map(oid => ({
+                //             id: oid.id.toString(),
+                //             text: `${oid.cipher} (${oid.full_name || 'Без назви'}) - ВЧ: ${oid.unit_code}`
+                //         }));
+                //         console.log("Plan Trip Form JS: Mapped OID options for TomSelect:", options);
+                //         oidsTomSelect.addOptions(options);
+                //         oidsTomSelect.placeholder = options.length > 0 ? 'Оберіть ОІД(и)...' : 'Для обраних ВЧ ОІДи не знайдено';
+                //         // Можливо, відновити раніше обрані значення, якщо це редагування
+                //         // const previouslySelectedOids = ... ;
+                //         // if(previouslySelectedOids) oidsTomSelect.setValue(previouslySelectedOids);
+                //     })
+                //     .catch(error => {
+                //         console.error("Plan Trip Form JS: Error loading OIDs:", error);
+                //         oidsTomSelect.placeholder = 'Помилка завантаження ОІДів';
+                //     });
+            
+			// ... всередині unitsSelectElement.tomselectInstance.on('change', function(selectedUnitIds) { ...
+// ... після console.log(`Plan Trip Form JS: Fetching OIDs from: ${oidsAjaxUrl}?${queryString}`);
+
+fetch(`${oidsAjaxUrl}?${queryString}`)
+    .then(response => {
+        console.log("Plan Trip Form JS: OIDs fetch response status:", response.status);
+        if (!response.ok) {
+            // Спробуємо отримати текст помилки, якщо є
+            return response.text().then(text => {
+                console.error('Plan Trip Form JS: Network error response text (OIDs):', text);
+                throw new Error(`Network error (OIDs): ${response.status} ${response.statusText}. Server: ${text}`);
+            });
+        }
+        // !!! ВАЖЛИВО: Потрібно викликати .json() для отримання тіла відповіді !!!
+        return response.json(); 
+    })
+
+	
+// ... всередині fetch(...).then(response => response.json())
+.then(data => {
+    console.log("Plan Trip Form JS: OIDs data received (parsed JSON): V3", data); // V3
+    if (!Array.isArray(data)) {
+        console.error('Plan Trip Form JS: Expected array from AJAX (OIDs), got:', typeof data, data);
+        oidsTomSelect.placeholder = 'Помилка формату даних ОІД';
+        if (oidsTomSelect.control_input) oidsTomSelect.refreshOptions(false); 
+        return;
+    }
+    const options = data.map(oid => ({
+        id: oid.id.toString(),
+        text: `${oid.cipher} (${oid.full_name || 'Без назви'}) - ВЧ: ${oid.unit_code}`
+    }));
+    console.log("Plan Trip Form JS: Mapped OID options for TomSelect:", options);
+    
+    // 1. Очистити поточний список опцій і обрані значення
+    console.log("Plan Trip Form JS: Calling oidsTomSelect.clearStore() if available, else clearOptions() and clear()");
+    if (typeof oidsTomSelect.clearStore === 'function') { // clearStore - це більш радикальне очищення
+        oidsTomSelect.clearStore(); 
+    } else {
+        oidsTomSelect.clearOptions(); 
+        oidsTomSelect.clear(); 
+    }
+    // oidsTomSelect.sync(); // Можливо, не потрібен тут
+
+    // 2. Додати нові опції
+    console.log(`Plan Trip Form JS: Attempting to add ${options.length} options.`);
+    try {
+        oidsTomSelect.addOptions(options);
+        console.log(`Plan Trip Form JS: addOptions called successfully with ${options.length} options.`);
+    } catch (e) {
+        console.error("Plan Trip Form JS: Error during addOptions():", e);
+    }
+    
+    // 3. Явно оновити опції та елементи в інтерфейсі TomSelect
+    // refreshOptions(true) може відкрити список, що допоможе побачити, чи є опції
+    console.log("Plan Trip Form JS: Calling refreshOptions(false).");
+    oidsTomSelect.refreshOptions(false); 
+    // oidsTomSelect.refreshItems(); // Може бути зайвим, якщо немає обраних
+
+    const currentTomSelectOptionsCount = Object.keys(oidsTomSelect.options).length;
+    const itemsInDropdown = oidsTomSelect.dropdown_content.querySelectorAll('.option').length;
+    console.log(`Plan Trip Form JS: Number of options in oidsTomSelect.options object: ${currentTomSelectOptionsCount}`);
+    console.log(`Plan Trip Form JS: Number of .option elements in dropdown_content: ${itemsInDropdown}`);
+
+    if (options.length > 0 && itemsInDropdown === 0) {
+        console.warn("Plan Trip Form JS: Options were added, but dropdown seems empty. Forcing open to check.");
+        // oidsTomSelect.open(); // Спробувати відкрити, щоб побачити, що там
+    }
+
+    oidsTomSelect.placeholder = options.length > 0 ? 'Оберіть ОІД(и)...' : 'Для обраних ВЧ ОІДи не знайдено';
+    
+})
+// ...
+
+
+
+
+	.catch(error => {
+        console.error("Plan Trip Form JS: Error loading OIDs (in CATCH block):", error);
+        oidsTomSelect.placeholder = 'Помилка завантаження ОІДів';
+        oidsTomSelect.sync(); // Синхронізуємо, щоб оновити placeholder
+    });
+// ...
+			
+			
+			} else {
+                oidsTomSelect.disable();
+                oidsTomSelect.placeholder = 'Спочатку оберіть ВЧ...';
+            }
+        });
+         // Якщо при завантаженні сторінки ВЧ вже обрані (редагування або помилка валідації),
+         // то ініціюємо завантаження ОІДів
+        const initialUnitValues = unitsSelectElement.tomselectInstance.getValue();
+        if (initialUnitValues && initialUnitValues.length > 0) {
+            console.log("Plan Trip Form JS: Units pre-selected on load, triggering 'change'. Values:", initialUnitValues);
+            unitsSelectElement.tomselectInstance.trigger('change', initialUnitValues); // Передаємо значення, щоб обробник спрацював
+        }
+
+
+    } else {
+        console.warn("Plan Trip Form JS: Units select, OIDs select, their TomSelect instances, or oidsAjaxUrl not available for dynamic OID loading setup.");
+    }
+     // Обмеження для полів дат
+    const startDateInput = document.getElementById('{{ form.start_date.id_for_label }}');
+    const endDateInput = document.getElementById('{{ form.end_date.id_for_label }}');
+    if (startDateInput && endDateInput) {
+        startDateInput.addEventListener('change', function() { if (this.value) endDateInput.min = this.value; });
+        endDateInput.addEventListener('change', function() { if (this.value) startDateInput.max = this.value; });
+    }
 });
 </script>
 {% endblock %}

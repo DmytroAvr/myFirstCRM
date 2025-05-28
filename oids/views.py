@@ -87,8 +87,44 @@ def ajax_load_oids_for_unit_categorized(request):
             return JsonResponse({'error': f'Серверна помилка: {type(e).__name__}'}, status=500)
             
     return JsonResponse(data)
-
 # Ваш ajax_load_oids_for_unit (якщо потрібен окремо для простого списку ОІДів, наприклад, для форм)
+
+def ajax_load_oids_for_multiple_units(request):
+    unit_ids_str = request.GET.getlist('unit_ids[]') # Отримуємо список ID як рядки
+    # Або якщо JS надсилає як 'unit_ids' через кому: request.GET.get('unit_ids', '').split(',')
+    
+    oids_data = []
+    unit_ids = []
+    for uid_str in unit_ids_str:
+        if uid_str.isdigit():
+            unit_ids.append(int(uid_str))
+
+    if unit_ids:
+        try:
+            # Отримуємо ОІДи, що належать до будь-якої з обраних ВЧ
+            oids_queryset = OID.objects.filter(
+                unit__id__in=unit_ids,
+                # Можна додати фільтр за статусом ОІД, наприклад:
+                # status__in=[OIDStatusChoices.ACTIVE, OIDStatusChoices.NEW, OIDStatusChoices.RECEIVED_REQUEST, OIDStatusChoices.RECEIVED_TZ]
+            ).select_related('unit').order_by('unit__code', 'cipher').distinct()
+            
+            for oid in oids_queryset:
+                oids_data.append({
+                    'id': oid.id,
+                    'cipher': oid.cipher, 
+                    'full_name': oid.full_name or "",
+                    'unit_code': oid.unit.code, # Додаємо код ВЧ для кращого відображення
+                    'unit_name': oid.unit.name or oid.unit.city # Також назву/місто ВЧ
+                })
+        except ValueError:
+            return JsonResponse({'error': 'Невірні ID військових частин'}, status=400)
+            
+    return JsonResponse(oids_data, safe=False)
+
+# Не забудьте додати URL для цього view у oids/urls.py:
+# path('ajax/load-oids-for-multiple-units/', views.ajax_load_oids_for_multiple_units, name='ajax_load_oids_for_multiple_units'),
+
+
 
 # AJAX view для завантаження ОІДів для Select2 у формах (якщо потрібно)
 # Цей view НЕ використовується для оновлення списків ОІД на головній панелі в цьому сценарії
