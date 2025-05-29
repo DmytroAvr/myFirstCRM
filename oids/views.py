@@ -158,6 +158,39 @@ def ajax_load_oids_for_unit(request):
 # oids/urls.py - не забудьте додати:
 # path('ajax/load-oids-for-unit/', views.ajax_load_oids_for_unit, name='ajax_load_oids_for_unit'),
 
+
+def ajax_load_work_requests_for_oids(request):
+    oid_ids_str = request.GET.getlist('oid_ids[]') # Отримуємо список ID ОІДів
+
+    work_requests_data = []
+    oid_ids = []
+    for oid_str in oid_ids_str:
+        if oid_str.isdigit():
+            oid_ids.append(int(oid_str))
+
+    if oid_ids:
+        try:
+            # Знаходимо заявки, які мають WorkRequestItem, пов'язаний з будь-яким із переданих ОІДів
+            # і мають відповідний статус
+            relevant_requests = WorkRequest.objects.filter(
+                items__oid__id__in=oid_ids,
+                status__in=[WorkRequestStatusChoices.PENDING, WorkRequestStatusChoices.IN_PROGRESS]
+            ).select_related('unit').distinct().order_by('-incoming_date')
+            # distinct() важливий, якщо одна заявка має кілька ОІДів з переданого списку
+
+            for wr in relevant_requests:
+                work_requests_data.append({
+                    'id': wr.id,
+                    'text': f"№{wr.incoming_number} від {wr.incoming_date.strftime('%d.%m.%Y')} (ВЧ: {wr.unit.code}) - {wr.get_status_display()}"
+                })
+        except Exception as e:
+            # Обробка можливих помилок, наприклад, якщо OID.DoesNotExist (малоймовірно при filter id__in)
+            print(f"Error in ajax_load_work_requests_for_oids: {e}") # Для логування
+            return JsonResponse({'error': str(e)}, status=500)
+            
+    return JsonResponse(work_requests_data, safe=False)
+
+
 def main_dashboard(request):
     """
     Головна сторінка. Фільтрація ВЧ -> ОІД відбувається на сервері 
