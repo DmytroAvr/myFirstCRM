@@ -85,215 +85,278 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("Plan Trip Form JS: DOMContentLoaded.");
-
-    // Визначаємо URL для AJAX запиту ОІДів
-    let oidsAjaxUrl = "{% url 'oids:ajax_load_oids_for_multiple_units' %}";
-    if (typeof window.AJAX_LOAD_OIDS_FOR_MULTIPLE_UNITS_URL !== 'undefined') {
-        oidsAjaxUrl = window.AJAX_LOAD_OIDS_FOR_MULTIPLE_UNITS_URL;
-    } else if (oidsAjaxUrl && !oidsAjaxUrl.includes("None") && oidsAjaxUrl.trim() !== "" && !oidsAjaxUrl.startsWith('{')) {
-        window.AJAX_LOAD_OIDS_FOR_MULTIPLE_UNITS_URL = oidsAjaxUrl; // Зберігаємо для можливого використання
-    } else {
-        console.error("Plan Trip Form JS: URL for loading OIDs is not defined or invalid!");
-        oidsAjaxUrl = null; // Робимо його невалідним, щоб уникнути помилок fetch
-    }
-    console.log("Plan Trip Form JS: AJAX URL for OIDs set to:", oidsAjaxUrl);
-
-
-    if (typeof TomSelect === 'undefined') {
-        console.error("Plan Trip Form JS: TomSelect library is NOT loaded!");
-        return;
-    }
-    console.log("Plan Trip Form JS: TomSelect library is loaded.");
-
-    // Ініціалізація TomSelect для полів з класом 'tomselect-field'
-    const tomSelectFields = document.querySelectorAll('#planTripForm .tomselect-field');
-    tomSelectFields.forEach(function(selectElement) {
-        let placeholderText = "Оберіть...";
-        if (selectElement.id === 'id_trip_form_units') placeholderText = "Оберіть ВЧ...";
-        else if (selectElement.id === 'id_trip_form_oids') placeholderText = "Спочатку оберіть ВЧ...";
-        else if (selectElement.id === '{{ form.persons.id_for_label }}') placeholderText = "Оберіть осіб...";
-        else if (selectElement.id === '{{ form.work_requests.id_for_label }}') placeholderText = "Оберіть заявки...";
-        
-        const config = {
-            plugins: ['remove_button'],
-            create: false,
-            placeholder: placeholderText,
-            allowEmptyOption: true,
-            // valueField: 'id', // TomSelect зазвичай сам визначає це з <option value="">
-            // labelField: 'text',
-            // searchField: ['text']
-        };
-
-        // Для поля ОІДів робимо його початково деактивованим
-        if (selectElement.id === 'id_trip_form_oids') {
-            config.disabled = true; 
-            config.options = []; // Початково без опцій
-        }
-        
-        const instance = new TomSelect(selectElement, config);
-        selectElement.tomselectInstance = instance; // Зберігаємо екземпляр
-        console.log(`Plan Trip Form JS: TomSelect initialized for #${selectElement.id}`);
-    });
+    console.log("Plan Trip Form JS: DOMContentLoaded. V7 Debug (Filter WorkRequests).");
 
     const unitsSelectElement = document.getElementById('id_trip_form_units');
     const oidsSelectElement = document.getElementById('id_trip_form_oids');
+    const workRequestsSelectElement = document.getElementById('id_work_requests'); // ID вашого поля заявок
 
-    if (unitsSelectElement && unitsSelectElement.tomselectInstance && oidsSelectElement && oidsSelectElement.tomselectInstance && oidsAjaxUrl) {
-        console.log("Plan Trip Form JS: Attaching 'change' listener to Units TomSelect.");
-        unitsSelectElement.tomselectInstance.on('change', function(selectedUnitIds) {
-            console.log("Plan Trip Form JS: Units selection changed. Selected Unit IDs:", selectedUnitIds);
-            const oidsTomSelect = oidsSelectElement.tomselectInstance;
+    let tomSelectUnits = null;
+    let tomSelectOids = null;
+    let tomSelectWorkRequests = null;
+
+    // URL-и для AJAX (переконайтесь, що вони правильно визначені у base.html або тут)
+    const oidsAjaxUrl = window.AJAX_LOAD_OIDS_FOR_MULTIPLE_UNITS_URL || "{% url 'oids:ajax_load_oids_for_multiple_units' %}";
+    const workRequestsAjaxUrl = window.AJAX_LOAD_WORK_REQUESTS_FOR_OIDS_URL || "{% url 'oids:ajax_load_work_requests_for_oids' %}";
+    
+    console.log("Plan Trip Form JS: AJAX URL for OIDs:", oidsAjaxUrl);
+    console.log("Plan Trip Form JS: AJAX URL for WorkRequests:", workRequestsAjaxUrl);
+
+    if (typeof TomSelect === 'undefined') {
+        console.error("Plan Trip Form JS: TomSelect library is NOT loaded!");
+        return; 
+    }
+    console.log("Plan Trip Form JS: TomSelect library is loaded.");
+
+    // Функція для ініціалізації TomSelect з базовими налаштуваннями
+    function initializeGenericTomSelect(element, placeholder, allowClear = true, plugins = ['remove_button']) {
+        if (!element) return null;
+        console.log(`Plan Trip Form JS: Initializing TomSelect for #${element.id}`);
+        const instance = new TomSelect(element, {
+            plugins: plugins,
+            create: false,
+            placeholder: placeholder,
+            allowEmptyOption: allowClear,
+        });
+        element.tomselectInstance = instance;
+        return instance;
+    }
+    
+    // Ініціалізація TomSelect для ВЧ
+    if (unitsSelectElement && unitsSelectElement.classList.contains('tomselect-field')) {
+        tomSelectUnits = initializeGenericTomSelect(unitsSelectElement, 'Оберіть ВЧ...');
+    }
+
+    // Функція для отримання конфігурації TomSelect для ОІДів
+    function getOidTomSelectConfig(placeholderText = 'Оберіть...', isDisabled = true) {
+        // ... (як було раніше) ...
+        return {
+            plugins: ['remove_button'], create: false, placeholder: placeholderText,
+            valueField: 'id', labelField: 'text', searchField: ['text'],
+            options: [], disabled: isDisabled, allowEmptyOption: true,
+        };
+    }
+    
+    // Початкова ініціалізація TomSelect для ОІДів (деактивований)
+    if (oidsSelectElement && oidsSelectElement.classList.contains('tomselect-field')) {
+        const initialOidConfig = getOidTomSelectConfig('Спочатку оберіть ВЧ...', true);
+        tomSelectOids = new TomSelect(oidsSelectElement, initialOidConfig);
+        oidsSelectElement.tomselectInstance = tomSelectOids;
+    }
+
+    // Ініціалізація TomSelect для Заявок (початково може бути деактивований або показувати всі)
+    if (workRequestsSelectElement && workRequestsSelectElement.classList.contains('tomselect-field')) {
+        tomSelectWorkRequests = initializeGenericTomSelect(workRequestsSelectElement, 'Спочатку оберіть ОІДи...', true);
+        if (tomSelectWorkRequests) tomSelectWorkRequests.disable(); // Деактивуємо, поки не обрані ОІДи
+    }
+
+    // --- НОВА ФУНКЦІЯ для фільтрації Заявок ---
+    function filterWorkRequestsByOids(selectedOidIds) {
+        console.log("Plan Trip Form JS: filterWorkRequestsByOids called with OID IDs:", selectedOidIds);
+        if (!tomSelectWorkRequests) {
+            console.warn("Plan Trip Form JS: TomSelect for Work Requests not initialized. Cannot filter.");
+            return;
+        }
+
+        tomSelectWorkRequests.clear();
+        tomSelectWorkRequests.clearOptions();
+        tomSelectWorkRequests.sync();
+
+        if (selectedOidIds && selectedOidIds.length > 0) {
+            tomSelectWorkRequests.enable();
+            tomSelectWorkRequests.placeholder = 'Завантаження заявок...';
+
+            const params = new URLSearchParams();
+            selectedOidIds.forEach(id => params.append('oid_ids[]', id));
+            const queryString = params.toString();
+            console.log(`Plan Trip Form JS: Fetching Work Requests from: ${workRequestsAjaxUrl}?${queryString}`);
+
+            fetch(`${workRequestsAjaxUrl}?${queryString}`)
+                .then(response => {
+                    console.log("Plan Trip Form JS: Work Requests fetch response status:", response.status);
+                    if (!response.ok) return response.text().then(text => { throw new Error(`Network error (WorkRequests): ${response.statusText}. Server: ${text}`); });
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("Plan Trip Form JS: Work Requests data received:", data); // Цей лог у вас є
+                    if (!Array.isArray(data)) {
+                        console.error('Plan Trip Form JS: Expected array from AJAX (WorkRequests), got:', typeof data);
+                        tomSelectWorkRequests.placeholder = 'Помилка формату даних заявок';
+                        tomSelectWorkRequests.refreshOptions(false);
+                        return;
+                    }
+
+                    const options = data.map(wr => ({ 
+                        id: wr.id.toString(), 
+                        text: wr.text 
+                    }));
+                    console.log("Plan Trip Form JS: Mapped Work Request options for TomSelect:", options);
+
+                    // 1. Очистити поточні обрані значення (якщо є)
+                    tomSelectWorkRequests.clear(); 
+                    console.log("Plan Trip Form JS: Work Requests TomSelect - called .clear()");
+
+                    // 2. Очистити ВСІ існуючі опції зі списку
+                    tomSelectWorkRequests.clearOptions(); 
+                    console.log("Plan Trip Form JS: Work Requests TomSelect - called .clearOptions()");
+                    
+                    // 3. Додати нові, відфільтровані опції
+                    if (options.length > 0) {
+                        tomSelectWorkRequests.addOptions(options);
+                        console.log(`Plan Trip Form JS: ${options.length} Work Request options passed to addOptions.`);
+                    } else {
+                        console.log("Plan Trip Form JS: No Work Request options to add (data was empty).");
+                    }
+
+                    // 4. Оновити відображення опцій у випадаючому списку
+                    tomSelectWorkRequests.refreshOptions(false); 
+                    console.log("Plan Trip Form JS: Work Requests TomSelect - called .refreshOptions(false).");
+
+                    // 5. Оновити відображення обраних елементів (якщо такі є після очищення і додавання)
+                    tomSelectWorkRequests.refreshItems(); // Може не знадобитися, якщо clear() вже все зробив
+
+                    // 6. Перевірка кількості опцій в DOM (для дебагу)
+                    const itemsInDropdownWR = tomSelectWorkRequests.dropdown_content.querySelectorAll('.option').length;
+                    console.log(`Plan Trip Form JS: Number of .option elements in WorkRequests dropdown_content: ${itemsInDropdownWR}`);
+
+                    tomSelectWorkRequests.placeholder = options.length > 0 ? 'Оберіть пов\'язані заявки...' : 'Заявок для обраних ОІДів не знайдено';
+
+                    if (options.length > 0 && itemsInDropdownWR === 0) {
+                        console.warn("Plan Trip Form JS (WorkRequests): Options were added, refresh called, but dropdown DOM seems empty for Work Requests.");
+                    } else if (options.length > 0 && itemsInDropdownWR > 0) {
+                        console.log("Plan Trip Form JS (WorkRequests): SUCCESS! Work Request options should be updated and visible.");
+                    }
+
+                })
+                .catch(error => {
+                    console.error("Plan Trip Form JS: Error loading Work Requests:", error);
+                    tomSelectWorkRequests.placeholder = 'Помилка завантаження заявок';
+                    tomSelectWorkRequests.refreshOptions(false);
+                });
+        } else {
+            tomSelectWorkRequests.disable();
+            tomSelectWorkRequests.placeholder = 'Спочатку оберіть ОІДи...';
+            console.log("Plan Trip Form JS: No OIDs selected, Work Requests select disabled.");
+        }
+    }
+
+
+    // Слухач на зміну ВЧ (як було, але тепер ми маємо `tomSelectOids` як let)
+    if (tomSelectUnits && oidsSelectElement) {
+        tomSelectUnits.on('change', function(selectedUnitIdsStringArray) {
+            const selectedUnitIds = selectedUnitIdsStringArray.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+            console.log("Plan Trip Form JS: Units selection changed. Parsed selected Unit IDs:", selectedUnitIds);
             
-            oidsTomSelect.clear();
-            oidsTomSelect.clearOptions();
-            oidsTomSelect.sync();
+            if (oidsSelectElement.tomselectInstance) {
+                oidsSelectElement.tomselectInstance.destroy();
+                oidsSelectElement.tomselectInstance = null;
+            }
+            // Очищаємо також список заявок, оскільки вони залежать від ОІДів
+            if (tomSelectWorkRequests) {
+                tomSelectWorkRequests.clear(); tomSelectWorkRequests.clearOptions(); tomSelectWorkRequests.sync();
+                tomSelectWorkRequests.disable(); tomSelectWorkRequests.placeholder = 'Спочатку оберіть ОІДи...';
+            }
+
 
             if (selectedUnitIds && selectedUnitIds.length > 0) {
-                oidsTomSelect.enable();
-                oidsTomSelect.placeholder = 'Завантаження ОІДів...';
+                const newOidConfig = getOidTomSelectConfig('Завантаження ОІДів...', false);
+                tomSelectOids = new TomSelect(oidsSelectElement, newOidConfig); // Присвоюємо оновлений екземпляр
+                oidsSelectElement.tomselectInstance = tomSelectOids;
+                console.log("Plan Trip Form JS: oidsTomSelect RE-INITIALIZED for fetch.");
 
-                // Будуємо query string для кількох ID: unit_ids[]=1&unit_ids[]=2...
+                // ... (код fetch для ОІДів, як у вашій попередній робочій версії) ...
                 const params = new URLSearchParams();
                 selectedUnitIds.forEach(id => params.append('unit_ids[]', id));
                 const queryString = params.toString();
-                console.log(`Plan Trip Form JS: Fetching OIDs from: ${oidsAjaxUrl}?${queryString}`);
-
-                // fetch(`${oidsAjaxUrl}?${queryString}`)
-                //     .then(response => {
-                //         console.log("Plan Trip Form JS: OIDs fetch response status:", response.status);
-                //         if (!response.ok) {
-                //             return response.text().then(text => {
-                //                 throw new Error(`Network error (OIDs): ${response.status} ${response.statusText}. Server: ${text}`);
-                //             });
-                //         }
-                //         return response.json();
-                //     })
-                //     .then(data => {
-                //         console.log("Plan Trip Form JS: OIDs data received:", data);
-                //         if (!Array.isArray(data)) {
-                //             console.error('Plan Trip Form JS: Expected array from AJAX (OIDs), got:', typeof data);
-                //             oidsTomSelect.placeholder = 'Помилка формату даних ОІД';
-                //             return;
-                //         }
-                //         const options = data.map(oid => ({
-                //             id: oid.id.toString(),
-                //             text: `${oid.cipher} (${oid.full_name || 'Без назви'}) - ВЧ: ${oid.unit_code}`
-                //         }));
-                //         console.log("Plan Trip Form JS: Mapped OID options for TomSelect:", options);
-                //         oidsTomSelect.addOptions(options);
-                //         oidsTomSelect.placeholder = options.length > 0 ? 'Оберіть ОІД(и)...' : 'Для обраних ВЧ ОІДи не знайдено';
-                //         // Можливо, відновити раніше обрані значення, якщо це редагування
-                //         // const previouslySelectedOids = ... ;
-                //         // if(previouslySelectedOids) oidsTomSelect.setValue(previouslySelectedOids);
-                //     })
-                //     .catch(error => {
-                //         console.error("Plan Trip Form JS: Error loading OIDs:", error);
-                //         oidsTomSelect.placeholder = 'Помилка завантаження ОІДів';
-                //     });
-            
-			// ... всередині unitsSelectElement.tomselectInstance.on('change', function(selectedUnitIds) { ...
-// ... після console.log(`Plan Trip Form JS: Fetching OIDs from: ${oidsAjaxUrl}?${queryString}`);
-
-fetch(`${oidsAjaxUrl}?${queryString}`)
-    .then(response => {
-        console.log("Plan Trip Form JS: OIDs fetch response status:", response.status);
-        if (!response.ok) {
-            // Спробуємо отримати текст помилки, якщо є
-            return response.text().then(text => {
-                console.error('Plan Trip Form JS: Network error response text (OIDs):', text);
-                throw new Error(`Network error (OIDs): ${response.status} ${response.statusText}. Server: ${text}`);
-            });
-        }
-        // !!! ВАЖЛИВО: Потрібно викликати .json() для отримання тіла відповіді !!!
-        return response.json(); 
-    })
-
-	
-// ... всередині fetch(...).then(response => response.json())
-.then(data => {
-    console.log("Plan Trip Form JS: OIDs data received (parsed JSON): V3", data); // V3
-    if (!Array.isArray(data)) {
-        console.error('Plan Trip Form JS: Expected array from AJAX (OIDs), got:', typeof data, data);
-        oidsTomSelect.placeholder = 'Помилка формату даних ОІД';
-        if (oidsTomSelect.control_input) oidsTomSelect.refreshOptions(false); 
-        return;
-    }
-    const options = data.map(oid => ({
-        id: oid.id.toString(),
-        text: `${oid.cipher} (${oid.full_name || 'Без назви'}) - ВЧ: ${oid.unit_code}`
-    }));
-    console.log("Plan Trip Form JS: Mapped OID options for TomSelect:", options);
-    
-    // 1. Очистити поточний список опцій і обрані значення
-    console.log("Plan Trip Form JS: Calling oidsTomSelect.clearStore() if available, else clearOptions() and clear()");
-    if (typeof oidsTomSelect.clearStore === 'function') { // clearStore - це більш радикальне очищення
-        oidsTomSelect.clearStore(); 
-    } else {
-        oidsTomSelect.clearOptions(); 
-        oidsTomSelect.clear(); 
-    }
-    // oidsTomSelect.sync(); // Можливо, не потрібен тут
-
-    // 2. Додати нові опції
-    console.log(`Plan Trip Form JS: Attempting to add ${options.length} options.`);
-    try {
-        oidsTomSelect.addOptions(options);
-        console.log(`Plan Trip Form JS: addOptions called successfully with ${options.length} options.`);
-    } catch (e) {
-        console.error("Plan Trip Form JS: Error during addOptions():", e);
-    }
-    
-    // 3. Явно оновити опції та елементи в інтерфейсі TomSelect
-    // refreshOptions(true) може відкрити список, що допоможе побачити, чи є опції
-    console.log("Plan Trip Form JS: Calling refreshOptions(false).");
-    oidsTomSelect.refreshOptions(false); 
-    // oidsTomSelect.refreshItems(); // Може бути зайвим, якщо немає обраних
-
-    const currentTomSelectOptionsCount = Object.keys(oidsTomSelect.options).length;
-    const itemsInDropdown = oidsTomSelect.dropdown_content.querySelectorAll('.option').length;
-    console.log(`Plan Trip Form JS: Number of options in oidsTomSelect.options object: ${currentTomSelectOptionsCount}`);
-    console.log(`Plan Trip Form JS: Number of .option elements in dropdown_content: ${itemsInDropdown}`);
-
-    if (options.length > 0 && itemsInDropdown === 0) {
-        console.warn("Plan Trip Form JS: Options were added, but dropdown seems empty. Forcing open to check.");
-        // oidsTomSelect.open(); // Спробувати відкрити, щоб побачити, що там
-    }
-
-    oidsTomSelect.placeholder = options.length > 0 ? 'Оберіть ОІД(и)...' : 'Для обраних ВЧ ОІДи не знайдено';
-    
-})
-// ...
+                fetch(`${oidsAjaxUrl}?${queryString}`)
+                    .then(response => {
+                        if (!response.ok) return response.text().then(text => { throw new Error(`Network error (OIDs): ${response.statusText}. Server: ${text}`); });
+                        return response.json();
+                    })
+                    .then(data => {
+                        const options = data.map(oid => ({
+                            id: oid.id.toString(),
+                            text: `${oid.cipher} (${oid.full_name || 'Без назви'}) - ВЧ: ${oid.unit_code}`
+                        }));
+                        tomSelectOids.addOptions(options);
 
 
 
 
-	.catch(error => {
-        console.error("Plan Trip Form JS: Error loading OIDs (in CATCH block):", error);
-        oidsTomSelect.placeholder = 'Помилка завантаження ОІДів';
-        oidsTomSelect.sync(); // Синхронізуємо, щоб оновити placeholder
-    });
-// ...
-			
-			
-			} else {
-                oidsTomSelect.disable();
-                oidsTomSelect.placeholder = 'Спочатку оберіть ВЧ...';
+                         tomSelectOids.refreshOptions(false); 
+                        // tomSelectOids.refreshItems(); 
+
+                        const itemsInDropdown = tomSelectOids.dropdown_content.querySelectorAll('.option').length;
+                        console.log(`Plan Trip Form JS: Number of .option elements in dropdown (RECREATED instance): ${itemsInDropdown}`);
+
+                        tomSelectOids.placeholder = options.length > 0 ? 'Оберіть ОІД(и)...' : 'Для обраних ВЧ ОІДи не знайдено';
+
+                        if (options.length > 0 && itemsInDropdown > 0) {
+                            console.log("Plan Trip Form JS: SUCCESS! Options are in dropdown DOM. Attempting to open.");
+                            tomSelectOids.open(); // <--- ЯВНО ВІДКРИВАЄМО СПИСОК
+                        } else if (options.length > 0 && itemsInDropdown === 0) {
+                            console.warn("Plan Trip Form JS: Options were processed, but not rendered in dropdown DOM. Attempting to open anyway.");
+                            tomSelectOids.open(); // <--- Спробуємо відкрити, навіть якщо DOM порожній (можливо, він оновиться при відкритті)
+                        } else {
+                            console.log("Plan Trip Form JS: No options to display, or dropdown already reflects this.");
+                        }
+
+                        // Додатково, переконайтеся, що елемент не деактивовано
+                        if (tomSelectOids.isDisabled) {
+                            console.log("Plan Trip Form JS: oidsTomSelect is disabled, enabling it.");
+                            tomSelectOids.enable();
+                        }
+                        // Після успішного завантаження ОІДів, викликаємо фільтрацію заявок (якщо ОІДи обрані)
+                        // Але краще викликати це, коли змінюється вибір У ОІДІВ
+                        // filterWorkRequestsByOids(tomSelectOids.getValue()); // Можливо, передчасно
+                    })
+                    .catch(error => { /* ... обробка помилки ... */ });
+            } else {
+                // ... (логіка для деактивації tomSelectOids, як було) ...
+                 if (oidsSelectElement.tomselectInstance) { // Використовуємо екземпляр, прив'язаний до елемента
+                    const ts = oidsSelectElement.tomselectInstance;
+                    ts.clear(); ts.clearOptions(); ts.disable();
+                    ts.placeholder = 'Спочатку оберіть ВЧ...'; ts.sync();
+                }
             }
         });
-         // Якщо при завантаженні сторінки ВЧ вже обрані (редагування або помилка валідації),
-         // то ініціюємо завантаження ОІДів
-        const initialUnitValues = unitsSelectElement.tomselectInstance.getValue();
+        // ... (ініціалізація при завантаженні, якщо ВЧ обрані, як було) ...
+    }
+    
+    // --- НОВИЙ СЛУХАЧ: на зміну обраних ОІДів ---
+    if (oidsSelectElement && oidsSelectElement.tomselectInstance) {
+        // Важливо: oidsSelectElement.tomselectInstance може бути переініціалізований,
+        // тому цей слухач краще додавати після кожної переініціалізації oidsTomSelect
+        // АБО, якщо tomSelectOids - це завжди актуальний екземпляр, то можна так:
+        // Однак, оскільки ми перестворюємо tomSelectOids, цей слухач потрібно буде додавати кожного разу
+        // після new TomSelect(oidsSelectElement, newOidConfig).
+        // Простіший варіант - додати його один раз і перевіряти існування oidsSelectElement.tomselectInstance
+        oidsSelectElement.addEventListener('change', function() { // Слухач на оригінальний HTML select
+            if (oidsSelectElement.tomselectInstance) {
+                const selectedOidIds = oidsSelectElement.tomselectInstance.getValue();
+                console.log("Plan Trip Form JS: OIDs selection changed. Selected OID IDs:", selectedOidIds);
+                filterWorkRequestsByOids(selectedOidIds);
+            }
+        });
+         console.log("Plan Trip Form JS: 'change' listener attached to OIDs select (for filtering WorkRequests).");
+    }
+
+
+    // Ініціалізація при завантаженні сторінки (для ВЧ)
+    if (tomSelectUnits) { // Перевіряємо, чи tomSelectUnits ініціалізований
+        const initialUnitValues = tomSelectUnits.getValue();
         if (initialUnitValues && initialUnitValues.length > 0) {
             console.log("Plan Trip Form JS: Units pre-selected on load, triggering 'change'. Values:", initialUnitValues);
-            unitsSelectElement.tomselectInstance.trigger('change', initialUnitValues); // Передаємо значення, щоб обробник спрацював
+            tomSelectUnits.trigger('change');
+        } else {
+             console.log("Plan Trip Form JS: No units pre-selected on load.");
+             if (tomSelectOids) {tomSelectOids.disable(); tomSelectOids.placeholder = 'Спочатку оберіть ВЧ...';}
+             if (tomSelectWorkRequests) {tomSelectWorkRequests.disable(); tomSelectWorkRequests.placeholder = 'Спочатку оберіть ОІДи...';}
         }
-
-
-    } else {
-        console.warn("Plan Trip Form JS: Units select, OIDs select, their TomSelect instances, or oidsAjaxUrl not available for dynamic OID loading setup.");
     }
-     // Обмеження для полів дат
+    
+
+    // ... (решта вашого JS, наприклад, для обмеження дат) ...
     const startDateInput = document.getElementById('{{ form.start_date.id_for_label }}');
     const endDateInput = document.getElementById('{{ form.end_date.id_for_label }}');
     if (startDateInput && endDateInput) {
