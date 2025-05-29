@@ -178,55 +178,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     return response.json();
                 })
                 .then(data => {
-                    console.log("Plan Trip Form JS: Work Requests data received:", data); // Цей лог у вас є
-                    if (!Array.isArray(data)) {
-                        console.error('Plan Trip Form JS: Expected array from AJAX (WorkRequests), got:', typeof data);
-                        tomSelectWorkRequests.placeholder = 'Помилка формату даних заявок';
-                        tomSelectWorkRequests.refreshOptions(false);
-                        return;
-                    }
-
-                    const options = data.map(wr => ({ 
-                        id: wr.id.toString(), 
-                        text: wr.text 
-                    }));
-                    console.log("Plan Trip Form JS: Mapped Work Request options for TomSelect:", options);
-
-                    // 1. Очистити поточні обрані значення (якщо є)
-                    tomSelectWorkRequests.clear(); 
-                    console.log("Plan Trip Form JS: Work Requests TomSelect - called .clear()");
-
-                    // 2. Очистити ВСІ існуючі опції зі списку
-                    tomSelectWorkRequests.clearOptions(); 
-                    console.log("Plan Trip Form JS: Work Requests TomSelect - called .clearOptions()");
-                    
-                    // 3. Додати нові, відфільтровані опції
-                    if (options.length > 0) {
-                        tomSelectWorkRequests.addOptions(options);
-                        console.log(`Plan Trip Form JS: ${options.length} Work Request options passed to addOptions.`);
-                    } else {
-                        console.log("Plan Trip Form JS: No Work Request options to add (data was empty).");
-                    }
-
-                    // 4. Оновити відображення опцій у випадаючому списку
-                    tomSelectWorkRequests.refreshOptions(false); 
-                    console.log("Plan Trip Form JS: Work Requests TomSelect - called .refreshOptions(false).");
-
-                    // 5. Оновити відображення обраних елементів (якщо такі є після очищення і додавання)
-                    tomSelectWorkRequests.refreshItems(); // Може не знадобитися, якщо clear() вже все зробив
-
-                    // 6. Перевірка кількості опцій в DOM (для дебагу)
-                    const itemsInDropdownWR = tomSelectWorkRequests.dropdown_content.querySelectorAll('.option').length;
-                    console.log(`Plan Trip Form JS: Number of .option elements in WorkRequests dropdown_content: ${itemsInDropdownWR}`);
-
+                    console.log("Plan Trip Form JS: Work Requests data received:", data);
+                    const options = data.map(wr => ({ id: wr.id.toString(), text: wr.text }));
+                    tomSelectWorkRequests.addOptions(options);
+                    tomSelectWorkRequests.refreshOptions(false);
                     tomSelectWorkRequests.placeholder = options.length > 0 ? 'Оберіть пов\'язані заявки...' : 'Заявок для обраних ОІДів не знайдено';
-
-                    if (options.length > 0 && itemsInDropdownWR === 0) {
-                        console.warn("Plan Trip Form JS (WorkRequests): Options were added, refresh called, but dropdown DOM seems empty for Work Requests.");
-                    } else if (options.length > 0 && itemsInDropdownWR > 0) {
-                        console.log("Plan Trip Form JS (WorkRequests): SUCCESS! Work Request options should be updated and visible.");
-                    }
-
+                    console.log(`Plan Trip Form JS: ${options.length} Work Request options added.`);
                 })
                 .catch(error => {
                     console.error("Plan Trip Form JS: Error loading Work Requests:", error);
@@ -279,11 +236,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             text: `${oid.cipher} (${oid.full_name || 'Без назви'}) - ВЧ: ${oid.unit_code}`
                         }));
                         tomSelectOids.addOptions(options);
-
-
-
-
-                         tomSelectOids.refreshOptions(false); 
+                        
+						
+						tomSelectOids.refreshOptions(false); 
                         // tomSelectOids.refreshItems(); 
 
                         const itemsInDropdown = tomSelectOids.dropdown_content.querySelectorAll('.option').length;
@@ -355,8 +310,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // Обмеження для полів дат (як було)
 
-    // ... (решта вашого JS, наприклад, для обмеження дат) ...
+     // Обмеження для полів дат
     const startDateInput = document.getElementById('{{ form.start_date.id_for_label }}');
     const endDateInput = document.getElementById('{{ form.end_date.id_for_label }}');
     if (startDateInput && endDateInput) {
