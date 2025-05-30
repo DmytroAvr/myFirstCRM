@@ -1,5 +1,6 @@
+{# oids/templates/oids/forms/add_document_processing_form.html #}
 {% extends "oids/base.html" %}
-{% load static %}
+{% load static %} {# Якщо base.html вже має, тут можна опустити, але для самостійності краще залишити #}
 
 {% block title %}{{ page_title|default:"Додати опрацювання документів" }}{% endblock %}
 
@@ -7,322 +8,542 @@
 <div class="container form-container">
     <h2 class="mb-4">
         {{ page_title|default:"Додати опрацювання документів" }}
-        {% if selected_oid %}
+        {% if selected_oid %} {# selected_oid передається з view #}
             для ОІД: <a href="{% url 'oids:oid_detail_view_name' selected_oid.id %}">{{ selected_oid.cipher }}</a>
-             ({{ selected_oid.get_oid_type_display }})
+            ({{ selected_oid.get_oid_type_display }})
         {% endif %}
     </h2>
 
-    <form method="post" enctype="multipart/form-data" novalidate>
+    <form method="post" enctype="multipart/form-data" novalidate id="documentProcessingForm">
         {% csrf_token %}
-        {{ form.media }}
+        
+        {# {{ main_form.media }} #} {# Якщо віджети головної форми використовують медіа #}
+        {# {{ formset.media }} #}   {# Якщо віджети формсету використовують медіа #}
 
-        <div class="table-like-form">
-            {% for field in form %}
-                <div class="form-row mb-3">
-                    <div class="form-group-label" style="font-weight: bold; padding-right: 10px; min-width: 200px; display: inline-block; vertical-align: top;">
-                        <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
-                        {% if field.field.required %}
-                            <span style="color: red;">*</span>
-                        {% endif %}
-                    </div>
-                    <div class="form-group-field" style="display: inline-block; width: calc(100% - 220px);">
-                        {{ field }}
-                        {% if field.help_text %}
-                            <br><small class="form-text text-muted">{{ field.help_text }}</small>
-                        {% endif %}
-                        {% for error in field.errors %}
-                            <div class="alert alert-danger mt-1 p-1" role="alert" style="font-size: 0.9em;">{{ error }}</div>
-                        {% endfor %}
-                    </div>
-                </div>
-            {% endfor %}
+        {# --- Повідомлення про помилки головної форми --- #}
+        {% if main_form.non_field_errors %}
+        <div class="alert alert-danger" role="alert">
+            {% for error in main_form.non_field_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
         </div>
-
-        {% if form.non_field_errors %}
-            <div class="alert alert-danger" role="alert">
-                {% for error in form.non_field_errors %}
-                    <p>{{ error }}</p>
-                {% endfor %}
-            </div>
         {% endif %}
 
-        <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Зберегти документ</button>
+        {# === Головна форма (DocumentProcessingMainForm) === #}
+        <fieldset class="mb-4 p-3 border rounded">
+            <legend class="w-auto px-2 h5">Загальна інформація про пакет документів</legend>
+
+            {# Поле Unit #}
+            <div class="row mb-3 align-items-center">
+                <label for="{{ main_form.unit.id_for_label }}" class="col-sm-3 col-form-label text-sm-end fw-bold">
+                    {{ main_form.unit.label }}{% if main_form.unit.field.required %}<span class="text-danger">*</span>{% endif %}:
+                </label>
+                <div class="col-sm-9">
+                    {{ main_form.unit }} {# Віджет має клас 'form-select tomselect-field' та ID 'id_proc_form_unit' з форми #}
+                    {% if main_form.unit.help_text %}<small class="form-text text-muted d-block">{{ main_form.unit.help_text }}</small>{% endif %}
+                    {% for error in main_form.unit.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+
+            {# Поле OID #}
+            <div class="row mb-3 align-items-center">
+                <label for="{{ main_form.oid.id_for_label }}" class="col-sm-3 col-form-label text-sm-end fw-bold">
+                    {{ main_form.oid.label }}{% if main_form.oid.field.required %}<span class="text-danger">*</span>{% endif %}:
+                </label>
+                <div class="col-sm-9">
+                    {{ main_form.oid }} {# Віджет має клас 'form-select tomselect-field' та ID 'id_proc_form_oid' з форми #}
+                    {% if main_form.oid.help_text %}<small class="form-text text-muted d-block">{{ main_form.oid.help_text }}</small>{% endif %}
+                    {% for error in main_form.oid.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+			
+            {# Поле Work Date (Дата виконання робіт на ОІД) #}
+            <div class="row mb-3 align-items-center">
+                <label for="{{ main_form.work_date.id_for_label }}" class="col-sm-3 col-form-label text-sm-end fw-bold">
+                    {{ main_form.work_date.label }}{% if main_form.work_date.field.required %}<span class="text-danger">*</span>{% endif %}:
+                </label>
+                <div class="col-sm-9">
+                    {{ main_form.work_date }} {# Віджет DateInput з class 'form-control' #}
+                    {% if main_form.work_date.help_text %}<small class="form-text text-muted d-block">{{ main_form.work_date.help_text }}</small>{% endif %}
+                    {% for error in main_form.work_date.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+
+            {# Поле WorkRequestItem #}
+            <div class="row mb-3 align-items-center">
+                <label for="{{ main_form.work_request_item.id_for_label }}" class="col-sm-3 col-form-label text-sm-end fw-bold">
+                    {{ main_form.work_request_item.label }}{% if main_form.work_request_item.field.required %}<span class="text-danger">*</span>{% endif %}:
+                </label>
+                <div class="col-sm-9">
+                    {{ main_form.work_request_item }} {# Віджет має клас 'form-select tomselect-field' та ID 'id_proc_form_work_request_item' #}
+                    {% if main_form.work_request_item.help_text %}<small class="form-text text-muted d-block">{{ main_form.work_request_item.help_text }}</small>{% endif %}
+                    {% for error in main_form.work_request_item.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+            
+            {# Поле Process Date (Дата опрацювання документів) #}
+            <div class="row mb-3 align-items-center">
+                <label for="{{ main_form.process_date.id_for_label }}" class="col-sm-3 col-form-label text-sm-end fw-bold">
+                    {{ main_form.process_date.label }}{% if main_form.process_date.field.required %}<span class="text-danger">*</span>{% endif %}:
+                </label>
+                <div class="col-sm-9">
+                    {{ main_form.process_date }} {# Віджет DateInput з class 'form-control' #}
+                    {% if main_form.process_date.help_text %}<small class="form-text text-muted d-block">{{ main_form.process_date.help_text }}</small>{% endif %}
+                    {% for error in main_form.process_date.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+
+
+            {# Поле Author (Автор/Виконавець) #}
+            <div class="row mb-3 align-items-center">
+                <label for="{{ main_form.author.id_for_label }}" class="col-sm-3 col-form-label text-sm-end fw-bold">
+                    {{ main_form.author.label }}{% if main_form.author.field.required %}<span class="text-danger">*</span>{% endif %}:
+                </label>
+                <div class="col-sm-9">
+                    {{ main_form.author }} {# Віджет має клас 'form-select tomselect-field' та ID 'id_proc_form_author' #}
+                    {% if main_form.author.help_text %}<small class="form-text text-muted d-block">{{ main_form.author.help_text }}</small>{% endif %}
+                    {% for error in main_form.author.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+        </fieldset>
+
+        {# === Формсет для документів (DocumentItemFormSet) === #}
+		<legend class="w-auto px-2 h5">Список документів у пакеті</legend>
+        <fieldset class="mb-4 p-3 border rounded">
+            
+            {{ formset.management_form }} {# Обов'язково для роботи формсетів! #}
+            
+            {% if formset.non_form_errors %}
+            <div class="alert alert-danger" role="alert">
+                {% for error in formset.non_form_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
+            </div>
+            {% endif %}
+
+            <div id="document-items-formset-container">
+                {% for item_form in formset %}
+                    <div class="document-item-form mb-3 p-3 border rounded bg-light"> {# Клас для JS, щоб ідентифікувати форму #}
+                        {% for hidden_field in item_form.hidden_fields %}{{ hidden_field }}{% endfor %}
+                        
+                        {% if item_form.non_field_errors %}
+                        <div class="alert alert-danger" role="alert">
+                            {% for error in item_form.non_field_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <div class="row g-3 align-items-start">
+                            {# Поле Document Type #}
+                            <div class="col-md-5">
+                                <label for="{{ item_form.document_type.id_for_label }}" class="form-label">{{ item_form.document_type.label }}{% if item_form.document_type.field.required %}<span class="text-danger">*</span>{% endif %}:</label>
+                                {{ item_form.document_type }} {# Віджет має клас 'form-select tomselect-doc-type' #}
+                                {% if item_form.document_type.help_text %}<small class="form-text text-muted d-block">{{ item_form.document_type.help_text }}</small>{% endif %}
+                                {% for error in item_form.document_type.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                            </div>
+
+                            {# Поле Document Number #}
+                            <div class="col-md-4">
+                                <label for="{{ item_form.document_number.id_for_label }}" class="form-label">{{ item_form.document_number.label }}{% if item_form.document_number.field.required %}<span class="text-danger">*</span>{% endif %}:</label>
+                                {{ item_form.document_number }}
+                                {% if item_form.document_number.help_text %}<small class="form-text text-muted d-block">{{ item_form.document_number.help_text }}</small>{% endif %}
+                                {% for error in item_form.document_number.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                            </div>
+                            
+                            {# Контейнер для кнопки видалення (та поля DELETE, якщо є) #}
+                            <div class="col-md-3 d-flex align-items-end">
+                                <div class="form-item-delete-button-container w-100">
+                                {% if item_form.DELETE %}
+                                    <div class="form-check">
+                                        {{ item_form.DELETE }}
+                                        <label for="{{ item_form.DELETE.id_for_label }}" class="form-check-label ms-1">Видалити цей документ</label>
+                                    </div>
+                                {% endif %}
+                                {# Сюди JavaScript може додати кнопку "Видалити" для нових форм #}
+                                </div>
+                            </div>
+                        </div>
+						
+                        {# Поле Note #}
+                        <div class="mt-2">
+                            <label for="{{ item_form.note.id_for_label }}" class="form-label">{{ item_form.note.label }}:</label>
+                            {{ item_form.note }}
+                            {% if item_form.note.help_text %}<small class="form-text text-muted d-block">{{ item_form.note.help_text }}</small>{% endif %}
+                            {% for error in item_form.note.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                        </div>
+                        {% if not forloop.last %}<hr class="my-3">{% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+            <button type="button" id="add-document-item-button" class="btn btn-outline-success btn-sm mt-3">
+                <i class="fas fa-plus"></i> Додати ще документ
+            </button>
+        </fieldset>
+
+        <div class="form-actions mt-4">
+            <button type="submit" class="btn btn-primary">Зберегти опрацьовані документи</button>
             {% if selected_oid %}
                  <a href="{% url 'oids:oid_detail_view_name' selected_oid.id %}" class="btn btn-secondary">Скасувати</a>
             {% else %}
-                <a href="{% url 'oids:main_dashboard' %}" class="btn btn-secondary">Скасувати</a>
+                 <a href="{% url 'oids:main_dashboard' %}" class="btn btn-secondary">Скасувати</a>
             {% endif %}
         </div>
     </form>
 </div>
+
+{# Шаблон для нової порожньої форми документа (для JavaScript) #}
+<template id="document-item-empty-form-template">
+    {% spaceless %}
+    {% with item_form=formset.empty_form %} {# Використовуємо empty_form з контексту #}
+    <div class="document-item-form mb-3 p-3 border rounded bg-light">
+        {% for hidden_field in item_form.hidden_fields %}{{ hidden_field }}{% endfor %}
+        <div class="row g-3 align-items-start">
+            <div class="col-md-5">
+                <label for="{{ item_form.document_type.id_for_label }}" class="form-label">{{ item_form.document_type.label }}{% if item_form.document_type.field.required %}<span class="text-danger">*</span>{% endif %}:</label>
+                {{ item_form.document_type }}
+            </div>
+            <div class="col-md-4">
+                <label for="{{ item_form.document_number.id_for_label }}" class="form-label">{{ item_form.document_number.label }}{% if item_form.document_number.field.required %}<span class="text-danger">*</span>{% endif %}:</label>
+                {{ item_form.document_number }}
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <div class="form-item-delete-button-container w-100">
+                     {# JavaScript додасть сюди кнопку "Видалити" #}
+                </div>
+            </div>
+        </div>
+        <div class="mt-2">
+            <label for="{{ item_form.attachment.id_for_label }}" class="form-label">{{ item_form.attachment.label }}:</label>
+            {{ item_form.attachment }}
+        </div>
+        <div class="mt-2">
+            <label for="{{ item_form.note.id_for_label }}" class="form-label">{{ item_form.note.label }}:</label>
+            {{ item_form.note }}
+        </div>
+        <hr class="my-3">
+    </div>
+    {% endwith %}
+    {% endspaceless %}
+</template>
+
 {% endblock %}
 
-{% block page_specific_js %}
+{% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("AddDocumentProcessing JS: DOMContentLoaded");
+    console.log("AddDocProc JS: DOMContentLoaded. V2 Fixes.");
 
-    // --- Елементи DOM та URL ---
-    const oidSelectElement = document.getElementById('{{ form.oid.id_for_label }}'); // ID з DocumentForm
-    const workRequestItemSelectElement = document.getElementById('{{ form.work_request_item.id_for_label }}');
-    const documentTypeSelectElement = document.getElementById('{{ form.document_type.id_for_label }}');
-    // Додайте сюди інші select, які потрібно ініціалізувати TomSelect, наприклад, 'author'
-    const authorSelectElement = document.getElementById('{{ form.author.id_for_label }}');
+    // --- DOM Елементи Головної Форми ---
+    const unitSelectElement = document.getElementById('id_proc_form_unit');
+    const oidSelectElement = document.getElementById('id_proc_form_oid');
+    const wriSelectElement = document.getElementById('id_proc_form_work_request_item');
+    const authorSelectElement = document.getElementById('id_proc_form_author');
+
+    // --- AJAX URLи ---
+    const oidsForUnitAjaxUrl = window.AJAX_LOAD_OIDS_FOR_UNIT_URL || "{% url 'oids:ajax_load_oids_for_unit' %}";
+    const wriForOidAjaxUrl = window.AJAX_LOAD_WORK_REQUEST_ITEMS_FOR_OID_URL || "{% url 'oids:ajax_load_work_request_items_for_oid' %}";
+    // const docTypesAjaxUrl = ... // Поки заглушка
+
+    let initialOidIdFromDjango = "{{ main_form.initial.oid.id|default:''|escapejs }}";
+    let initialWRIIdFromDjango = "{{ main_form.initial.work_request_item.id|default:''|escapejs }}";
+    // Потрібно отримати initial OID Type, якщо ОІД обраний через Django initial
+    // Це можна зробити, додавши data-атрибут до опції ОІД у віджеті форми або передати окремо
+    let initialOidTypeFromDjango = null; 
+    {% if main_form.initial.oid and main_form.initial.oid.oid_type %}
+        initialOidTypeFromDjango = "{{ main_form.initial.oid.oid_type|escapejs }}";
+    {% endif %}
 
 
-    const workRequestItemsAjaxUrl = "{% url 'oids:ajax_load_work_request_items_for_oid' %}";
-    const documentTypesAjaxUrl = "{% url 'oids:ajax_load_document_types_for_oid_and_work' %}";
+    if (typeof TomSelect === 'undefined') { console.error("AddDocProc JS: TomSelect library NOT loaded!"); return; }
+    console.log("AddDocProc JS: TomSelect library loaded.");
 
-    if (typeof TomSelect === 'undefined') {
-        console.error("AddDocumentProcessing JS: TomSelect library is NOT loaded!");
-        return; 
-    }
-    console.log("AddDocumentProcessing JS: TomSelect library is loaded.");
-
-    // --- Стан ---
-    let currentSelectedOidId = null;
-    let currentSelectedOidType = null; // Будемо зберігати тип обраного ОІД (МОВНА/ПЕМІН)
-    let currentSelectedWorkType = null;  // Тип робіт з обраного WorkRequestItem
-
-    // --- TomSelect екземпляри ---
-    let tomSelectOid = null;
-    let tomSelectWRI = null; // WorkRequestItem
-    let tomSelectDocType = null;
-    let tomSelectAuthor = null; // Для поля Автор
-
-    // --- Утилітарна функція для конфігурації TomSelect ---
-    function getTomSelectConfig(elementId, placeholder, isDisabled = false, initialOptions = [], allowClear = true, isMulti = false) {
-        console.log(`CONFIG: TomSelect for #${elementId}. Placeholder: "${placeholder}", Disabled: ${isDisabled}`);
+    function getTomSelectConfig(elementId, placeholder, isDisabled = false, initialOptions = [], allowClear = true, plugins = [], isMulti = false) {
+        let effPlugins = isMulti ? ['remove_button', ...plugins] : plugins;
+        console.log(`CONFIG: TomSelect for #${elementId}. Placeholder: "${placeholder}", Disabled: ${isDisabled}, Multi: ${isMulti}, Plugins: ${effPlugins.join(',')}`);
         return {
-            plugins: isMulti ? ['remove_button'] : [],
-            create: false, placeholder: placeholder,
+            plugins: effPlugins, create: false, placeholder: placeholder,
             valueField: 'id', labelField: 'text', searchField: ['text'],
             options: initialOptions, disabled: isDisabled, allowEmptyOption: allowClear,
         };
     }
 
-    // --- Модуль/Логіка для поля "Тип Документа" (DocumentType) ---
-    const DocumentTypeManager = {
-        init: function() {
-            if (documentTypeSelectElement) {
-                const config = getTomSelectConfig(documentTypeSelectElement.id, 'Спочатку оберіть ОІД та Тип робіт', true);
-                tomSelectDocType = new TomSelect(documentTypeSelectElement, config);
-                documentTypeSelectElement.tomselectInstance = tomSelectDocType;
-                console.log("DocTypeManager: TomSelect for DocumentType INITIALIZED (disabled).");
-            } else { console.warn("DocTypeManager: DocumentType select element not found."); }
-        },
-        load: function(oidId, oidType, workType) {
-            console.log(`DocTypeManager: load CALLED. OID ID: ${oidId}, OID Type: ${oidType}, Work Type: ${workType}`);
-            if (!tomSelectDocType) { console.warn("DocTypeManager: TomSelect instance not ready."); return; }
+    const MainFormManager = (function() {
+        let tsUnit, tsOid, tsWri, tsAuthor;
+        let currentOidId = null;     // Зберігає ID поточного обраного ОІД
+        let currentOidType = null; // Зберігає тип обраного ОІД (МОВНА/ПЕМІН)
+        let currentWorkTypeFromWRI = null;
 
-            tomSelectDocType.clear();
-            tomSelectDocType.clearOptions();
-            tomSelectDocType.sync();
-
-            if (oidId && oidType) { // Тип ОІД має бути відомий
-                tomSelectDocType.enable();
-                tomSelectDocType.placeholder = 'Завантаження типів документів...';
+        function init() {
+            console.log("MainFormManager: init CALLED.");
+            if (unitSelectElement) {
+                console.log(`MainFormManager: HTML <select id="${unitSelectElement.id}"> has ${unitSelectElement.options.length} options BEFORE TomSelect init.`);
+                let htmlUnitOpts = [];
+                Array.from(unitSelectElement.options).forEach(opt => {if (opt.value) htmlUnitOpts.push({id:opt.value, text:opt.text, selected:opt.selected});});
                 
-                const params = new URLSearchParams({ oid_id: oidId });
-                // Тип робіт (workType) є опціональним для цього запиту, 
-                // сервер сам вирішить, які типи документів показувати, якщо workType не передано
-                if (workType) {
-                    params.append('work_type', workType);
-                }
-                console.log(`DocTypeManager: Fetching DocumentTypes from: ${documentTypesAjaxUrl}?${params.toString()}`);
-
-                fetch(`${documentTypesAjaxUrl}?${params.toString()}`)
-                    .then(response => {
-                        if (!response.ok) return response.text().then(text => { throw new Error(`Net error DocTypes: ${response.statusText}. Server: ${text}`);});
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log("DocTypeManager: DocumentTypes data received:", data);
-                        const options = data.map(dt => ({ id: dt.id.toString(), text: dt.text }));
-                        tomSelectDocType.addOptions(options);
-                        tomSelectDocType.refreshOptions(false);
-                        const items = tomSelectDocType.dropdown_content.querySelectorAll('.option').length;
-                        console.log(`DocTypeManager: Options in DocumentType dropdown: ${items}`);
-                        tomSelectDocType.placeholder = options.length > 0 ? 'Оберіть тип документа...' : 'Типи документів не знайдено';
-                        if (options.length > 0 && items > 0) tomSelectDocType.open();
-                    })
-                    .catch(error => { console.error("DocTypeManager: Error loading DocumentTypes:", error); tomSelectDocType.placeholder = 'Помилка завантаження типів'; tomSelectDocType.refreshOptions(false);});
-            } else {
-                tomSelectDocType.disable();
-                tomSelectDocType.placeholder = 'Спочатку оберіть ОІД (та Тип робіт)';
-            }
-        }
-    };
-
-    // --- Модуль/Логіка для поля "Елемент Заявки" (WorkRequestItem) ---
-    const WorkRequestItemManager = {
-        init: function() {
-            if (workRequestItemSelectElement) {
-                const config = getTomSelectConfig(workRequestItemSelectElement.id, 'Спочатку оберіть ОІД', true, [], true, []); // Не multi, allowClear=true
-                tomSelectWRI = new TomSelect(workRequestItemSelectElement, config);
-                workRequestItemSelectElement.tomselectInstance = tomSelectWRI;
-                console.log("WRIManager: TomSelect for WorkRequestItem INITIALIZED (disabled).");
-
-                // Слухач на зміну Елемента Заявки -> оновлюємо Тип Документа
-                tomSelectWRI.on('change', function(selectedWRI_Id) {
-                    console.log("WRIManager: WorkRequestItem selection CHANGED. Selected WRI ID:", selectedWRI_Id);
-                    currentSelectedWorkType = null; // Скидаємо попередній тип робіт
-                    if (selectedWRI_Id) {
-                        const selectedOptionData = this.options[selectedWRI_Id]; // Отримуємо дані опції
-                        if (selectedOptionData && selectedOptionData.work_type) {
-                            currentSelectedWorkType = selectedOptionData.work_type;
-                            console.log("WRIManager: Extracted WorkType from selected WRI:", currentSelectedWorkType);
-                        } else {
-                            console.warn("WRIManager: Could not extract WorkType from selected WRI option data:", selectedOptionData);
-                        }
-                    }
-                    // Оновлюємо типи документів на основі нового типу робіт (та поточного ОІД та його типу)
-                    if (currentSelectedOidId && currentSelectedOidType) {
-                         DocumentTypeManager.load(currentSelectedOidId, currentSelectedOidType, currentSelectedWorkType);
-                    } else {
-                        DocumentTypeManager.load(null, null, null); // Очистити типи документів
-                    }
-                });
-
-            } else { console.warn("WRIManager: WorkRequestItem select element not found."); }
-        },
-        load: function(oidId) {
-            console.log(`WRIManager: load CALLED. OID ID: ${oidId}`);
-            if (!tomSelectWRI) { console.warn("WRIManager: TomSelect instance not ready."); return; }
-
-            tomSelectWRI.clear();
-            tomSelectWRI.clearOptions();
-            tomSelectWRI.sync();
-            currentSelectedWorkType = null; // Скидаємо тип робіт, оскільки ОІД змінився
-
-            if (oidId) {
-                tomSelectWRI.enable();
-                tomSelectWRI.placeholder = 'Завантаження елементів заявок...';
+                tsUnit = new TomSelect(unitSelectElement, getTomSelectConfig(unitSelectElement.id, 'Оберіть ВЧ', false, htmlUnitOpts, true, [], false));
+                unitSelectElement.tomselectInstance = tsUnit;
+                console.log("MainFormManager: TomSelect for Unit INITIALIZED. Options in TS:", Object.keys(tsUnit.options).length);
+                tsUnit.on('change', handleUnitChange);
                 
-                console.log(`WRIManager: Fetching WorkRequestItems from: ${workRequestItemsAjaxUrl}?oid_id=${oidId}`);
-                fetch(`${workRequestItemsAjaxUrl}?oid_id=${oidId}`)
-                    .then(response => {
-                        if (!response.ok) return response.text().then(text => { throw new Error(`Net error WRI: ${response.statusText}. Server: ${text}`);});
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log("WRIManager: WorkRequestItems data received:", data);
-                        // Важливо: AJAX має повертати 'work_type' для кожної опції
-                        const options = data.map(item => ({ 
-                            id: item.id.toString(), 
-                            text: item.text,
-                            work_type: item.work_type // Зберігаємо тип робіт в даних опції
-                        }));
-                        tomSelectWRI.addOptions(options);
-                        tomSelectWRI.refreshOptions(false);
-                        const items = tomSelectWRI.dropdown_content.querySelectorAll('.option').length;
-                        console.log(`WRIManager: Options in WRI dropdown: ${items}`);
-                        tomSelectWRI.placeholder = options.length > 0 ? 'Оберіть елемент заявки (необов\'язково)' : 'Для ОІД немає пов\'язаних заявок';
-                    })
-                    .catch(error => { console.error("WRIManager: Error loading WorkRequestItems:", error); tomSelectWRI.placeholder = 'Помилка завантаження заявок'; tomSelectWRI.refreshOptions(false);});
-            } else {
-                tomSelectWRI.disable();
-                tomSelectWRI.placeholder = 'Спочатку оберіть ОІД';
-            }
-        }
-    };
-
-    // --- Модуль/Логіка для поля "ОІД" ---
-    const OidManager = {
-        init: function() {
-            if (oidSelectElement) {
-                // Якщо ОІД вже обраний на сторінці (наприклад, initial_oid з view)
-                // TomSelect має автоматично підхопити його з HTML <select>
-                const config = getTomSelectConfig(oidSelectElement.id, 'Оберіть ОІД...', false, [], true, []); // Не multi
-                tomSelectOid = new TomSelect(oidSelectElement, config);
-                oidSelectElement.tomselectInstance = tomSelectOid;
-                console.log("OidManager: TomSelect for OID INITIALIZED.");
-
-                // Отримуємо початково обраний ОІД ID та його тип
-                currentSelectedOidId = tomSelectOid.getValue();
-                if (currentSelectedOidId) {
-                    const selectedOptionElement = oidSelectElement.options[oidSelectElement.selectedIndex];
-                    if (selectedOptionElement && selectedOptionElement.dataset.oidType) {
-                         currentSelectedOidType = selectedOptionElement.dataset.oidType;
-                    } else {
-                        // Якщо типу немає в data-атрибуті, його потрібно буде завантажити або отримати інакше
-                        console.warn("OidManager: OID type not found in data-attribute for pre-selected OID. DocumentType filtering might be incomplete.");
-                    }
-                    console.log(`OidManager: Initial OID ID: ${currentSelectedOidId}, OID Type: ${currentSelectedOidType}`);
-                }
-
-
-                tomSelectOid.on('change', function(selectedOid) {
-                    console.log("OidManager: OID selection CHANGED. Selected OID ID:", selectedOid);
-                    currentSelectedOidId = selectedOid;
-                    currentSelectedOidType = null; // Скидаємо тип, потрібно отримати новий
-
-                    if (selectedOid) {
-                        // Отримуємо data-oid-type з обраної опції TomSelect (якщо він там є)
-                        // TomSelect зберігає оригінальні дані опції в this.options[value]
-                        const optionData = this.options[selectedOid]; 
-                        if (optionData && optionData.dataset && optionData.dataset.oidType) { // Якщо data-атрибут скопіювався
-                            currentSelectedOidType = optionData.dataset.oidType;
-                        } else {
-                            // Або з самого HTML елемента, якщо TomSelect його не копіює
-                            const selectedOptionElement = oidSelectElement.querySelector(`option[value="${selectedOid}"]`);
-                            if (selectedOptionElement && selectedOptionElement.dataset.oidType) {
-                                currentSelectedOidType = selectedOptionElement.dataset.oidType;
-                            } else {
-                                 console.warn("OidManager: OID type not found in data-attribute for selected OID. DocumentType filtering might be incomplete.");
-                                 // Тут можна зробити AJAX запит для отримання типу ОІД, якщо потрібно
-                            }
-                        }
-                        console.log(`OidManager: New OID Type from selection: ${currentSelectedOidType}`);
-                        WorkRequestItemManager.load(selectedOid);
-                        DocumentTypeManager.load(selectedOid, currentSelectedOidType, null); // Завантажуємо типи документів без типу робіт спочатку
-                    } else {
-                        WorkRequestItemManager.load(null); // Очистити WRI
-                        DocumentTypeManager.load(null, null, null); // Очистити DocumentTypes
-                    }
-                });
-
-                // Початкове завантаження залежних полів, якщо ОІД вже обраний
-                if (currentSelectedOidId) {
-                    console.log("OidManager: Triggering initial load for dependent fields based on pre-selected OID.");
-                    WorkRequestItemManager.load(currentSelectedOidId);
-                    DocumentTypeManager.load(currentSelectedOidId, currentSelectedOidType, null);
+                const initialUnitVal = tsUnit.getValue();
+                console.log("MainFormManager: Initial Unit value (from TomSelect):", initialUnitVal);
+                if (initialUnitVal && initialUnitVal !== "") {
+                    handleUnitChange(initialUnitVal);
                 } else {
-                    // Якщо ОІД не обраний, деактивуємо залежні поля
-                    WorkRequestItemManager.load(null);
-                    DocumentTypeManager.load(null, null, null);
+                    handleUnitChange(null); // Для очищення залежних
                 }
+            } else { console.warn("MainFormManager: Unit select element not found."); }
 
+            if (oidSelectElement) {
+                tsOid = new TomSelect(oidSelectElement, getTomSelectConfig(oidSelectElement.id, 'Спочатку оберіть ВЧ', true, [], true, [], false));
+                oidSelectElement.tomselectInstance = tsOid;
+                console.log("MainFormManager: TomSelect for OID INITIALIZED (disabled).");
+                tsOid.on('change', handleOidChange);
+            } else { console.warn("MainFormManager: OID select element not found."); }
 
-            } else { console.warn("OidManager: OID select element not found."); }
+            if (wriSelectElement) {
+                tsWri = new TomSelect(wriSelectElement, getTomSelectConfig(wriSelectElement.id, 'Спочатку оберіть ОІД', true, [], true, [], false));
+                wriSelectElement.tomselectInstance = tsWri;
+                console.log("MainFormManager: TomSelect for WRI INITIALIZED (disabled).");
+                tsWri.on('change', handleWriChange);
+            } else { console.warn("MainFormManager: WRI select element not found."); }
+            
+            if (authorSelectElement) {
+                let htmlAuthorOpts = [];
+                Array.from(authorSelectElement.options).forEach(opt => {if (opt.value) htmlAuthorOpts.push({id:opt.value, text:opt.text});});
+                tsAuthor = new TomSelect(authorSelectElement, getTomSelectConfig(authorSelectElement.id, 'Оберіть автора (необов\'язково)', false, htmlAuthorOpts, true, [], false));
+                authorSelectElement.tomselectInstance = tsAuthor;
+                console.log("MainFormManager: TomSelect for Author INITIALIZED.");
+            }
         }
-    };
+
+        function handleUnitChange(unitId) {
+            console.log("MainFormManager: Unit CHANGED to:", unitId);
+            currentOidId = null; currentOidType = null; currentSelectedWorkTypeFromWRI = null;
+            
+            if (tsOid) {
+                tsOid.clear(); tsOid.clearOptions(); tsOid.sync();
+                if (unitId) {
+                    tsOid.enable(); tsOid.placeholder = 'Завантаження ОІДів...';
+                    fetch(`${oidsForUnitAjaxUrl}?unit_id=${unitId}`)
+                        .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t || `Error ${r.status}`); }))
+                        .then(data => {
+                            console.log("MainFormManager: OIDs for Unit received:", data);
+                            const options = data.map(oid => ({ id: oid.id.toString(), text: `${oid.cipher} (${oid.full_name || 'Без назви'})`, oid_type: oid.oid_type }));
+                            tsOid.addOptions(options);
+                            tsOid.refreshOptions(false);
+                            tsOid.placeholder = options.length ? 'Оберіть ОІД...' : 'Для ВЧ немає ОІДів';
+                            if (initialOidIdFromDjango && unitId === oidSelectElement.querySelector(`option[value="${initialOidIdFromDjango}"]`)?.parentElement.value && tsOid.options[initialOidIdFromDjango]) { // Перевіряємо, чи initialOid належить до поточної ВЧ
+                                console.log("MainFormManager: Setting initial OID from Django:", initialOidIdFromDjango);
+                                tsOid.setValue(initialOidIdFromDjango, true); 
+                                handleOidChange(initialOidIdFromDjango); 
+                                initialOidIdFromDjango = null; // Використати лише один раз
+                            } else {
+                                handleOidChange(null); // Скинути ОІД та залежні
+                            }
+                        }).catch(e => { console.error("MainFormManager: Error loading OIDs:", e); if (tsOid) tsOid.placeholder = 'Помилка завантаження ОІДів';});
+                } else {
+                    tsOid.disable(); tsOid.placeholder = 'Спочатку оберіть ВЧ';
+                    handleOidChange(null); // Скинути ОІД та залежні
+                }
+            }
+        }
+
+        function handleOidChange(oidId) {
+            console.log("MainFormManager: OID CHANGED to:", oidId);
+            currentOidId = oidId; // Оновлюємо збережений ID
+            currentOidType = null; currentSelectedWorkTypeFromWRI = null; 
+            
+            if (tsWri) {
+                tsWri.clear(); tsWri.clearOptions(); tsWri.sync();
+                if (oidId) {
+                    const oidOptionData = tsOid.options[oidId]; 
+                    if (oidOptionData && oidOptionData.oid_type) {
+                        currentOidType = oidOptionData.oid_type;
+                        console.log("MainFormManager: currentSelectedOidType for OID", oidId, "set to:", currentOidType);
+                    } else { console.warn("MainFormManager: OID Type not found in selected OID option data. OID Data:", oidOptionData); }
+
+                    tsWri.enable(); tsWri.placeholder = 'Завантаження елементів заявок...';
+                    fetch(`${wriForOidAjaxUrl}?oid_id=${oidId}`)
+                        .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t || `Error ${r.status}`); }))
+                        .then(data => {
+                            console.log("MainFormManager: WRIs for OID", oidId, "received:", data);
+                            const options = data.map(item => ({ id: item.id.toString(), text: item.text, work_type: item.work_type }));
+                            tsWri.addOptions(options);
+                            tsWri.refreshOptions(false);
+                            tsWri.placeholder = options.length ? 'Елемент заявки (необов\'язково)' : 'Для ОІД немає заявок';
+                            if (initialWRIIdFromDjango && oidId === wriSelectElement.querySelector(`option[value="${initialWRIIdFromDjango}"]`)?.parentElement.value && tsWri.options[initialWRIIdFromDjango]) {
+                                console.log("MainFormManager: Setting initial WRI from Django:", initialWRIIdFromDjango);
+                                tsWri.setValue(initialWRIIdFromDjango, true);
+                                handleWriChange(initialWRIIdFromDjango);
+                                initialWRIIdFromDjango = null; // Використати один раз
+                            } else {
+                                handleWriChange(null); // Скинути WRI та залежні
+                            }
+                        }).catch(e => { console.error("MainFormManager: Error loading WRIs for OID", oidId, e); if(tsWri) tsWri.placeholder = 'Помилка завантаження заявок';});
+                } else {
+                    tsWri.disable(); tsWri.placeholder = 'Спочатку оберіть ОІД';
+                    handleWriChange(null); // Скинути WRI та залежні
+                }
+            }
+        }
+
+        function handleWriChange(wriId) {
+            console.log("MainFormManager: WRI CHANGED to:", wriId);
+            currentSelectedWorkTypeFromWRI = null;
+            if (wriId && tsWri) {
+                const wriOptionData = tsWri.options[wriId];
+                if (wriOptionData && wriOptionData.work_type) {
+                    currentSelectedWorkTypeFromWRI = wriOptionData.work_type;
+                    console.log("MainFormManager: currentSelectedWorkTypeFromWRI set to:", currentSelectedWorkTypeFromWRI);
+                } else { console.warn("MainFormManager: WorkType not found in selected WRI option data. WRI Data:", wriOptionData);}
+            }
+            // Викликаємо оновлення типів документів у формсеті
+            DocumentItemFormsetManager.updateAllDocTypes(currentOidId, currentOidType, currentSelectedWorkTypeFromWRI);
+        }
+        
+        return { 
+            init, 
+            getOidInstance: function() { return tsOid; },
+            getWriInstance: function() { return tsWri; },
+            getCurrentOidId: function() { return currentOidId; },
+            getCurrentOidType: function() { return currentOidType; },
+            getCurrentWorkType: function() { return currentSelectedWorkTypeFromWRI; }
+        };
+    })();
+
+    const DocumentItemFormsetManager = (function() {
+        // ... (код DocumentItemFormsetManager.init, addFormItem, removeFormItem, etc. ЯК БУВ, АЛЕ З ВИПРАВЛЕННЯМ ДЛЯ getOidInstance) ...
+        const container = document.getElementById('document-items-formset-container');
+        const addButton = document.getElementById('add-document-item-button');
+        const emptyFormTemplateElement = document.getElementById('document-item-empty-form-template');
+        let formsetPrefix;
+        let totalFormsInput; /*...*/ let minFormsCount; let maxFormsCount; let canDeleteForms;
+
+        function initializeTomSelectForDocTypeInForm(formDiv) {
+            const docTypeSelect = formDiv.querySelector('select[name$="-document_type"]');
+            if (docTypeSelect && typeof TomSelect !== 'undefined') {
+                console.log("DocItemFormset: Initializing TomSelect for DocType in form, ID:", docTypeSelect.id);
+                let htmlDocTypeOptions = [];
+                Array.from(docTypeSelect.options).forEach(opt => {if (opt.value) htmlDocTypeOptions.push({id:opt.value, text:opt.text});});
+                const config = getTomSelectConfig(docTypeSelect.id, 'Оберіть тип документа', false, htmlDocTypeOptions, true, [], false);
+                const instance = new TomSelect(docTypeSelect, config);
+                docTypeSelect.tomselectInstance = instance;
+                if (htmlDocTypeOptions.length === 0 ) {
+                    instance.disable(); instance.placeholder = 'Заглушка: типи (фільтрація скоро)';
+                }
+            }
+        }
+        
+        function updateAllDocTypes(oidId, oidType, workType) {
+            console.log(`DocItemFormset: updateAllDocTypes CALLED. OID_ID: ${oidId}, OID_Type: ${oidType}, Work_Type: ${workType}`);
+            container.querySelectorAll('.document-item-form').forEach(formDiv => {
+                const docTypeSelect = formDiv.querySelector('select[name$="-document_type"]');
+                if (docTypeSelect && docTypeSelect.tomselectInstance) {
+                    const tsInstance = docTypeSelect.tomselectInstance;
+                    tsInstance.clear(); tsInstance.clearOptions(); tsInstance.sync();
+                    console.log(`DocItemFormset: DocType select [${docTypeSelect.id}] - Updating with STUB logic.`);
+                    if (oidId && oidType) {
+                        tsInstance.enable();
+                        tsInstance.placeholder = `Типи для ОІД ${oidType || 'N/A'}${workType ? ', робіт ' + workType : ''} (фільтр заглушка)`;
+                        // !!! ЗАГЛУШКА - Тут має бути AJAX-запит до docTypesAjaxUrl для отримання відфільтрованих типів документів
+                        // Наприклад, тимчасово додамо всі опції, які були в select при ініціалізації
+                        let initialHtmlOptions = [];
+                        Array.from(docTypeSelect.options).forEach(opt => { // Беремо з оригінального <select>
+                            if (opt.value) { initialHtmlOptions.push({ id: opt.value, text: opt.text });}
+                        });
+                        if(initialHtmlOptions.length > 0) { //Якщо Django щось відрендерив спочатку
+                            tsInstance.addOptions(initialHtmlOptions);
+                            tsInstance.refreshOptions(false);
+                        } else { // Якщо початково порожній (наприклад, queryset=none у формі)
+                             // tsInstance.addOptions([{id:'', text:'Завантажте/фільтруйте типи...'}]); // Для прикладу
+                        }
+                        console.warn(`DocItemFormset: Actual DocumentType filtering for [${docTypeSelect.id}] is NOT YET IMPLEMENTED.`);
+                    } else {
+                        tsInstance.disable();
+                        tsInstance.placeholder = 'Оберіть ОІД та/або Заявку в гол. формі';
+                    }
+                }
+            });
+        }
+
+        function addFormItem() {
+            console.log("DocItemFormset: Adding form.");
+            const currentFormsCount = container.querySelectorAll('.document-item-form:not([style*="display: none"])').length; // Рахуємо тільки видимі
+            if (maxFormsCount && currentFormsCount >= maxFormsCount) { /* ... alert ... */ return; }
+
+            const newFormHtml = emptyFormTemplateElement.innerHTML.replace(/__prefix__/g, totalFormsInput.value); // Використовуємо totalFormsInput.value для індекса
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = newFormHtml;
+            const newFormElement = tempDiv.firstElementChild;
+            
+            container.appendChild(newFormElement);
+            totalFormsInput.value = parseInt(totalFormsInput.value) + 1;
+
+            initializeTomSelectForDocTypeInForm(newFormElement);
+            
+            // Оновлюємо типи документів для нової форми
+            const oidVal = MainFormManager.getCurrentOidId();
+            const oidTypeVal = MainFormManager.getCurrentOidType();
+            const workTypeVal = MainFormManager.getCurrentWorkType();
+            console.log(`DocItemFormset: Updating DocTypes for new form. OID ID: ${oidVal}, OID Type: ${oidTypeVal}, Work Type: ${workTypeVal}`);
+            // Оновлюємо тільки для нового елемента, або для всіх (updateAllDocTypes)
+            const newDocTypeSelect = newFormElement.querySelector('select[name$="-document_type"]');
+            if (newDocTypeSelect && newDocTypeSelect.tomselectInstance) {
+                const ts = newDocTypeSelect.tomselectInstance;
+                ts.clear(); ts.clearOptions(); ts.sync();
+                 if (oidVal && oidTypeVal) {
+                    ts.enable();
+                    ts.placeholder = `Типи для ОІД ${oidTypeVal || 'N/A'}${workTypeVal ? ', робіт ' + workTypeVal : ''} (фільтр заглушка)`;
+                 } else {
+                    ts.disable(); ts.placeholder = 'Оберіть ОІД та/або Заявку в гол. формі';
+                 }
+            }
+            
+            setupDeleteButton(newFormElement); // Додаємо кнопку видалення
+            updateDeleteButtonsVisibility();
+            console.log(`DocItemFormset: Form added. New TOTAL_FORMS: ${totalFormsInput.value}`);
+        }
+
+        function setupDeleteButton(formDiv) { /* ... як було, але перевірте селектор для controlsDiv ... */ 
+            const controlsDiv = formDiv.querySelector('.item-controls'); // Має бути у шаблоні форми
+            if (controlsDiv) {
+                let deleteButton = controlsDiv.querySelector('.remove-document-item-button');
+                if (!deleteButton) {
+                    deleteButton = document.createElement('button');
+                    deleteButton.type = 'button';
+                    deleteButton.classList.add('btn', 'btn-danger', 'btn-sm', 'remove-document-item-button');
+                    deleteButton.innerHTML = '<i class="fas fa-trash"></i>'; deleteButton.title = "Видалити документ";
+                    controlsDiv.appendChild(deleteButton);
+                }
+            } else { console.warn("DocItemFormset: '.item-controls' div not found in form to add delete button:", formDiv); }
+        }
+        function removeFormItem(formDivToRemove) { /* ... як було ... */ }
+        function updateDeleteButtonsVisibility() { /* ... як було ... */ }
+        
+        function init() { /* ... як було, але викликайте setupDeleteButton для існуючих форм ... */
+             if (!container || !addButton || !emptyFormTemplateElement || !emptyFormTemplateElement.innerHTML.trim()) {return;}
+            console.log("DocItemFormset: Initializing.");
+            formsetPrefix = '{{ formset.prefix }}'; 
+            totalFormsInput = document.getElementById(`id_${formsetPrefix}-TOTAL_FORMS`);
+            minFormsCount = parseInt(document.getElementById(`id_${formsetPrefix}-MIN_NUM_FORMS`)?.value || '0');
+            maxFormsCount = parseInt(document.getElementById(`id_${formsetPrefix}-MAX_NUM_FORMS`)?.value || '1000');
+            canDeleteForms = "{{ formset.can_delete|yesno:'true,false' }}" === 'true';
+            
+            container.querySelectorAll('.document-item-form').forEach((formDiv, index) => {
+                initializeTomSelectForDocTypeInForm(formDiv);
+                setupDeleteButton(formDiv); // Налаштовуємо кнопку видалення для існуючих форм
+            });
+            addButton.addEventListener('click', addFormItem);
+            container.addEventListener('click', function(event) { 
+                if (event.target.classList.contains('remove-document-item-button') || event.target.closest('.remove-document-item-button')) {
+                    removeFormItem(event.target.closest('.document-item-form'));
+                }
+            });
+            updateDeleteButtonsVisibility();
+        }
+        return { init, updateAllDocTypes };
+    })();
     
-    // Ініціалізація поля "Автор"
-    if (authorSelectElement) {
-        const authorConfig = getTomSelectConfig(authorSelectElement.id, 'Оберіть автора...', false, [], true, []);
-        tomSelectAuthor = new TomSelect(authorSelectElement, authorConfig);
-        authorSelectElement.tomselectInstance = tomSelectAuthor;
-        console.log("AddDocumentProcessing JS: TomSelect for Author INITIALIZED.");
-    }
-
-
     // --- Головна ініціалізація ---
-    OidManager.init();
-    WorkRequestItemManager.init();
-    DocumentTypeManager.init();
-
-    // Обмеження для полів дат
-    const processDateInput = document.getElementById('{{ form.process_date.id_for_label }}');
-    const workDateInput = document.getElementById('{{ form.work_date.id_for_label }}');
-    // ... (логіка для обмеження дат, якщо потрібна)
-
-    // Переконайтесь, що URL-и для AJAX визначені (можна у <head> або перед цим скриптом)
-    if (!workRequestItemsAjaxUrl || !documentTypesAjaxUrl) {
-        console.error("AddDocumentProcessing JS: One or more AJAX URLs are not defined!");
-    }
+    console.log("AddDocProc JS: Initializing managers.");
+    MainFormManager.init();
+    DocumentItemFormsetManager.init(); 
 });
 </script>
 {% endblock %}

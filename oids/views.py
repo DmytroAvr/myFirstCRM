@@ -13,7 +13,7 @@ from .models import (
     
     OIDTypeChoices, OIDStatusChoices, SecLevelChoices, WorkRequestStatusChoices, WorkTypeChoices, DocumentReviewResultChoices
 )
-from .forms import ( TripForm, DocumentForm, WorkRequestForm, WorkRequestItemFormSet, OIDForm
+from .forms import ( TripForm, DocumentProcessingMainForm, DocumentItemFormSet, DocumentForm, WorkRequestForm, WorkRequestItemFormSet, OIDForm
 )
 
 # Твоя допоміжна функція (залишається без змін, але буде викликатися в AJAX view)
@@ -544,6 +544,97 @@ def add_work_request_view(request):
     }
     return render(request, 'oids/forms/add_work_request_form.html', context)
 
+
+def add_document_processing_view(request, oid_id=None, work_request_item_id=None):
+    selected_oid_instance = None
+    selected_wri_instance = None # WorkRequestItem instance
+    initial_main_form_data = {}
+
+    if oid_id:
+        selected_oid_instance = get_object_or_404(OID, pk=oid_id)
+        initial_main_form_data['unit'] = selected_oid_instance.unit
+        initial_main_form_data['oid'] = selected_oid_instance
+    
+    if work_request_item_id:
+        selected_wri_instance = get_object_or_404(WorkRequestItem, pk=work_request_item_id)
+        initial_main_form_data['work_request_item'] = selected_wri_instance
+        if not selected_oid_instance: # Якщо ОІД не передано, беремо з WorkRequestItem
+            selected_oid_instance = selected_wri_instance.oid
+            initial_main_form_data['unit'] = selected_oid_instance.unit # Оновлюємо unit, якщо потрібно
+            initial_main_form_data['oid'] = selected_oid_instance
+
+    if request.method == 'POST':
+        main_form = DocumentProcessingMainForm(request.POST, prefix='main')
+        # Передаємо initial_oid та initial_work_request_item для правильного встановлення queryset у __init__
+        # formset = DocumentItemFormSet(request.POST, request.FILES, prefix='docs', form_kwargs={'initial_oid': selected_oid_instance, 'initial_wri': selected_wri_instance})
+        # form_kwargs тут не спрацює для formset_factory напряму, логіку queryset для DocumentItemForm.document_type краще робити в JS
+        formset = DocumentItemFormSet(request.POST, request.FILES, prefix='docs')
+
+
+        if main_form.is_valid() and formset.is_valid():
+            # Отримуємо дані з головної форми
+            oid_instance = main_form.cleaned_data['oid']
+            work_request_item_instance = main_form.cleaned_data.get('work_request_item') # Може бути None
+            process_date_from_main = main_form.cleaned_data['process_date']
+            work_date_from_main = main_form.cleaned_data['work_date']
+            author_instance = main_form.cleaned_data.get('author')
+
+            saved_docs_count = 0
+            for item_form in formset:
+                if item_form.is_valid() and item_form.has_changed(): # Обробляємо тільки валідні та змінені форми
+                    document_instance = item_form.save(commit=False)
+                    document_instance.oid = oid_instance
+                    document_instance.work_request_item = work_request_item_instance
+                    document_instance.process_date = process_date_from_main
+                    document_instance.work_date = work_date_from_main
+                    document_instance.author = author_instance
+                    
+                    # Логіка обчислення expiration_date вже є в моделі Document.save()
+                    document_instance.save() # Це викличе Document.save() з усіма обчисленнями
+                    saved_docs_count += 1
+            
+            if saved_docs_count > 0:
+                messages.success(request, f'{saved_docs_count} документ(ів) успішно додано до ОІД "{oid_instance.cipher}".')
+                # Оновлення статусів (як було, але тепер контекст може бути іншим)
+                if work_request_item_instance:
+                    # Логіка оновлення статусу WorkRequestItem (можливо, перевірка всіх доданих документів)
+                    # work_request_item_instance.status = ...
+                    # work_request_item_instance.save() -> це викличе оновлення статусу головної заявки
+                    pass 
+                if oid_instance:
+                    # Логіка оновлення статусу ОІД
+                    pass
+                return redirect('oids:oid_detail_view_name', oid_id=oid_instance.id)
+            else:
+                messages.info(request, "Не було додано жодного нового документа.")
+                # Залишаємося на сторінці або перенаправляємо
+        else:
+            messages.error(request, "Будь ласка, виправте помилки у формі.")
+            if not main_form.is_valid():
+                print("Main form errors:", main_form.errors.as_json())
+            if not formset.is_valid():
+                print("Formset errors:", formset.errors) # formset.errors - це список словників
+                for i, form_errors in enumerate(formset.errors):
+                    if form_errors:
+                        print(f"Errors in form {i}: {form_errors}")
+
+
+    else: # GET request
+        main_form = DocumentProcessingMainForm(initial=initial_main_form_data, prefix='main', 
+                                               initial_oid=selected_oid_instance, 
+                                               initial_work_request_item=selected_wri_instance)
+        formset = DocumentItemFormSet(prefix='docs')
+
+    context = {
+        'main_form': main_form,
+        'formset': formset,
+        'page_title': 'Додати опрацювання документів',
+        'selected_oid': selected_oid_instance # Для відображення в заголовку
+    }
+    return render(request, 'oids/forms/add_document_processing_form.html', context)
+
+
+
 # list info 
 
 
@@ -716,7 +807,6 @@ def document_type_list_view(request):
         'page_obj': page_obj
     }
     return render(request, 'oids/lists/document_type_list.html', context)
-
 
 def oid_list_view(request):
     oid_list_queryset = OID.objects.select_related(
@@ -930,7 +1020,6 @@ def work_request_list_view(request):
     }
     return render(request, 'oids/lists/work_request_list.html', context)
  
-
 def trip_list_view(request):
     trip_list_queryset = Trip.objects.prefetch_related(
         'units', 

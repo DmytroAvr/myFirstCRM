@@ -261,6 +261,110 @@ class DocumentForm(forms.ModelForm):
             self.save_m2m() # Якщо є ManyToMany поля
         return instance
     
+# new form for documents
+# new form for documents
+# oids/forms.py
+from django import forms
+from django.forms import formset_factory # Або modelformset_factory
+from .models import Document, OID, Unit, WorkRequestItem, DocumentType, Person
+
+# Форма для одного документа (буде використовуватися у формсеті)
+class DocumentItemForm(forms.ModelForm):
+    document_type = forms.ModelChoiceField(
+        queryset=DocumentType.objects.all().order_by('name'), # Поки що всі, потім буде фільтрація
+        label="Тип документа",
+        widget=forms.Select(attrs={'class': 'form-select tomselect-doc-type'}), # Клас для JS
+        required=True
+    )
+    document_number = forms.CharField(
+        label="Підготовлений № документа",
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+        initial='27/14-', # Можна встановити тут, або динамічно в JS
+        required=True
+    )
+    note = forms.CharField(
+        label="Примітки до документа",
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+        required=False
+    )
+    
+
+    class Meta:
+        model = Document
+        fields = ['document_type', 'document_number', 'note']
+        # Поля oid, work_request_item, process_date, work_date, author будуть з головної форми
+
+# Головна форма для сторінки "Опрацювання документів"
+class DocumentProcessingMainForm(forms.Form):
+    unit = forms.ModelChoiceField(
+        queryset=Unit.objects.all().order_by('code'),
+        label="Військова частина",
+        widget=forms.Select(attrs={'class': 'form-select tomselect-field', 'id': 'id_proc_form_unit'})
+    )
+    oid = forms.ModelChoiceField(
+        queryset=OID.objects.none(), # Заповнюється динамічно JS
+        label="Об'єкт інформаційної діяльності (ОІД)",
+        widget=forms.Select(attrs={'class': 'form-select tomselect-field', 'id': 'id_proc_form_oid'}),
+        required=True
+    )
+    work_request_item = forms.ModelChoiceField(
+        queryset=WorkRequestItem.objects.none(), # Заповнюється динамічно JS
+        label="Елемент заявки (якщо застосовно)",
+        widget=forms.Select(attrs={'class': 'form-select tomselect-field', 'id': 'id_proc_form_work_request_item'}),
+        required=False 
+    )
+    process_date = forms.DateField(
+        label="Дата опрацювання документів (пакету)",
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        required=True
+    )
+    work_date = forms.DateField(
+        label="Дата виконання робіт на ОІД (для цього пакету)",
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        required=True
+    )
+    author = forms.ModelChoiceField(
+        queryset=Person.objects.filter(is_active=True).order_by('full_name'),
+        label="Автор/Виконавець (загальний для пакету)",
+        widget=forms.Select(attrs={'class': 'form-select tomselect-field', 'id': 'id_proc_form_author'}),
+        required=False
+    )
+
+    def __init__(self, *args, **kwargs):
+        initial_oid_instance = kwargs.pop('initial_oid', None)
+        initial_work_request_item_instance = kwargs.pop('initial_work_request_item', None)
+        
+        super().__init__(*args, **kwargs)
+
+        # Встановлення початкових значень та queryset для головної форми
+        if initial_oid_instance:
+            self.fields['unit'].initial = initial_oid_instance.unit
+            self.fields['oid'].queryset = OID.objects.filter(unit=initial_oid_instance.unit).order_by('cipher')
+            self.fields['oid'].initial = initial_oid_instance
+            
+            if initial_work_request_item_instance and initial_work_request_item_instance.oid == initial_oid_instance:
+                self.fields['work_request_item'].queryset = WorkRequestItem.objects.filter(oid=initial_oid_instance).select_related('request').order_by('-request__incoming_date')
+                self.fields['work_request_item'].initial = initial_work_request_item_instance
+            else: # Якщо є ОІД, але немає конкретного WRI, завантажуємо всі WRI для цього ОІД
+                self.fields['work_request_item'].queryset = WorkRequestItem.objects.filter(oid=initial_oid_instance).select_related('request').order_by('-request__incoming_date')
+
+        elif self.is_bound: # Якщо форма обробляє POST-дані
+            unit_id = self.data.get('unit')
+            oid_id = self.data.get('oid')
+            if unit_id:
+                self.fields['oid'].queryset = OID.objects.filter(unit_id=unit_id).order_by('cipher')
+            if oid_id:
+                 self.fields['work_request_item'].queryset = WorkRequestItem.objects.filter(oid_id=oid_id).select_related('request').order_by('-request__incoming_date')
+
+
+# Створюємо формсет для DocumentItemForm
+# extra=1 - одна порожня форма за замовчуванням
+DocumentItemFormSet = formset_factory(DocumentItemForm, extra=1, can_delete=True)
+
+# end end new form for documents
+
+
+
 class OIDForm(forms.ModelForm):
     class Meta:
         model = OID
