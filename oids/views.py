@@ -181,7 +181,7 @@ def ajax_load_work_requests_for_oids(request):
             for wr in relevant_requests:
                 work_requests_data.append({
                     'id': wr.id,
-                    'text': f"№{wr.incoming_number} від {wr.incoming_date.strftime('%d.%m.%Y')} (ВЧ: {wr.unit.code}) - {wr.get_status_display()}"
+                    'text': f"заявка вх.№{wr.incoming_number} від {wr.incoming_date.strftime('%d.%m.%Y')} (ВЧ: {wr.unit.code}) - {wr.get_status_display()}"
                 })
         except Exception as e:
             # Обробка можливих помилок, наприклад, якщо OID.DoesNotExist (малоймовірно при filter id__in)

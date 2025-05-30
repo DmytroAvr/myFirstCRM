@@ -188,7 +188,7 @@ class WorkRequest(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
 
     def __str__(self):
-        return f"Заявка №{self.incoming_number} від {self.incoming_date} ({self.get_status_display()})"
+        return f"в/ч {self.unit.code} Заявка вх.№{self.incoming_number} від {self.incoming_date} ({self.get_status_display()})"
 
     class Meta:
         verbose_name = "Заявка на проведення робіт"
