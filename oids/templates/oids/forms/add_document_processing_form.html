@@ -61,81 +61,268 @@
 
 {% block page_specific_js %}
 <script>
-$(document).ready(function() {
-    // Ініціалізація Select2
-    // initSelect2Fields($('.form-container'));
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("AddDocumentProcessing JS: DOMContentLoaded");
 
-    // Динамічне оновлення "Тип документа" та "Елемент заявки" на основі "ОІД"
-    const oidSelect = $('#id_document_oid'); // ID з DocumentForm
-    const workRequestItemSelect = $('#id_work_request_item'); // ID з DocumentForm
-    const documentTypeSelect = $('#id_document_type'); // ID з DocumentForm (поле document_type у формі)
+    // --- Елементи DOM та URL ---
+    const oidSelectElement = document.getElementById('{{ form.oid.id_for_label }}'); // ID з DocumentForm
+    const workRequestItemSelectElement = document.getElementById('{{ form.work_request_item.id_for_label }}');
+    const documentTypeSelectElement = document.getElementById('{{ form.document_type.id_for_label }}');
+    // Додайте сюди інші select, які потрібно ініціалізувати TomSelect, наприклад, 'author'
+    const authorSelectElement = document.getElementById('{{ form.author.id_for_label }}');
 
-    function updateDependentFields() {
-        const oidId = oidSelect.val();
-        
-        // Оновлення WorkRequestItem
-        if (oidId) {
-            // Припустимо, є AJAX URL для завантаження WorkRequestItems для OID
-            // Тобі потрібно створити цей view та URL
-            // const wrItemsUrl = "{% url 'oids:ajax_load_work_request_items_for_oid' %}"; // Приклад
-            const wrItemsUrl = `/oids/ajax/load-work-request-items-for-oid/`; // Або жорстко, якщо не впевнений в reverse у JS
-            
-            if (typeof loadSingleSelectOptions === 'function' && wrItemsUrl) {
-                 // Передаємо URL напряму, бо data-атрибут може бути не на oidSelect для цього конкретного зв'язку
-                 loadSingleSelectOptions(workRequestItemSelect, oidId, {
-                    url: wrItemsUrl,
-                    paramName: 'oid_id',
-                    placeholder: { default: 'Оберіть елемент заявки (необов\'язково)', loading: 'Завантаження...', error: 'Помилка', empty: 'Немає заявок для цього ОІД' },
-                    transformItem: item => ({ value: item.id, text: `Заявка №${item.request_incoming_number} - ${item.work_type_display}` }) 
-                    // Потрібно, щоб AJAX view повертав request_incoming_number та work_type_display
-                });
-            }
-        } else {
-            workRequestItemSelect.empty().append($('<option value="">Спочатку оберіть ОІД</option>')).prop('disabled', true).trigger('change');
-        }
 
-        // Оновлення DocumentType
-        // Ця логіка складніша, бо залежить від oid.oid_type та work_request_item.work_type (якщо обрано)
-        // або від якогось іншого способу визначення поточного типу робіт
-        if (oidId) {
-            // const docTypesUrl = "{% url 'oids:ajax_load_document_types_for_oid_and_work' %}"; // Приклад
-            const docTypesUrl = `/oids/ajax/load-document-types-for-oid/`; // Потрібен view, що приймає oid_id і, можливо, work_type
-            
-            // Потрібно визначити work_type. Це може бути обрано окремим полем або взято з workRequestItem, якщо воно обрано.
-            // let currentWorkType = $('#id_some_work_type_selector_on_form').val(); // Якщо є окремий вибір типу робіт
-            let currentWorkType = null;
-            if (workRequestItemSelect.val()) {
-                // Потрібно буде отримати work_type з обраного work_request_item, можливо, через інший AJAX або з data-атрибута
-                // currentWorkType = $(workRequestItemSelect.find('option:selected')).data('work-type');
-            }
+    const workRequestItemsAjaxUrl = "{% url 'oids:ajax_load_work_request_items_for_oid' %}";
+    const documentTypesAjaxUrl = "{% url 'oids:ajax_load_document_types_for_oid_and_work' %}";
 
-            if (typeof loadSingleSelectOptions === 'function' && docTypesUrl) {
-                let ajaxParams = { oid_id: oidId };
-                // if (currentWorkType) ajaxParams.work_type = currentWorkType; // Додати work_type, якщо він є
+    if (typeof TomSelect === 'undefined') {
+        console.error("AddDocumentProcessing JS: TomSelect library is NOT loaded!");
+        return; 
+    }
+    console.log("AddDocumentProcessing JS: TomSelect library is loaded.");
 
-                loadSingleSelectOptions(documentTypeSelect, oidId, { // sourceValue може бути oidId
-                    url: docTypesUrl, // AJAX view, що повертає DocumentType[]
-                    paramName: 'oid_id', // Або комбінація параметрів
-                    // В data функції в $.ajax можна передати кілька параметрів:
-                    // data: ajaxParams, 
-                    placeholder: { default: 'Оберіть тип документа', loading: 'Завантаження...', error: 'Помилка', empty: 'Немає доступних типів' },
-                    transformItem: item => ({ value: item.id, text: `${item.name} (${item.oid_type}, ${item.work_type})` })
-                });
-            }
-        } else {
-            documentTypeSelect.empty().append($('<option value="">Спочатку оберіть ОІД</option>')).prop('disabled', true).trigger('change');
-        }
+    // --- Стан ---
+    let currentSelectedOidId = null;
+    let currentSelectedOidType = null; // Будемо зберігати тип обраного ОІД (МОВНА/ПЕМІН)
+    let currentSelectedWorkType = null;  // Тип робіт з обраного WorkRequestItem
+
+    // --- TomSelect екземпляри ---
+    let tomSelectOid = null;
+    let tomSelectWRI = null; // WorkRequestItem
+    let tomSelectDocType = null;
+    let tomSelectAuthor = null; // Для поля Автор
+
+    // --- Утилітарна функція для конфігурації TomSelect ---
+    function getTomSelectConfig(elementId, placeholder, isDisabled = false, initialOptions = [], allowClear = true, isMulti = false) {
+        console.log(`CONFIG: TomSelect for #${elementId}. Placeholder: "${placeholder}", Disabled: ${isDisabled}`);
+        return {
+            plugins: isMulti ? ['remove_button'] : [],
+            create: false, placeholder: placeholder,
+            valueField: 'id', labelField: 'text', searchField: ['text'],
+            options: initialOptions, disabled: isDisabled, allowEmptyOption: allowClear,
+        };
     }
 
-    if (oidSelect.length) {
-        oidSelect.on('change', updateDependentFields);
-        if (oidSelect.val()) { // Початкове завантаження, якщо ОІД вже обраний
-            updateDependentFields();
+    // --- Модуль/Логіка для поля "Тип Документа" (DocumentType) ---
+    const DocumentTypeManager = {
+        init: function() {
+            if (documentTypeSelectElement) {
+                const config = getTomSelectConfig(documentTypeSelectElement.id, 'Спочатку оберіть ОІД та Тип робіт', true);
+                tomSelectDocType = new TomSelect(documentTypeSelectElement, config);
+                documentTypeSelectElement.tomselectInstance = tomSelectDocType;
+                console.log("DocTypeManager: TomSelect for DocumentType INITIALIZED (disabled).");
+            } else { console.warn("DocTypeManager: DocumentType select element not found."); }
+        },
+        load: function(oidId, oidType, workType) {
+            console.log(`DocTypeManager: load CALLED. OID ID: ${oidId}, OID Type: ${oidType}, Work Type: ${workType}`);
+            if (!tomSelectDocType) { console.warn("DocTypeManager: TomSelect instance not ready."); return; }
+
+            tomSelectDocType.clear();
+            tomSelectDocType.clearOptions();
+            tomSelectDocType.sync();
+
+            if (oidId && oidType) { // Тип ОІД має бути відомий
+                tomSelectDocType.enable();
+                tomSelectDocType.placeholder = 'Завантаження типів документів...';
+                
+                const params = new URLSearchParams({ oid_id: oidId });
+                // Тип робіт (workType) є опціональним для цього запиту, 
+                // сервер сам вирішить, які типи документів показувати, якщо workType не передано
+                if (workType) {
+                    params.append('work_type', workType);
+                }
+                console.log(`DocTypeManager: Fetching DocumentTypes from: ${documentTypesAjaxUrl}?${params.toString()}`);
+
+                fetch(`${documentTypesAjaxUrl}?${params.toString()}`)
+                    .then(response => {
+                        if (!response.ok) return response.text().then(text => { throw new Error(`Net error DocTypes: ${response.statusText}. Server: ${text}`);});
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log("DocTypeManager: DocumentTypes data received:", data);
+                        const options = data.map(dt => ({ id: dt.id.toString(), text: dt.text }));
+                        tomSelectDocType.addOptions(options);
+                        tomSelectDocType.refreshOptions(false);
+                        const items = tomSelectDocType.dropdown_content.querySelectorAll('.option').length;
+                        console.log(`DocTypeManager: Options in DocumentType dropdown: ${items}`);
+                        tomSelectDocType.placeholder = options.length > 0 ? 'Оберіть тип документа...' : 'Типи документів не знайдено';
+                        if (options.length > 0 && items > 0) tomSelectDocType.open();
+                    })
+                    .catch(error => { console.error("DocTypeManager: Error loading DocumentTypes:", error); tomSelectDocType.placeholder = 'Помилка завантаження типів'; tomSelectDocType.refreshOptions(false);});
+            } else {
+                tomSelectDocType.disable();
+                tomSelectDocType.placeholder = 'Спочатку оберіть ОІД (та Тип робіт)';
+            }
         }
+    };
+
+    // --- Модуль/Логіка для поля "Елемент Заявки" (WorkRequestItem) ---
+    const WorkRequestItemManager = {
+        init: function() {
+            if (workRequestItemSelectElement) {
+                const config = getTomSelectConfig(workRequestItemSelectElement.id, 'Спочатку оберіть ОІД', true, [], true, []); // Не multi, allowClear=true
+                tomSelectWRI = new TomSelect(workRequestItemSelectElement, config);
+                workRequestItemSelectElement.tomselectInstance = tomSelectWRI;
+                console.log("WRIManager: TomSelect for WorkRequestItem INITIALIZED (disabled).");
+
+                // Слухач на зміну Елемента Заявки -> оновлюємо Тип Документа
+                tomSelectWRI.on('change', function(selectedWRI_Id) {
+                    console.log("WRIManager: WorkRequestItem selection CHANGED. Selected WRI ID:", selectedWRI_Id);
+                    currentSelectedWorkType = null; // Скидаємо попередній тип робіт
+                    if (selectedWRI_Id) {
+                        const selectedOptionData = this.options[selectedWRI_Id]; // Отримуємо дані опції
+                        if (selectedOptionData && selectedOptionData.work_type) {
+                            currentSelectedWorkType = selectedOptionData.work_type;
+                            console.log("WRIManager: Extracted WorkType from selected WRI:", currentSelectedWorkType);
+                        } else {
+                            console.warn("WRIManager: Could not extract WorkType from selected WRI option data:", selectedOptionData);
+                        }
+                    }
+                    // Оновлюємо типи документів на основі нового типу робіт (та поточного ОІД та його типу)
+                    if (currentSelectedOidId && currentSelectedOidType) {
+                         DocumentTypeManager.load(currentSelectedOidId, currentSelectedOidType, currentSelectedWorkType);
+                    } else {
+                        DocumentTypeManager.load(null, null, null); // Очистити типи документів
+                    }
+                });
+
+            } else { console.warn("WRIManager: WorkRequestItem select element not found."); }
+        },
+        load: function(oidId) {
+            console.log(`WRIManager: load CALLED. OID ID: ${oidId}`);
+            if (!tomSelectWRI) { console.warn("WRIManager: TomSelect instance not ready."); return; }
+
+            tomSelectWRI.clear();
+            tomSelectWRI.clearOptions();
+            tomSelectWRI.sync();
+            currentSelectedWorkType = null; // Скидаємо тип робіт, оскільки ОІД змінився
+
+            if (oidId) {
+                tomSelectWRI.enable();
+                tomSelectWRI.placeholder = 'Завантаження елементів заявок...';
+                
+                console.log(`WRIManager: Fetching WorkRequestItems from: ${workRequestItemsAjaxUrl}?oid_id=${oidId}`);
+                fetch(`${workRequestItemsAjaxUrl}?oid_id=${oidId}`)
+                    .then(response => {
+                        if (!response.ok) return response.text().then(text => { throw new Error(`Net error WRI: ${response.statusText}. Server: ${text}`);});
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log("WRIManager: WorkRequestItems data received:", data);
+                        // Важливо: AJAX має повертати 'work_type' для кожної опції
+                        const options = data.map(item => ({ 
+                            id: item.id.toString(), 
+                            text: item.text,
+                            work_type: item.work_type // Зберігаємо тип робіт в даних опції
+                        }));
+                        tomSelectWRI.addOptions(options);
+                        tomSelectWRI.refreshOptions(false);
+                        const items = tomSelectWRI.dropdown_content.querySelectorAll('.option').length;
+                        console.log(`WRIManager: Options in WRI dropdown: ${items}`);
+                        tomSelectWRI.placeholder = options.length > 0 ? 'Оберіть елемент заявки (необов\'язково)' : 'Для ОІД немає пов\'язаних заявок';
+                    })
+                    .catch(error => { console.error("WRIManager: Error loading WorkRequestItems:", error); tomSelectWRI.placeholder = 'Помилка завантаження заявок'; tomSelectWRI.refreshOptions(false);});
+            } else {
+                tomSelectWRI.disable();
+                tomSelectWRI.placeholder = 'Спочатку оберіть ОІД';
+            }
+        }
+    };
+
+    // --- Модуль/Логіка для поля "ОІД" ---
+    const OidManager = {
+        init: function() {
+            if (oidSelectElement) {
+                // Якщо ОІД вже обраний на сторінці (наприклад, initial_oid з view)
+                // TomSelect має автоматично підхопити його з HTML <select>
+                const config = getTomSelectConfig(oidSelectElement.id, 'Оберіть ОІД...', false, [], true, []); // Не multi
+                tomSelectOid = new TomSelect(oidSelectElement, config);
+                oidSelectElement.tomselectInstance = tomSelectOid;
+                console.log("OidManager: TomSelect for OID INITIALIZED.");
+
+                // Отримуємо початково обраний ОІД ID та його тип
+                currentSelectedOidId = tomSelectOid.getValue();
+                if (currentSelectedOidId) {
+                    const selectedOptionElement = oidSelectElement.options[oidSelectElement.selectedIndex];
+                    if (selectedOptionElement && selectedOptionElement.dataset.oidType) {
+                         currentSelectedOidType = selectedOptionElement.dataset.oidType;
+                    } else {
+                        // Якщо типу немає в data-атрибуті, його потрібно буде завантажити або отримати інакше
+                        console.warn("OidManager: OID type not found in data-attribute for pre-selected OID. DocumentType filtering might be incomplete.");
+                    }
+                    console.log(`OidManager: Initial OID ID: ${currentSelectedOidId}, OID Type: ${currentSelectedOidType}`);
+                }
+
+
+                tomSelectOid.on('change', function(selectedOid) {
+                    console.log("OidManager: OID selection CHANGED. Selected OID ID:", selectedOid);
+                    currentSelectedOidId = selectedOid;
+                    currentSelectedOidType = null; // Скидаємо тип, потрібно отримати новий
+
+                    if (selectedOid) {
+                        // Отримуємо data-oid-type з обраної опції TomSelect (якщо він там є)
+                        // TomSelect зберігає оригінальні дані опції в this.options[value]
+                        const optionData = this.options[selectedOid]; 
+                        if (optionData && optionData.dataset && optionData.dataset.oidType) { // Якщо data-атрибут скопіювався
+                            currentSelectedOidType = optionData.dataset.oidType;
+                        } else {
+                            // Або з самого HTML елемента, якщо TomSelect його не копіює
+                            const selectedOptionElement = oidSelectElement.querySelector(`option[value="${selectedOid}"]`);
+                            if (selectedOptionElement && selectedOptionElement.dataset.oidType) {
+                                currentSelectedOidType = selectedOptionElement.dataset.oidType;
+                            } else {
+                                 console.warn("OidManager: OID type not found in data-attribute for selected OID. DocumentType filtering might be incomplete.");
+                                 // Тут можна зробити AJAX запит для отримання типу ОІД, якщо потрібно
+                            }
+                        }
+                        console.log(`OidManager: New OID Type from selection: ${currentSelectedOidType}`);
+                        WorkRequestItemManager.load(selectedOid);
+                        DocumentTypeManager.load(selectedOid, currentSelectedOidType, null); // Завантажуємо типи документів без типу робіт спочатку
+                    } else {
+                        WorkRequestItemManager.load(null); // Очистити WRI
+                        DocumentTypeManager.load(null, null, null); // Очистити DocumentTypes
+                    }
+                });
+
+                // Початкове завантаження залежних полів, якщо ОІД вже обраний
+                if (currentSelectedOidId) {
+                    console.log("OidManager: Triggering initial load for dependent fields based on pre-selected OID.");
+                    WorkRequestItemManager.load(currentSelectedOidId);
+                    DocumentTypeManager.load(currentSelectedOidId, currentSelectedOidType, null);
+                } else {
+                    // Якщо ОІД не обраний, деактивуємо залежні поля
+                    WorkRequestItemManager.load(null);
+                    DocumentTypeManager.load(null, null, null);
+                }
+
+
+            } else { console.warn("OidManager: OID select element not found."); }
+        }
+    };
+    
+    // Ініціалізація поля "Автор"
+    if (authorSelectElement) {
+        const authorConfig = getTomSelectConfig(authorSelectElement.id, 'Оберіть автора...', false, [], true, []);
+        tomSelectAuthor = new TomSelect(authorSelectElement, authorConfig);
+        authorSelectElement.tomselectInstance = tomSelectAuthor;
+        console.log("AddDocumentProcessing JS: TomSelect for Author INITIALIZED.");
     }
-    // if (workRequestItemSelect.length) {
-    //     workRequestItemSelect.on('change', updateDependentFields); // Зміна WorkRequestItem також може оновлювати DocumentType
-    // }
+
+
+    // --- Головна ініціалізація ---
+    OidManager.init();
+    WorkRequestItemManager.init();
+    DocumentTypeManager.init();
+
+    // Обмеження для полів дат
+    const processDateInput = document.getElementById('{{ form.process_date.id_for_label }}');
+    const workDateInput = document.getElementById('{{ form.work_date.id_for_label }}');
+    // ... (логіка для обмеження дат, якщо потрібна)
+
+    // Переконайтесь, що URL-и для AJAX визначені (можна у <head> або перед цим скриптом)
+    if (!workRequestItemsAjaxUrl || !documentTypesAjaxUrl) {
+        console.error("AddDocumentProcessing JS: One or more AJAX URLs are not defined!");
+    }
 });
 </script>
 {% endblock %}

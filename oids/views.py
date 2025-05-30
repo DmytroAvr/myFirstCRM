@@ -121,9 +121,75 @@ def ajax_load_oids_for_multiple_units(request):
             
     return JsonResponse(oids_data, safe=False)
 
-# Не забудьте додати URL для цього view у oids/urls.py:
-# path('ajax/load-oids-for-multiple-units/', views.ajax_load_oids_for_multiple_units, name='ajax_load_oids_for_multiple_units'),
 
+def ajax_load_work_request_items_for_oid(request):
+    oid_id_str = request.GET.get('oid_id')
+    items_data = []
+    if oid_id_str and oid_id_str.isdigit():
+        oid_id = int(oid_id_str)
+        try:
+            # Отримуємо елементи заявок для цього ОІД, можливо, з певними статусами
+            items_queryset = WorkRequestItem.objects.filter(
+                oid_id=oid_id,
+                # status__in=[WorkRequestStatusChoices.PENDING, WorkRequestStatusChoices.IN_PROGRESS] # Приклад фільтрації
+            ).select_related('request').order_by('-request__incoming_date')
+            
+            for item in items_queryset:
+                items_data.append({
+                    'id': item.id,
+                    'text': f"Заявка №{item.request.incoming_number} ({item.request.incoming_date.strftime('%d.%m.%Y')}) - {item.get_work_type_display()}",
+                    'work_type': item.work_type # Передаємо work_type для подальшої фільтрації DocumentType
+                })
+        except ValueError:
+            return JsonResponse({'error': 'Невірний ID ОІД'}, status=400)
+            
+    return JsonResponse(items_data, safe=False)
+
+def ajax_load_document_types_for_oid_and_work(request):
+    oid_id_str = request.GET.get('oid_id')
+    work_type_from_wri = request.GET.get('work_type') # Тип робіт з обраного WorkRequestItem
+    # Або можна передавати work_request_item_id і отримувати work_type з нього на сервері
+
+    doc_types_data = []
+    
+    if oid_id_str and oid_id_str.isdigit():
+        oid_id = int(oid_id_str)
+        try:
+            oid_instance = OID.objects.get(pk=oid_id)
+            oid_actual_type = oid_instance.oid_type # Тип самого ОІД (МОВНА/ПЕМІН)
+
+            # Фільтруємо DocumentType
+            # 1. За типом ОІД (МОВНА/ПЕМІН) - має збігатися або бути "спільним" (припустимо, спільний має порожній oid_type у DocumentType)
+            # 2. За типом робіт (Атестація/ІК) - має збігатися з work_type_from_wri або бути "спільним"
+            
+            q_filters = Q(oid_type=oid_actual_type) | Q(oid_type='') # Або порожній рядок, або спеціальне значення для "спільного"
+            
+            if work_type_from_wri: # Якщо тип робіт визначено (наприклад, з обраного WorkRequestItem)
+                q_filters &= (Q(work_type=work_type_from_wri) | Q(work_type=''))
+            # else:
+                # Якщо тип робіт не визначено, можливо, показувати всі типи документів, 
+                # що підходять для типу ОІД, або вимагати вибору типу робіт окремо.
+                # Поки що, якщо work_type_from_wri не передано, фільтр по work_type не застосовується (або показує тільки спільні для роботи).
+                # Для більшої точності, якщо work_type не передано, можливо, не варто повертати нічого або тільки дуже загальні типи.
+                # Або додати окреме поле "Тип робіт" на форму, якщо WorkRequestItem не обрано.
+                # Поточна логіка: якщо work_type_from_wri не надано, фільтр по work_type буде широким.
+
+            doc_types_queryset = DocumentType.objects.filter(q_filters).order_by('name')
+            
+            for dt in doc_types_queryset:
+                doc_types_data.append({
+                    'id': dt.id,
+                    # Відображаємо всю інформацію для ясності у випадаючому списку
+                    'text': f"{dt.name} (для ОІД: {dt.get_oid_type_display()}, для робіт: {dt.get_work_type_display()})"
+                })
+
+        except OID.DoesNotExist:
+            return JsonResponse({'error': 'ОІД не знайдено'}, status=404)
+        except Exception as e:
+            print(f"Error in ajax_load_document_types: {e}")
+            return JsonResponse({'error': str(e)}, status=500)
+            
+    return JsonResponse(doc_types_data, safe=False)
 
 
 # AJAX view для завантаження ОІДів для Select2 у формах (якщо потрібно)

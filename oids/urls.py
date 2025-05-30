@@ -13,6 +13,9 @@ urlpatterns = [
     path('ajax/load-oids-categorized/', views.ajax_load_oids_for_unit_categorized, name='ajax_load_oids_categorized'), # Новий URL
     path('ajax/load-oids-for-multiple-units/', views.ajax_load_oids_for_multiple_units, name='ajax_load_oids_for_multiple_units'), # Новий URL
     path('ajax/load-work-requests-for-oids/', views.ajax_load_work_requests_for_oids, name='ajax_load_work_requests_for_oids'),
+	path('ajax/load-work-request-items-for-oid/', views.ajax_load_work_request_items_for_oid, name='ajax_load_work_request_items_for_oid'),
+	path('ajax/load-document-types-for-oid-and-work/', views.ajax_load_document_types_for_oid_and_work, name='ajax_load_document_types_for_oid_and_work'),
+
     # URLs для форм
     path('trip/plan/', views.plan_trip_view, name='plan_trip_view_name'),
     path('document/add/', views.add_document_processing_view, name='add_document_processing_view_name'),
