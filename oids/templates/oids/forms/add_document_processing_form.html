@@ -54,7 +54,7 @@
                     {% for error in main_form.oid.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
                 </div>
             </div>
-			
+
             {# Поле Work Date (Дата виконання робіт на ОІД) #}
             <div class="row mb-3 align-items-center">
                 <label for="{{ main_form.work_date.id_for_label }}" class="col-sm-3 col-form-label text-sm-end fw-bold">
@@ -146,17 +146,17 @@
                             </div>
                             
                             {# Контейнер для кнопки видалення (та поля DELETE, якщо є) #}
-                            <div class="col-md-3 d-flex align-items-end">
-                                <div class="form-item-delete-button-container w-100">
+                            <!-- <div class="col-md-3 d-flex align-items-end">
+                                <div class="form-item-delete-button-container w-100 item-controls">
                                 {% if item_form.DELETE %}
-                                    <div class="form-check">
+                                    <div class="form-check" style="display: none;">
                                         {{ item_form.DELETE }}
                                         <label for="{{ item_form.DELETE.id_for_label }}" class="form-check-label ms-1">Видалити цей документ</label>
                                     </div>
                                 {% endif %}
                                 {# Сюди JavaScript може додати кнопку "Видалити" для нових форм #}
                                 </div>
-                            </div>
+                            </div> -->
                         </div>
 						
                         {# Поле Note #}
@@ -187,6 +187,7 @@
 </div>
 
 {# Шаблон для нової порожньої форми документа (для JavaScript) #}
+
 <template id="document-item-empty-form-template">
     {% spaceless %}
     {% with item_form=formset.empty_form %} {# Використовуємо empty_form з контексту #}
@@ -202,15 +203,12 @@
                 {{ item_form.document_number }}
             </div>
             <div class="col-md-3 d-flex align-items-end">
-                <div class="form-item-delete-button-container w-100">
+                <div class="form-item-delete-button-container w-100 item-controls remove-item-button">
                      {# JavaScript додасть сюди кнопку "Видалити" #}
                 </div>
             </div>
         </div>
-        <div class="mt-2">
-            <label for="{{ item_form.attachment.id_for_label }}" class="form-label">{{ item_form.attachment.label }}:</label>
-            {{ item_form.attachment }}
-        </div>
+     
         <div class="mt-2">
             <label for="{{ item_form.note.id_for_label }}" class="form-label">{{ item_form.note.label }}:</label>
             {{ item_form.note }}
@@ -224,6 +222,7 @@
 {% endblock %}
 
 {% block extra_js %}
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     console.log("AddDocProc JS: DOMContentLoaded. V2 Fixes.");
@@ -397,8 +396,31 @@ document.addEventListener('DOMContentLoaded', function() {
             DocumentItemFormsetManager.updateAllDocTypes(currentOidId, currentOidType, currentSelectedWorkTypeFromWRI);
         }
         
+		function updateAllDocumentTypesBasedOnMainForm() {
+			const oidVal = MainFormManager.getCurrentOidId();
+			const oidTypeVal = MainFormManager.getCurrentOidType();
+			const workTypeVal = MainFormManager.getCurrentWorkType();
+			console.log("DocItemFormset: updateAllDocumentTypesBasedOnMainForm CALLED. Current main form state:", {oidVal, oidTypeVal, workTypeVal});
+			container.querySelectorAll('.document-item-form').forEach(formDiv => {
+				const docTypeSelect = formDiv.querySelector('select[name$="-document_type"]');
+				if (docTypeSelect && docTypeSelect.tomselectInstance) {
+					updateSpecificDocType(docTypeSelect.tomselectInstance, oidVal, oidTypeVal, workTypeVal);
+				}
+			});
+		}
+		// return { init,  updateAllDocTypes: updateAllDocumentTypesBasedOnMainForm};
+		// ... (MainFormManager, як був, АЛЕ в його handleOidChange та handleWriChange тепер викликаємо DocumentItemFormsetManager.updateAllDocTypes())
+
+		// У MainFormManager.handleOidChange, після отримання currentOidType:
+		// DocumentItemFormsetManager.updateAllDocTypes(currentOidId, currentOidType, null);
+
+		// У MainFormManager.handleWriChange, після отримання currentSelectedWorkTypeFromWRI:
+		// DocumentItemFormsetManager.updateAllDocTypes(MainFormManager.getCurrentOidId(), MainFormManager.getCurrentOidType(), currentSelectedWorkTypeFromWRI);
+
+
         return { 
             init, 
+			updateAllDocTypes: updateAllDocumentTypesBasedOnMainForm,
             getOidInstance: function() { return tsOid; },
             getWriInstance: function() { return tsWri; },
             getCurrentOidId: function() { return currentOidId; },
@@ -414,21 +436,57 @@ document.addEventListener('DOMContentLoaded', function() {
         const emptyFormTemplateElement = document.getElementById('document-item-empty-form-template');
         let formsetPrefix;
         let totalFormsInput; /*...*/ let minFormsCount; let maxFormsCount; let canDeleteForms;
-
-        function initializeTomSelectForDocTypeInForm(formDiv) {
-            const docTypeSelect = formDiv.querySelector('select[name$="-document_type"]');
-            if (docTypeSelect && typeof TomSelect !== 'undefined') {
-                console.log("DocItemFormset: Initializing TomSelect for DocType in form, ID:", docTypeSelect.id);
-                let htmlDocTypeOptions = [];
-                Array.from(docTypeSelect.options).forEach(opt => {if (opt.value) htmlDocTypeOptions.push({id:opt.value, text:opt.text});});
-                const config = getTomSelectConfig(docTypeSelect.id, 'Оберіть тип документа', false, htmlDocTypeOptions, true, [], false);
-                const instance = new TomSelect(docTypeSelect, config);
-                docTypeSelect.tomselectInstance = instance;
-                if (htmlDocTypeOptions.length === 0 ) {
-                    instance.disable(); instance.placeholder = 'Заглушка: типи (фільтрація скоро)';
+		
+	
+		function initializeTomSelectForDocTypeInForm(formDiv) {
+        const docTypeSelectElement = formDiv.querySelector('select[name$="-document_type"]');
+        if (docTypeSelectElement && typeof TomSelect !== 'undefined') {
+            console.log("DocItemFormset: Initializing TomSelect for DocType in form, ID:", docTypeSelectElement.id);
+            
+            let htmlDocTypeOptions = [];
+            let hasInitialValue = false;
+            Array.from(docTypeSelectElement.options).forEach(opt => {
+                if (opt.value) { 
+                    htmlDocTypeOptions.push({id:opt.value, text:opt.text});
+                    if (opt.selected) hasInitialValue = true;
                 }
+            });
+            console.log(`DocItemFormset: HTML options for new DocType select [${docTypeSelectElement.id}]:`, htmlDocTypeOptions.length);
+
+            // Якщо ОІД/Тип робіт ще не обрані, то document_type має бути disabled
+            const mainOidId = MainFormManager.getCurrentOidId();
+            const mainOidType = MainFormManager.getCurrentOidType();
+            const shouldBeDisabled = !(mainOidId && mainOidType);
+
+            const config = getTomSelectConfig(
+                docTypeSelectElement.id, 
+                shouldBeDisabled ? 'Оберіть ОІД та Заявку' : 'Оберіть тип документа', 
+                shouldBeDisabled, // isDisabled
+                htmlDocTypeOptions, // Передаємо опції з HTML (empty_form)
+                true,  // allowClear
+                [],    // plugins
+                false  // isMulti
+            );
+            const instance = new TomSelect(docTypeSelectElement, config);
+            docTypeSelectElement.tomselectInstance = instance;
+            console.log(`DocItemFormset: TomSelect for DocType CREATED for [${docTypeSelectElement.id}]. Options in DOM: ${instance.dropdown_content.querySelectorAll('.option').length}`);
+
+            // Якщо опції не підхопилися (малоймовірно, якщо передали в config.options),
+            // але вони були в HTML, можна спробувати їх додати ще раз.
+            if (instance.dropdown_content.querySelectorAll('.option').length === 0 && htmlDocTypeOptions.length > 0) {
+                console.warn(`DocItemFormset: TomSelect for [${docTypeSelectElement.id}] empty after init with options. Re-adding.`);
+                instance.addOptions(htmlDocTypeOptions);
+                instance.refreshOptions(false);
+                console.log(`DocItemFormset: Options in DOM after re-add for [${docTypeSelectElement.id}]: ${instance.dropdown_content.querySelectorAll('.option').length}`);
             }
+            
+            // Одразу застосовуємо "фільтрацію-заглушку" на основі поточного стану головної форми
+            updateSpecificDocType(instance, mainOidId, mainOidType, MainFormManager.getCurrentWorkType());
+
+        } else {
+            console.warn("DocItemFormset: DocumentType select not found or TomSelect undefined in form:", formDiv);
         }
+    }
         
         function updateAllDocTypes(oidId, oidType, workType) {
             console.log(`DocItemFormset: updateAllDocTypes CALLED. OID_ID: ${oidId}, OID_Type: ${oidType}, Work_Type: ${workType}`);
@@ -462,88 +520,339 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
-        function addFormItem() {
-            console.log("DocItemFormset: Adding form.");
-            const currentFormsCount = container.querySelectorAll('.document-item-form:not([style*="display: none"])').length; // Рахуємо тільки видимі
-            if (maxFormsCount && currentFormsCount >= maxFormsCount) { /* ... alert ... */ return; }
+		// Ця функція буде оновлювати ОДИН конкретний TomSelect для DocumentType
+		function updateSpecificDocType(tsInstance, oidId, oidType, workType) {
+			if (!tsInstance) {
+				console.warn("DocItemFormset: updateSpecificDocType - TomSelect instance is null.");
+				return;
+			}
+			console.log(`DocItemFormset: updateSpecificDocType CALLED for [${tsInstance.input.id}]. OID_ID: ${oidId}, OID_Type: ${oidType}, Work_Type: ${workType}`);
+			
+			// Очищаємо перед можливою фільтрацією (поки що фільтрація - заглушка)
+			// tsInstance.clear(); // Не очищаємо обране значення, тільки опції
+			// tsInstance.clearOptions(); // Якщо буде реальний AJAX, то тут очищатимемо
+			// tsInstance.sync();
 
-            const newFormHtml = emptyFormTemplateElement.innerHTML.replace(/__prefix__/g, totalFormsInput.value); // Використовуємо totalFormsInput.value для індекса
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = newFormHtml;
-            const newFormElement = tempDiv.firstElementChild;
-            
-            container.appendChild(newFormElement);
-            totalFormsInput.value = parseInt(totalFormsInput.value) + 1;
+			// !!! ЗАГЛУШКА для реальної фільтрації !!!
+			if (oidId && oidType) { 
+				tsInstance.enable();
+				tsInstance.placeholder = `Типи для ОІД ${oidType || 'N/A'}${workType ? ', робіт ' + workType : ''} (фільтр заглушка)`;
+				// Якщо опції вже були завантажені при ініціалізації (з HTML), то нічого не робимо.
+				// Якщо б тут був AJAX для фільтрації:
+				// 1. clearOptions()
+				// 2. fetch(...)
+				// 3. addOptions(...)
+				// 4. refreshOptions(false)
+				console.warn(`DocItemFormset: Actual DocumentType filtering for [${tsInstance.input.id}] is STUBBED. It should use AJAX if options need to change.`);
+				// Просто оновимо, щоб плейсхолдер змінився, якщо він був інший
+				tsInstance.refreshOptions(false); 
+			} else {
+				tsInstance.disable();
+				tsInstance.placeholder = 'Оберіть ОІД/Заявку в гол. формі';
+				tsInstance.clearOptions(); // Якщо немає ОІД/типу, очищаємо опції
+				tsInstance.refreshOptions(false);
+			}
+		}
 
-            initializeTomSelectForDocTypeInForm(newFormElement);
+        // function addFormItem() {
+        //     console.log("DocItemFormset: Adding form.");
+        //     const currentFormsCount = container.querySelectorAll('.document-item-form:not([style*="display: none"])').length; // Рахуємо тільки видимі
+        //     if (maxFormsCount && currentFormsCount >= maxFormsCount) { /* ... alert ... */ return; }
+
+        //     const newFormHtml = emptyFormTemplateElement.innerHTML.replace(/__prefix__/g, totalFormsInput.value); // Використовуємо totalFormsInput.value для індекса
+        //     const tempDiv = document.createElement('div');
+        //     tempDiv.innerHTML = newFormHtml;
+        //     const newFormElement = tempDiv.firstElementChild;
             
-            // Оновлюємо типи документів для нової форми
-            const oidVal = MainFormManager.getCurrentOidId();
-            const oidTypeVal = MainFormManager.getCurrentOidType();
-            const workTypeVal = MainFormManager.getCurrentWorkType();
-            console.log(`DocItemFormset: Updating DocTypes for new form. OID ID: ${oidVal}, OID Type: ${oidTypeVal}, Work Type: ${workTypeVal}`);
-            // Оновлюємо тільки для нового елемента, або для всіх (updateAllDocTypes)
-            const newDocTypeSelect = newFormElement.querySelector('select[name$="-document_type"]');
-            if (newDocTypeSelect && newDocTypeSelect.tomselectInstance) {
-                const ts = newDocTypeSelect.tomselectInstance;
-                ts.clear(); ts.clearOptions(); ts.sync();
-                 if (oidVal && oidTypeVal) {
-                    ts.enable();
-                    ts.placeholder = `Типи для ОІД ${oidTypeVal || 'N/A'}${workTypeVal ? ', робіт ' + workTypeVal : ''} (фільтр заглушка)`;
-                 } else {
-                    ts.disable(); ts.placeholder = 'Оберіть ОІД та/або Заявку в гол. формі';
-                 }
-            }
+        //     container.appendChild(newFormElement);
+        //     totalFormsInput.value = parseInt(totalFormsInput.value) + 1;
+
+        //     initializeTomSelectForDocTypeInForm(newFormElement);
             
-            setupDeleteButton(newFormElement); // Додаємо кнопку видалення
-            updateDeleteButtonsVisibility();
-            console.log(`DocItemFormset: Form added. New TOTAL_FORMS: ${totalFormsInput.value}`);
+        //     // Оновлюємо типи документів для нової форми
+        //     const oidVal = MainFormManager.getCurrentOidId();
+        //     const oidTypeVal = MainFormManager.getCurrentOidType();
+        //     const workTypeVal = MainFormManager.getCurrentWorkType();
+        //     console.log(`DocItemFormset: Updating DocTypes for new form. OID ID: ${oidVal}, OID Type: ${oidTypeVal}, Work Type: ${workTypeVal}`);
+        //     // Оновлюємо тільки для нового елемента, або для всіх (updateAllDocTypes)
+        //     const newDocTypeSelect = newFormElement.querySelector('select[name$="-document_type"]');
+        //     if (newDocTypeSelect && newDocTypeSelect.tomselectInstance) {
+        //         const ts = newDocTypeSelect.tomselectInstance;
+        //         ts.clear(); ts.clearOptions(); ts.sync();
+        //          if (oidVal && oidTypeVal) {
+        //             ts.enable();
+        //             ts.placeholder = `Типи для ОІД ${oidTypeVal || 'N/A'}${workTypeVal ? ', робіт ' + workTypeVal : ''} (фільтр заглушка)`;
+        //          } else {
+        //             ts.disable(); ts.placeholder = 'Оберіть ОІД та/або Заявку в гол. формі';
+        //          }
+        //     }
+            
+        //     setupDeleteButton(newFormElement); // Додаємо кнопку видалення
+        //     updateDeleteButtonsVisibility();
+        //     console.log(`DocItemFormset: Form added. New TOTAL_FORMS: ${totalFormsInput.value}`);
+        // }
+
+		function addFormItem() {
+        // ... (початок функції addFormItem, як був: отримання formIdx, newFormHtml, ...) ...
+        console.log("DocItemFormset: Adding form.");
+        const currentFormsCountQuery = container.querySelectorAll('.document-item-form');
+        let formIdx = 0;
+        if (totalFormsInput){ // Якщо totalFormsInput існує
+            formIdx = parseInt(totalFormsInput.value, 10);
+        } else { // Якщо ні, рахуємо елементи (менш надійно для індексів Django)
+             formIdx = currentFormsCountQuery.length;
+             console.warn("DocItemFormset: totalFormsInput not found, using querySelectorAll length for index.");
         }
 
-        function setupDeleteButton(formDiv) { /* ... як було, але перевірте селектор для controlsDiv ... */ 
-            const controlsDiv = formDiv.querySelector('.item-controls'); // Має бути у шаблоні форми
-            if (controlsDiv) {
-                let deleteButton = controlsDiv.querySelector('.remove-document-item-button');
-                if (!deleteButton) {
-                    deleteButton = document.createElement('button');
-                    deleteButton.type = 'button';
-                    deleteButton.classList.add('btn', 'btn-danger', 'btn-sm', 'remove-document-item-button');
-                    deleteButton.innerHTML = '<i class="fas fa-trash"></i>'; deleteButton.title = "Видалити документ";
-                    controlsDiv.appendChild(deleteButton);
-                }
-            } else { console.warn("DocItemFormset: '.item-controls' div not found in form to add delete button:", formDiv); }
-        }
-        function removeFormItem(formDivToRemove) { /* ... як було ... */ }
-        function updateDeleteButtonsVisibility() { /* ... як було ... */ }
+
+        if (maxFormsCount && formIdx >= maxFormsCount) { /* ... alert ... */ return; }
+
+        const newFormHtml = emptyFormTemplateElement.innerHTML.replace(/__prefix__/g, formIdx);
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = newFormHtml;
+        const newFormElement = tempDiv.firstElementChild;
         
-        function init() { /* ... як було, але викликайте setupDeleteButton для існуючих форм ... */
-             if (!container || !addButton || !emptyFormTemplateElement || !emptyFormTemplateElement.innerHTML.trim()) {return;}
-            console.log("DocItemFormset: Initializing.");
-            formsetPrefix = '{{ formset.prefix }}'; 
-            totalFormsInput = document.getElementById(`id_${formsetPrefix}-TOTAL_FORMS`);
-            minFormsCount = parseInt(document.getElementById(`id_${formsetPrefix}-MIN_NUM_FORMS`)?.value || '0');
-            maxFormsCount = parseInt(document.getElementById(`id_${formsetPrefix}-MAX_NUM_FORMS`)?.value || '1000');
-            canDeleteForms = "{{ formset.can_delete|yesno:'true,false' }}" === 'true';
+        container.appendChild(newFormElement);
+        if (totalFormsInput) totalFormsInput.value = formIdx + 1;
+        else console.error("DocItemFormset: totalFormsInput is NULL, cannot update count!");
+
+
+        console.log(`DocItemFormset: Form ${formIdx} added. New TOTAL_FORMS: ${totalFormsInput ? totalFormsInput.value : 'N/A'}`);
+
+        // !!! ВИКЛИКАЄМО ІНІЦІАЛІЗАЦІЮ ДЛЯ НОВОЇ ФОРМИ !!!
+        initializeTomSelectForDocTypeInForm(newFormElement); 
+        
+        setupDeleteButton(newFormElement); 
+        updateDeleteButtonsVisibility();
+    }
+
+		function setupDeleteButton(formDiv) { // Перейменовано для ясності, бо вона налаштовує, а не тільки додає
+			const deleteButtonContainer = formDiv.querySelector('.form-item-delete-button-container'); // Використовуйте ваш правильний селектор
+			if (!deleteButtonContainer) {
+				console.warn("DocItemFormset: Delete button container not found in form:", formDiv);
+				return;
+			}
+
+			// Якщо кнопка вже є (наприклад, для існуючих форм з Django), просто переконуємося, що вона має клас
+			let removeButton = deleteButtonContainer.querySelector('.remove-document-item-button');
+			if (removeButton) {
+				console.log("DocItemFormset: Delete button already exists in container for form:", formDiv.id);
+				// Переконуємося, що на ній є слухач (хоча делегування на контейнер має працювати)
+			} else if (canDeleteForms) { // Додаємо кнопку, тільки якщо її немає і можна видаляти
+									// (canDeleteForms - змінна, що зберігає {{ formset.can_delete }})
+				console.log("DocItemFormset: Adding new delete button to container for form:", formDiv.id);
+				removeButton = document.createElement('button');
+				removeButton.type = 'button';
+				removeButton.classList.add('btn', 'btn-danger', 'btn-sm', 'remove-document-item-button');
+				removeButton.innerHTML = '<i class="fas fa-trash"></i>Видалити'; // Можна додати текст "Видалити"
+				removeButton.title = "Видалити цей документ";
+				deleteButtonContainer.appendChild(removeButton);
+			}
+
+			// Логіка для чекбокса DELETE, якщо він є
+			const deleteCheckbox = formDiv.querySelector(`input[type="checkbox"][name$="-DELETE"]`);
+			if (deleteCheckbox) {
+				deleteCheckbox.style.display = 'none'; // Ховаємо стандартний чекбокс
+				console.log("DocItemFormset: DELETE checkbox found and hidden for form:", formDiv.id);
+			}
+		}
+		
+		function removeFormItem(formDivToRemove) { // Тут параметр називається formDivToRemove
+    console.log("DocItemFormset: removeFormItem CALLED for formDiv:", formDivToRemove);
+    
+    if (!formDivToRemove) {
+        console.error("DocItemFormset: removeFormItem called with null/undefined formDivToRemove.");
+        return;
+    }
+
+    const deleteCheckbox = formDivToRemove.querySelector(`input[type="checkbox"][name$="-DELETE"]`);
+    
+    // Знищуємо TomSelect перед видаленням/приховуванням
+    const docTypeSelect = formDivToRemove.querySelector('select[name$="-document_type"]');
+    if (docTypeSelect && docTypeSelect.tomselectInstance) {
+        console.log("DocItemFormset: Destroying TomSelect on removed form item:", docTypeSelect.id);
+        docTypeSelect.tomselectInstance.destroy();
+        docTypeSelect.tomselectInstance = null;
+    }
+
+    if (deleteCheckbox && formDivToRemove.dataset.isSaved === 'true') {
+        console.log("DocItemFormset: Marking existing form item for deletion.");
+        deleteCheckbox.checked = true;
+        formDivToRemove.style.display = 'none';
+    } else {
+        console.log("DocItemFormset: Removing new form item from DOM.");
+        formDivToRemove.remove();
+        // Оновлюємо TOTAL_FORMS тільки якщо форма фізично видалена
+        totalFormsInput.value = parseInt(totalFormsInput.value) - 1;
+        // Потрібно перенумерувати наступні форми, якщо це важливо для валідації на клієнті,
+        // але Django має впоратися з пропусками індексів при POST.
+    }
+    updateDeleteButtonsVisibility(); // Оновлюємо видимість кнопок на формах, що залишилися
+}
+
+
+	function updateDeleteButtonsVisibility() { // БЕЗ АРГУМЕНТІВ
+		console.log('it\'s doesnt work and I make it empty');
+		// console.log(`FORMSET_MGR [${formsetPrefix}]: updateDeleteButtonsVisibility CALLED.`); 
+		// // formsetPrefix, container, formClass, removeButtonClass, minFormsCount - мають бути доступні з області видимості менеджера
+
+		// if (!container) { // container - це змінна менеджера, що вказує на DOM-контейнер формсету
+		//     console.error(`FORMSET_MGR [${formsetPrefix}]: Container not found in updateDeleteButtonsVisibility.`);
+		//     return;
+		// }
+
+		// const forms = container.querySelectorAll(formClass); // formClass - наприклад, '.document-item-form'
+		// let visibleFormsCount = 0;
+		// forms.forEach(form => {
+		//     const delCheckbox = form.querySelector(`input[type="checkbox"][name$="-DELETE"]`);
+		//     if (!delCheckbox || !delCheckbox.checked) { // Рахуємо тільки ті, що не позначені на видалення
+		//         visibleFormsCount++;
+		//     }
+		// });
+
+		// console.log(`FORMSET_MGR [${formsetPrefix}]: Updating delete buttons. Visible forms: ${visibleFormsCount}, Min forms: ${minFormsCount}`);
+		
+		// forms.forEach((form) => { // form - це поточна форма з циклу
+		//     let deleteButton = form.querySelector(removeButtonClass); // removeButtonClass - наприклад, '.remove-document-item-button'
+		//     const delCheckbox = form.querySelector(`input[type="checkbox"][name$="-DELETE"]`);
+
+		//     // Якщо кнопка видалення динамічно додається/видаляється функцією setupDeleteButton,
+		//     // то тут ми лише керуємо її видимістю.
+		//     // Якщо setupDeleteButton гарантує наявність кнопки (коли потрібно), то ця перевірка може бути зайвою.
+		//     if (!deleteButton && canDeleteForms && (!delCheckbox || !delCheckbox.checked) ) { 
+		//         // Якщо кнопки немає, а вона має бути (і форма не позначена на видалення)
+		//         // Це означає, що setupDeleteButton її не додав, що є окремою проблемою.
+		//         // Для простоти, тут ми просто оновлюємо видимість існуючих.
+		//         // console.warn(`FORMSET_MGR [${formsetPrefix}]: Delete button not found on a visible form, but expected. Form:`, form);
+		//     }
+
+		//     if (deleteButton) {
+		//         if (delCheckbox && delCheckbox.checked) { // Якщо форма позначена на видалення, ховаємо її кнопку
+		//             deleteButton.style.display = 'none'; 
+		//         } else {
+		//             // Показуємо кнопку, якщо кількість видимих форм більша за мінімально дозволену
+		//             deleteButton.style.display = (visibleFormsCount > minFormsCount) ? 'inline-block' : 'none';
+		//         }
+		//     }
+		// });
+	}
+
+        // function init() { /* ... як було, але викликайте setupDeleteButton для існуючих форм ... */
+        //      if (!container || !addButton || !emptyFormTemplateElement || !emptyFormTemplateElement.innerHTML.trim()) {return;}
+        //     console.log("DocItemFormset: Initializing.");
+        //     formsetPrefix = '{{ formset.prefix }}'; 
+        //     totalFormsInput = document.getElementById(`id_${formsetPrefix}-TOTAL_FORMS`);
+        //     minFormsCount = parseInt(document.getElementById(`id_${formsetPrefix}-MIN_NUM_FORMS`)?.value || '0');
+        //     maxFormsCount = parseInt(document.getElementById(`id_${formsetPrefix}-MAX_NUM_FORMS`)?.value || '1000');
+        //     canDeleteForms = "{{ formset.can_delete|yesno:'true,false' }}" === 'true';
             
-            container.querySelectorAll('.document-item-form').forEach((formDiv, index) => {
-                initializeTomSelectForDocTypeInForm(formDiv);
-                setupDeleteButton(formDiv); // Налаштовуємо кнопку видалення для існуючих форм
-            });
-            addButton.addEventListener('click', addFormItem);
-            container.addEventListener('click', function(event) { 
-                if (event.target.classList.contains('remove-document-item-button') || event.target.closest('.remove-document-item-button')) {
-                    removeFormItem(event.target.closest('.document-item-form'));
-                }
-            });
-            updateDeleteButtonsVisibility();
+        //     container.querySelectorAll('.document-item-form').forEach((formDiv, index) => {
+        //         initializeTomSelectForDocTypeInForm(formDiv);
+        //         setupDeleteButton(formDiv); // Налаштовуємо кнопку видалення для існуючих форм
+        //     });
+        //     addButton.addEventListener('click', addFormItem);
+        //     container.addEventListener('click', function(event) { 
+        //         if (event.target.classList.contains('remove-document-item-button') || event.target.closest('.remove-document-item-button')) {
+        //             removeFormItem(event.target.closest('.document-item-form'));
+        //         }
+        //     });
+        //     updateDeleteButtonsVisibility();
+        // }
+		 // Важливо, щоб init викликав initializeTomSelectForDocTypeInForm для вже існуючих форм
+    function init() {
+		if (container) { // Перевіряємо, чи контейнер існує
+    console.log("DocItemFormset: Attaching 'click' listener to container:", container);
+    container.addEventListener('click', function(event) {
+        console.log("DocItemFormset: Click event on container. Target:", event.target);
+
+        const removeButton = event.target.closest('.remove-document-item-button');
+        console.log("DocItemFormset: Attempting to find remove button via closest('.remove-document-item-button'). Result:", removeButton);
+
+        if (removeButton) {
+            console.log("DocItemFormset: Remove button was clicked (or its child).");
+            const formDivToRemove = removeButton.closest('.document-item-form');
+            console.log("DocItemFormset: Form to remove identified:", formDivToRemove);
+            if (formDivToRemove) {
+                removeFormItem(formDivToRemove);
+            } else {
+                console.warn("DocItemFormset: Could not find parent '.document-item-form' for the clicked remove button.");
+            }
+        } else {
+            // console.log("DocItemFormset: Clicked target was not a remove button or its child.");
         }
+    });
+		} else {
+			console.error("DocItemFormset: Container for formset items not found. Delete functionality will not work.");
+		}
+        if (!container || !addButton || !emptyFormTemplateElement || !emptyFormTemplateElement.innerHTML.trim()) { /* ... */ return;}
+        formsetPrefix = '{{ formset.prefix }}'; 
+        totalFormsInput = document.getElementById(`id_${formsetPrefix}-TOTAL_FORMS`);
+        minFormsCount = parseInt(document.getElementById(`id_${formsetPrefix}-MIN_NUM_FORMS`)?.value || '0');
+        maxFormsCount = parseInt(document.getElementById(`id_${formsetPrefix}-MAX_NUM_FORMS`)?.value || '1000');
+        canDeleteForms = "{{ formset.can_delete|yesno:'true,false' }}" === 'true';
+        
+        console.log(`DocItemFormset: Initializing. Prefix: ${formsetPrefix}, TOTAL_FORMS_INPUT: ${totalFormsInput?.value}`);
+
+        container.querySelectorAll('.document-item-form').forEach((formDiv, index) => {
+            initializeTomSelectForDocTypeInForm(formDiv); // Для існуючих форм
+            setupDeleteButton(formDiv);
+        });
+        addButton.addEventListener('click', addFormItem);
+        container.addEventListener('click', function(event) { /* ... remove ... */ });
+        updateDeleteButtonsVisibility();
+    }
+
         return { init, updateAllDocTypes };
     })();
     
+
     // --- Головна ініціалізація ---
     console.log("AddDocProc JS: Initializing managers.");
     MainFormManager.init();
     DocumentItemFormsetManager.init(); 
 });
 </script>
+
 {% endblock %}
+
+
+<!-- 
+
+
+З цих логів видно, що ми досягли значного прогресу з ініціалізацією TomSelect для поля "Тип документа" (document_type) у динамічно доданих формах у вашому формсеті!
+
+Давайте розберемо ключові моменти:
+
+Збір HTML опцій:
+
+add/:627 DocItemFormset: HTML options for new DocType select [id_docs-2-document_type]: 10
+Ваш JavaScript успішно знаходить 10 <option> тегів, які Django згенерував всередині HTML <select> елемента для document_type у новому (клонованому з empty_form) рядку формсету.
+Проблема автоматичного підхоплення опцій TomSelect'ом:
+
+add/:645 DocItemFormset: TomSelect for DocType CREATED for [id_docs-2-document_type]. Options in DOM: 0
+Як і раніше з полем "Військові частини", TomSelect при ініціалізації (навіть якщо ми передаємо йому опції через конфігурацію, зібрані з HTML) не одразу рендерить ці опції у своєму DOM-дереві випадаючого списку.
+Ручне додавання опцій спрацьовує!:
+
+add/:650 DocItemFormset: TomSelect for [id_docs-2-document_type] empty after init with options. Re-adding. - спрацьовує наша логіка для виправлення.
+add/:653 DocItemFormset: Options in DOM after re-add for [id_docs-2-document_type]: 10 - Чудово! Після ручного виклику addOptions() та refreshOptions(), у випадаючому списку TomSelect для нового поля "Тип документа" тепер є 10 опцій.
+Виклик updateSpecificDocType:
+
+add/:702 DocItemFormset: updateSpecificDocType CALLED for [id_docs-2-document_type]. OID_ID: null, OID_Type: null, Work_Type: null
+Ця функція викликається для щойно створеного поля "Тип документа". Оскільки на момент додавання нової порожньої форми документа в головній формі ще не обрано ОІД/Тип робіт (або ця інформація не передається сюди коректно для нової форми), то oidId, oidType, workType є null. Це призведе до того, що updateSpecificDocType (у її поточній "заглушковій" реалізації для фільтрації) встановить плейсхолдер типу "Оберіть ОІД та Заявку" і, можливо, деактивує поле, що є правильною поведінкою для заглушки.
+Висновок:
+
+Схоже, проблема з ініціалізацією та заповненням опціями полів "Тип документа" у нових, динамічно доданих формах тепер вирішена завдяки механізму ручного додавання опцій, якщо TomSelect не підхоплює їх автоматично. Кожен новий рядок документа повинен тепер мати поле "Тип документа" з повним списком типів, як він визначений у DocumentItemForm (ймовірно, DocumentType.objects.all()).
+
+Що далі / На що звернути увагу:
+
+Фільтрація Типів Документів (Заглушка): Пам'ятайте, що функція updateSpecificDocType (і updateAllDocTypes) зараз є заглушкою для реальної фільтрації. Коли ви будете готові реалізувати динамічну фільтрацію типів документів на основі ОІД/Типу робіт з головної форми, вам потрібно буде:
+
+Розширити updateSpecificDocType для виконання AJAX-запиту до ajax_load_document_types_for_oid_and_work.
+Передавати актуальні oidId, oidType та workType з MainFormManager у DocumentItemFormsetManager.updateAllDocTypes.
+Ваш ajax_load_document_types_for_oid_and_work view має повертати відфільтрований список типів документів.
+Перевірка всіх сценаріїв:
+
+Додавання форми: Перевірте, чи коректно ініціалізується TomSelect для "Тип документа" з усіма опціями.
+Зміна ОІД/Елемента заявки в головній формі: Перевірте, чи викликається DocumentItemFormsetManager.updateAllDocTypes і чи змінюються плейсхолдери/стан полів "Тип документа" у всіх рядках формсету (поки що згідно з логікою заглушки).
+Видалення форми: Чи коректно працює видалення, і чи не виникають помилки JS.
+Схоже, ми на правильному шляху! Якщо ця частина працює стабільно, ми можемо перейти до наступного етапу, наприклад, до реалізації фільтрації типів документів або до інших сторінок. -->

@@ -399,3 +399,88 @@ class OIDForm(forms.ModelForm):
         initial_unit_id = kwargs.pop('initial_unit_id', None)
         if initial_unit_id:
             self.fields['unit'].initial = initial_unit_id
+
+ALLOWED_STATUS_CHOICES = [
+    (OIDStatusChoices.CANCELED, OIDStatusChoices.CANCELED.label),
+    (OIDStatusChoices.TERMINATED, OIDStatusChoices.TERMINATED.label),
+    (OIDStatusChoices.ACTIVE, OIDStatusChoices.ACTIVE.label),
+]
+
+class OIDStatusUpdateForm(forms.Form):
+    unit = forms.ModelChoiceField(
+        queryset=Unit.objects.all().order_by('code'),
+        label="Військова частина",
+        widget=forms.Select(attrs={'class': 'form-select tomselect-field', 'id': 'id_status_update_unit'}),
+        empty_label="Оберіть ВЧ..."
+    )
+    oid = forms.ModelChoiceField(
+        queryset=OID.objects.none(), # Заповнюється динамічно
+        label="Об'єкт інформаційної діяльності (ОІД)",
+        widget=forms.Select(attrs={'class': 'form-select tomselect-field', 'id': 'id_status_update_oid'}),
+        empty_label="Спочатку оберіть ВЧ..."
+    )
+    # Поточний статус буде відображатися окремо, не як поле форми для зміни
+    new_status = forms.ChoiceField(
+        choices=ALLOWED_STATUS_CHOICES,
+        label="Новий статус ОІД",
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        required=True
+    )
+    reason = forms.CharField(
+        label="Причина зміни статусу",
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        required=True
+    )
+    
+    # Поля для документа, що ініціює зміну (якщо є)
+    # Ці поля не будуть напряму створювати об'єкт Document, 
+    # а будуть використані для заповнення полів в OIDStatusChange або для пошуку існуючого документа.
+    # Для простоти, поки що це будуть текстові поля. Потім можна розширити до вибору документа.
+    initiating_document_number = forms.CharField(
+        label="Вх. номер документа-ініціатора",
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+        required=False
+    )
+    initiating_document_date = forms.DateField(
+        label="Дата вх. документа-ініціатора",
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        required=False
+    )
+
+    changed_by = forms.ModelChoiceField(
+        queryset=Person.objects.filter(is_active=True).order_by('full_name'),
+        label="Хто змінив статус (виконавець)",
+        widget=forms.Select(attrs={'class': 'form-select tomselect-field', 'id': 'id_status_update_changed_by'}),
+        required=False # Буде заповнюватися автоматично в майбутньому
+    )
+
+    def __init__(self, *args, **kwargs):
+        # Можливість передати початкові unit_id або oid_id з view
+        initial_unit_id = kwargs.pop('initial_unit_id', None)
+        initial_oid_id = kwargs.pop('initial_oid_id', None)
+        
+        super().__init__(*args, **kwargs)
+
+        if initial_unit_id:
+            self.fields['unit'].initial = initial_unit_id
+            self.fields['oid'].queryset = OID.objects.filter(unit_id=initial_unit_id).order_by('cipher')
+            if initial_oid_id:
+                self.fields['oid'].initial = initial_oid_id
+        
+        # Якщо форма обробляє POST-дані, оновлюємо queryset для OID для валідації
+        if self.is_bound and 'unit' in self.data:
+            unit_id_from_data = self.data.get('unit')
+            if unit_id_from_data and unit_id_from_data.isdigit():
+                self.fields['oid'].queryset = OID.objects.filter(unit_id=int(unit_id_from_data)).order_by('cipher')
+
+    def clean(self):
+        cleaned_data = super().clean()
+        oid_instance = cleaned_data.get('oid')
+        new_status_val = cleaned_data.get('new_status')
+
+        if oid_instance and new_status_val:
+            if oid_instance.status == new_status_val:
+                self.add_error('new_status', f"ОІД вже має статус '{oid_instance.get_status_display()}'. Оберіть інший статус.")
+        
+        # Тут можна додати іншу логіку валідації, якщо потрібно
+        return cleaned_data

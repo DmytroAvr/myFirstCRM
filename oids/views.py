@@ -9,11 +9,12 @@ from django.db.models import Q, Max, Prefetch, Count
 from .models import (
     Unit, UnitGroup, OID, OIDStatusChange, TerritorialManagement, Document, DocumentType,
     WorkRequest, WorkRequestItem, Trip,TripResultForUnit, Person, TechnicalTask,
-    AttestationRegistration, AttestationItem, AttestationResponse,
-    
-    OIDTypeChoices, OIDStatusChoices, SecLevelChoices, WorkRequestStatusChoices, WorkTypeChoices, DocumentReviewResultChoices
+    AttestationRegistration, AttestationItem, AttestationResponse, OIDTypeChoices, 
+    OIDStatusChoices, SecLevelChoices, WorkRequestStatusChoices, WorkTypeChoices, 
+    DocumentReviewResultChoices,
 )
-from .forms import ( TripForm, DocumentProcessingMainForm, DocumentItemFormSet, DocumentForm, WorkRequestForm, WorkRequestItemFormSet, OIDForm
+from .forms import ( TripForm, DocumentProcessingMainForm, DocumentItemFormSet, DocumentForm, 
+                    WorkRequestForm, WorkRequestItemFormSet, OIDForm, OIDStatusUpdateForm, 
 )
 
 # Твоя допоміжна функція (залишається без змін, але буде викликатися в AJAX view)
@@ -38,7 +39,27 @@ def get_last_document_expiration_date(oid_instance, document_name_keyword, work_
     except Exception as e:
         print(f"Помилка get_last_document_expiration_date для ОІД {oid_instance.cipher if oid_instance else 'N/A'} ({document_name_keyword}): {e}")
         return None
-    
+
+
+def ajax_get_oid_current_status(request):
+    oid_id_str = request.GET.get('oid_id')
+    if oid_id_str and oid_id_str.isdigit():
+        oid_id = int(oid_id_str)
+        try:
+            oid_instance = OID.objects.get(pk=oid_id)
+            return JsonResponse({
+                'status': 'success',
+                'current_status_display': oid_instance.get_status_display(),
+                'current_status_value': oid_instance.status,
+                'oid_cipher': oid_instance.cipher,
+                'oid_type_display': oid_instance.get_oid_type_display()
+            })
+        except OID.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'ОІД не знайдено'}, status=404)
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    return JsonResponse({'status': 'error', 'message': 'Необхідно ID ОІДа'}, status=400)
+
 # changede by gemeni. перейшли від передачі словників до передачі повних екземплярів моделі OID у функцію get_last_document_expiration_date. Це важливо для коректної роботи сервера, незалежно від фронтенд-фільтрації.
 def ajax_load_oids_for_unit_categorized(request):
     unit_id_str = request.GET.get('unit_id')
@@ -255,6 +276,9 @@ def ajax_load_work_requests_for_oids(request):
             return JsonResponse({'error': str(e)}, status=500)
             
     return JsonResponse(work_requests_data, safe=False)
+
+
+
 
 
 def main_dashboard(request):
@@ -633,7 +657,69 @@ def add_document_processing_view(request, oid_id=None, work_request_item_id=None
     }
     return render(request, 'oids/forms/add_document_processing_form.html', context)
 
+def update_oid_status_view(request, oid_id_from_url=None):
+    initial_unit = None
+    initial_oid = None
 
+    if oid_id_from_url: # Якщо переходимо на сторінку для конкретного ОІД
+        initial_oid = get_object_or_404(OID, pk=oid_id_from_url)
+        initial_unit = initial_oid.unit
+
+    if request.method == 'POST':
+        form = OIDStatusUpdateForm(request.POST, initial_unit_id=initial_unit.id if initial_unit else None, 
+                                   initial_oid_id=initial_oid.id if initial_oid else None)
+        if form.is_valid():
+            oid_to_update = form.cleaned_data['oid']
+            new_status = form.cleaned_data['new_status']
+            reason_for_change = form.cleaned_data['reason']
+            changed_by_person = form.cleaned_data.get('changed_by') # Може бути None
+            doc_number = form.cleaned_data.get('initiating_document_number')
+            doc_date = form.cleaned_data.get('initiating_document_date')
+
+            old_status_val = oid_to_update.status 
+            
+            # Створюємо запис в історії
+            OIDStatusChange.objects.create(
+                oid=oid_to_update,
+                old_status=old_status_val, # Зберігаємо старий статус
+                new_status=new_status,
+                reason=reason_for_change,
+                changed_by=changed_by_person, # TODO: Замінити на request.user, коли буде автентифікація
+                # Якщо потрібно пов'язати з документом, тут потрібна логіка пошуку/створення Document
+                # initiating_document= ... 
+            )
+            
+            # Оновлюємо статус самого ОІД
+            oid_to_update.status = new_status
+            oid_to_update.save(update_fields=['status', 'updated_at']) # Оновлюємо тільки потрібні поля
+
+            messages.success(request, f"Статус для ОІД '{oid_to_update.cipher}' успішно змінено на '{oid_to_update.get_status_display()}'.")
+            return redirect('oids:oid_detail_view_name', oid_id=oid_to_update.id)
+        else:
+            messages.error(request, "Будь ласка, виправте помилки у формі.")
+            # Якщо форма не валідна, selected_oid для заголовка може бути втрачений, 
+            # потрібно його отримати знову, якщо можливо
+            submitted_oid_id = request.POST.get('oid')
+            if submitted_oid_id and submitted_oid_id.isdigit():
+                 try:
+                    selected_oid_instance = OID.objects.get(pk=int(submitted_oid_id))
+                 except OID.DoesNotExist:
+                    selected_oid_instance = None
+            else:
+                selected_oid_instance = initial_oid # Якщо був GET параметр
+    else: # GET request
+        form = OIDStatusUpdateForm(initial_unit_id=initial_unit.id if initial_unit else None, 
+                                   initial_oid_id=initial_oid.id if initial_oid else None)
+        selected_oid_instance = initial_oid
+
+
+    context = {
+        'form': form,
+        'page_title': 'Зміна статусу Об\'єкта Інформаційної Діяльності (ОІД)',
+        'selected_oid_for_title': selected_oid_instance, # Для відображення в заголовку
+        'current_oid_status_display': selected_oid_instance.get_status_display() if selected_oid_instance else None,
+    }
+    return render(request, 'oids/forms/update_oid_status_form.html', context)
 
 # list info 
 

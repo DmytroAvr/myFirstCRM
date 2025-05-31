@@ -15,6 +15,8 @@ urlpatterns = [
     path('ajax/load-work-requests-for-oids/', views.ajax_load_work_requests_for_oids, name='ajax_load_work_requests_for_oids'),
 	path('ajax/load-work-request-items-for-oid/', views.ajax_load_work_request_items_for_oid, name='ajax_load_work_request_items_for_oid'),
 	path('ajax/load-document-types-for-oid-and-work/', views.ajax_load_document_types_for_oid_and_work, name='ajax_load_document_types_for_oid_and_work'),
+	path('ajax/get-oid-current-status/', views.ajax_get_oid_current_status, name='ajax_get_oid_current_status'),
+
 
     # URLs для форм
     path('trip/plan/', views.plan_trip_view, name='plan_trip_view_name'),
@@ -25,7 +27,10 @@ urlpatterns = [
 	# Якщо форма додавання документа викликається з контексту елемента заявки:
     path('work-request-item/<int:work_request_item_id>/document/add/', views.add_document_processing_view, name='add_document_for_work_request_item_view_name'),
     path('request/add/', views.add_work_request_view, name='add_work_request_view_name'),
-   
+	# Отримати Status OID
+	path('oid/update-status/', views.update_oid_status_view, name='update_oid_status'),
+	path('oid/<int:oid_id_from_url>/update-status/', views.update_oid_status_view, name='update_specific_oid_status'),
+
 
 	path('summary-hub/', views.summary_information_hub_view, name='summary_information_hub'),
     # Далі будемо додавати URL-и для кожного списку моделей

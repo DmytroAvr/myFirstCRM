@@ -15,7 +15,7 @@
     <li><strong>Військова частина:</strong> <a href="{% url 'oids:main_dashboard' %}?unit={{ oid.unit.id }}">{{ oid.unit.code }} - {{ oid.unit.name|default:oid.unit.city }}</a></li>
     <li><strong>Територіальне управління:</strong> {{ oid.unit.territorial_management.name|default:"Не вказано" }}</li>
     <li><strong>Приміщення:</strong> {{ oid.room }}</li>
-    <li><strong>Поточний стан:</strong> {{ oid.get_status_display }}</li>
+    <li><strong>Поточний стан:</strong> {{ oid.get_status_display }} <a href="{% url 'oids:update_specific_oid_status' oid_id_from_url=oid.id %}"> ---> Змінити статус ОІД</a> </li> 
     <li><strong>Гриф ОІД:</strong> {{ oid.get_sec_level_display }}</li>
     <li><strong>Примітки:</strong> {{ oid.note|default:"-" }}</li>
     {% if last_attestation_expiration %}

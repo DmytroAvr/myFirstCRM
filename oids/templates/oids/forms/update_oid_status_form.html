@@ -1,0 +1,306 @@
+{# oids/forms/update_oid_status_form.html #}
+{% extends "oids/base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container form-container">
+    <h2 class="mb-4">
+        {{ page_title }}
+        {% if selected_oid_for_title %}
+             для ОІД: <a href="{% url 'oids:oid_detail_view_name' selected_oid_for_title.id %}">{{ selected_oid_for_title.cipher }}</a> 
+             ({{ selected_oid_for_title.get_oid_type_display }})
+        {% endif %}
+    </h2>
+
+    <form method="post" novalidate id="updateOidStatusForm">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger" role="alert">
+                {% for error in form.non_field_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
+            </div>
+        {% endif %}
+
+        <fieldset class="mb-3 p-3 border rounded">
+            <legend class="w-auto px-2 h6">Вибір ОІД та Новий Статус</legend>
+
+            {# Поле Unit #}
+            <div class="row mb-3 align-items-center">
+                <label for="{{ form.unit.id_for_label }}" class="col-sm-4 col-form-label text-sm-end fw-bold">{{ form.unit.label }}:</label>
+                <div class="col-sm-8">
+                    {{ form.unit }}
+                    {% for error in form.unit.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+
+            {# Поле OID #}
+            <div class="row mb-3 align-items-center">
+                <label for="{{ form.oid.id_for_label }}" class="col-sm-4 col-form-label text-sm-end fw-bold">{{ form.oid.label }}:</label>
+                <div class="col-sm-8">
+                    {{ form.oid }}
+                    {% for error in form.oid.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+
+            {# Відображення поточного статусу ОІД #}
+            <div class="row mb-3 align-items-center">
+                <div class="col-sm-4 col-form-label text-sm-end fw-bold">Поточний статус ОІД:</div>
+                <div class="col-sm-8">
+                    <span id="current_oid_status_display" class="form-control-plaintext">
+                        {% if current_oid_status_display %}
+                            {{ current_oid_status_display }}
+                        {% else %}
+                            (Оберіть ОІД для відображення статусу)
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+
+            {# Поле New Status #}
+            <div class="row mb-3 align-items-center">
+                <label for="{{ form.new_status.id_for_label }}" class="col-sm-4 col-form-label text-sm-end fw-bold">{{ form.new_status.label }}:</label>
+                <div class="col-sm-8">
+                    {{ form.new_status }}
+                    {% for error in form.new_status.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+
+             {# Поле Reason #}
+            <div class="row mb-3 align-items-center">
+                <label for="{{ form.reason.id_for_label }}" class="col-sm-4 col-form-label text-sm-end fw-bold">{{ form.reason.label }}:</label>
+                <div class="col-sm-8">
+                    {{ form.reason }}
+                    {% for error in form.reason.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+        </fieldset>
+        
+        <fieldset class="mb-3 p-3 border rounded">
+            <legend class="w-auto px-2 h6">Інформація про документ-ініціатор</legend>
+            {# Поле Initiating Document Number #}
+            <div class="row mb-3 align-items-center">
+                <label for="{{ form.initiating_document_number.id_for_label }}" class="col-sm-4 col-form-label text-sm-end fw-bold">{{ form.initiating_document_number.label }}:</label>
+                <div class="col-sm-8">
+                    {{ form.initiating_document_number }}
+                    {% for error in form.initiating_document_number.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+
+            {# Поле Initiating Document Date #}
+            <div class="row mb-3 align-items-center">
+                <label for="{{ form.initiating_document_date.id_for_label }}" class="col-sm-4 col-form-label text-sm-end fw-bold">{{ form.initiating_document_date.label }}:</label>
+                <div class="col-sm-8">
+                    {{ form.initiating_document_date }}
+                    {% for error in form.initiating_document_date.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+        </fieldset>
+
+        <fieldset class="mb-3 p-3 border rounded">
+            <legend class="w-auto px-2 h6">Інформація про зміну</legend>
+             {# Поле Changed By #}
+            <div class="row mb-3 align-items-center">
+                <label for="{{ form.changed_by.id_for_label }}" class="col-sm-4 col-form-label text-sm-end fw-bold">{{ form.changed_by.label }}:</label>
+                <div class="col-sm-8">
+                    {{ form.changed_by }}
+                    <small class="form-text text-muted d-block">(В майбутньому буде заповнюватися автоматично)</small>
+                    {% for error in form.changed_by.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+            {# Дата зміни буде встановлена автоматично на сервері (auto_now_add=True у OIDStatusChange.changed_at) #}
+        </fieldset>
+
+        <div class="form-actions mt-4">
+            <button type="submit" class="btn btn-primary">Зберегти зміну статусу</button>
+            <a href="{% if selected_oid_for_title %}{% url 'oids:oid_detail_view_name' selected_oid_for_title.id %}{% else %}{% url 'oids:list_oid_status_changes' %}{% endif %}" class="btn btn-secondary">Скасувати</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("UpdateOidStatus JS: DOMContentLoaded. V2 Debug (OID Loading).");
+
+    const unitSelectElement = document.getElementById('id_status_update_unit');
+    const oidSelectElement = document.getElementById('id_status_update_oid');
+    const changedBySelectElement = document.getElementById('id_status_update_changed_by'); // Змінено ім'я змінної
+    const currentStatusDisplaySpan = document.getElementById('current_oid_status_display'); // Змінено ім'я змінної
+
+    const oidsForUnitAjaxUrl = window.AJAX_LOAD_OIDS_FOR_UNIT_URL || "{% url 'oids:ajax_load_oids_for_unit' %}";
+    const oidCurrentStatusAjaxUrl = window.AJAX_GET_OID_CURRENT_STATUS_URL || "{% url 'oids:ajax_get_oid_current_status' %}";
+
+    let tsUnit, tsOid, tsChangedBy;
+
+    if (typeof TomSelect === 'undefined') { 
+        console.error("UpdateOidStatus JS: TomSelect library NOT loaded!"); 
+        return; 
+    }
+    console.log("UpdateOidStatus JS: TomSelect library is loaded.");
+
+    function getTomSelectConfig(elementId, placeholder, isDisabled = false, initialOptions = [], allowClear = true, plugins = [], isMulti = false) {
+        let effPlugins = isMulti ? ['remove_button', ...plugins] : plugins;
+        console.log(`CONFIG: TomSelect for #${elementId}. Placeholder: "${placeholder}", Disabled: ${isDisabled}`);
+        return {
+            plugins: effPlugins, create: false, placeholder: placeholder,
+            valueField: 'id', labelField: 'text', searchField: ['text'],
+            options: initialOptions, disabled: isDisabled, allowEmptyOption: allowClear,
+        };
+    }
+
+    // Ініціалізація TomSelect для ВЧ
+    if (unitSelectElement) {
+        let htmlUnitOpts = [];
+        Array.from(unitSelectElement.options).forEach(opt => { if (opt.value) htmlUnitOpts.push({id:opt.value, text:opt.text, selected:opt.selected});});
+        console.log(`UpdateOidStatus JS: HTML options for Unit select: ${htmlUnitOpts.length}`);
+        
+        tsUnit = new TomSelect(unitSelectElement, getTomSelectConfig(unitSelectElement.id, 'Оберіть ВЧ...', false, htmlUnitOpts, true, [], false));
+        unitSelectElement.tomselectInstance = tsUnit;
+        console.log("UpdateOidStatus JS: Unit TomSelect INITIALIZED. Options in TS:", Object.keys(tsUnit.options).length);
+        
+        // Перевірка і ручне додавання, якщо потрібно (як ми робили для Trip form)
+        const domOptionsInUnitTS = tsUnit.dropdown_content.querySelectorAll('.option').length;
+        console.log(`UpdateOidStatus JS: Options in Unit TomSelect dropdown DOM after init: ${domOptionsInUnitTS}`);
+        if (domOptionsInUnitTS === 0 && htmlUnitOpts.length > 0) {
+            console.warn("UpdateOidStatus JS: Unit TomSelect empty after init, attempting manual add.");
+            tsUnit.addOptions(htmlUnitOpts);
+            tsUnit.refreshOptions(false);
+             htmlUnitOpts.forEach(opt => { if (opt.selected) tsUnit.addItem(opt.id, true); }); // Відновлюємо обране значення
+            console.log(`UpdateOidStatus JS: Units TomSelect DOM options after manual add: ${tsUnit.dropdown_content.querySelectorAll('.option').length}`);
+        }
+
+        tsUnit.on('change', handleUnitChange);
+        console.log("UpdateOidStatus JS: 'change' listener attached to Unit TomSelect.");
+    } else { console.warn("UpdateOidStatus JS: Unit select element not found."); }
+
+    // Ініціалізація TomSelect для ОІД (початково деактивовано)
+    if (oidSelectElement) {
+        tsOid = new TomSelect(oidSelectElement, getTomSelectConfig(oidSelectElement.id, 'Спочатку оберіть ВЧ', true, [], true, [], false));
+        oidSelectElement.tomselectInstance = tsOid;
+        console.log("UpdateOidStatus JS: OID TomSelect INITIALIZED (disabled).");
+        tsOid.on('change', handleOidChange);
+    } else { console.warn("UpdateOidStatus JS: OID select element not found."); }
+
+    // Ініціалізація TomSelect для "Хто змінив"
+    if (changedBySelectElement) {
+        let htmlPersonOpts = []; 
+        Array.from(changedBySelectElement.options).forEach(opt => {if (opt.value) htmlPersonOpts.push({id:opt.value, text:opt.text, selected: opt.selected});});
+        tsChangedBy = new TomSelect(changedBySelectElement, getTomSelectConfig(changedBySelectElement.id, 'Оберіть виконавця (необов\'язково)', false, htmlPersonOpts, true, [], false));
+        changedBySelectElement.tomselectInstance = tsChangedBy;
+        console.log("UpdateOidStatus JS: ChangedBy TomSelect INITIALIZED.");
+    }
+
+    function handleUnitChange(unitId) {
+        console.log("UpdateOidStatus JS: Unit CHANGED to:", unitId);
+        if (!tsOid) { console.warn("UpdateOidStatus JS: OID TomSelect not initialized, cannot load OIDs."); return; }
+        
+        tsOid.clear(); 
+        tsOid.clearOptions(); 
+        tsOid.sync();
+        if (currentStatusDisplaySpan) currentStatusDisplaySpan.textContent = '(Оберіть ОІД...)';
+
+        if (unitId && unitId !== "") { // Перевіряємо, що unitId не порожній
+            tsOid.enable(); 
+            tsOid.placeholder = 'Завантаження ОІДів...';
+            console.log(`UpdateOidStatus JS: Fetching OIDs for Unit ID [${unitId}] from URL [${oidsForUnitAjaxUrl}]`);
+            
+            fetch(`${oidsForUnitAjaxUrl}?unit_id=${unitId}`)
+                .then(response => {
+                    console.log("UpdateOidStatus JS: OIDs fetch response status:", response.status);
+                    if (!response.ok) return response.text().then(text => { throw new Error(`OID Load Net Error: ${response.statusText}. Server: ${text}`); });
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("UpdateOidStatus JS: OIDs for Unit received:", data);
+                    // AJAX для OID має повертати 'oid_type' для кожного ОІД, якщо це потрібно для подальшої логіки
+                    const options = data.map(oid => ({ 
+                        id: oid.id.toString(), 
+                        text: `${oid.cipher} (${oid.full_name || 'Без назви'})`,
+                        // oid_type: oid.oid_type // Якщо ваш AJAX endpoint 'ajax_load_oids_for_unit' повертає це
+                    }));
+                    tsOid.addOptions(options);
+                    tsOid.refreshOptions(false);
+                    const itemsInDropdown = tsOid.dropdown_content.querySelectorAll('.option').length;
+                    console.log(`UpdateOidStatus JS: Options in OID dropdown DOM: ${itemsInDropdown}`);
+                    tsOid.placeholder = options.length ? 'Оберіть ОІД...' : 'Для ВЧ немає ОІДів';
+                    if (tsOid.control_input) tsOid.control_input.placeholder = tsOid.placeholder;
+
+                    if (options.length > 0 && itemsInDropdown > 0) {
+                        console.log("UpdateOidStatus JS: OID options loaded. Opening dropdown.");
+                        tsOid.open();
+                    }
+
+                    // Якщо був initial_oid_id і він належить до цієї ВЧ, спробуємо його обрати
+                    const initialOidFromDjango = "{{ form.initial.oid.id|default:''|escapejs }}";
+                    if (initialOidFromDjango && unitId === "{{ form.initial.unit.id|default:''|escapejs }}" && tsOid.options[initialOidFromDjango]) {
+                        console.log("UpdateOidStatus JS: Setting initial OID from Django context:", initialOidFromDjango);
+                        tsOid.setValue(initialOidFromDjango, true); // silent
+                        handleOidChange(initialOidFromDjango); // Завантажити статус для нього
+                    }
+                })
+                .catch(e => { 
+                    console.error("UpdateOidStatus JS: Error loading OIDs:", e); 
+                    if (tsOid) {tsOid.placeholder = 'Помилка завантаження ОІДів'; tsOid.refreshOptions(false);}
+                });
+        } else {
+            console.log("UpdateOidStatus JS: No Unit selected, OID select disabled.");
+            tsOid.disable(); 
+            tsOid.placeholder = 'Спочатку оберіть ВЧ';
+        }
+    }
+
+    function handleOidChange(oidId) {
+        console.log("UpdateOidStatus JS: OID CHANGED to:", oidId);
+        if (!currentStatusDisplaySpan) { console.warn("UpdateOidStatus JS: currentStatusDisplaySpan not found."); return; }
+
+        if (oidId && oidId !== "") { // Перевіряємо, що oidId не порожній
+            currentStatusDisplaySpan.textContent = 'Завантаження статусу...';
+            console.log(`UpdateOidStatus JS: Fetching current status for OID ID [${oidId}] from URL [${oidCurrentStatusAjaxUrl}]`);
+            fetch(`${oidCurrentStatusAjaxUrl}?oid_id=${oidId}`)
+                .then(response => {
+                    console.log("UpdateOidStatus JS: OID Status fetch response status:", response.status);
+                    if (!response.ok) return response.text().then(text => { throw new Error(`OID Status Net Error: ${response.statusText}. Server: ${text}`); });
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("UpdateOidStatus JS: Current OID status data received:", data);
+                    if (data.status === 'success') {
+                        currentStatusDisplaySpan.textContent = `${data.current_status_display || 'N/A'} (Тип: ${data.oid_type_display || 'N/A'})`;
+                        // Можна зберегти data.current_status_value, якщо потрібно для валідації на клієнті
+                    } else {
+                        currentStatusDisplaySpan.textContent = `Помилка: ${data.message || 'не вдалося завантажити статус'}`;
+                    }
+                })
+                .catch(e => {
+                    console.error("UpdateOidStatus JS: Error fetching OID status:", e);
+                    currentStatusDisplaySpan.textContent = 'Помилка завантаження статусу.';
+                });
+        } else {
+            console.log("UpdateOidStatus JS: No OID selected, clearing status display.");
+            currentStatusDisplaySpan.textContent = '(Оберіть ОІД для відображення статусу)';
+        }
+    }
+
+    // Початковий виклик для завантаження ОІДів, якщо ВЧ вже обрана
+    // (наприклад, з initial_data форми, переданого з view)
+    if (tsUnit && tsUnit.getValue() && tsUnit.getValue() !== "") {
+        console.log("UpdateOidStatus JS: Initial unit selected on page load:", tsUnit.getValue());
+        handleUnitChange(tsUnit.getValue()); // Це завантажить ОІДи
+    } else if (oidSelectElement && oidSelectElement.value && (!tsUnit || !tsUnit.getValue())) {
+        // Якщо ОІД встановлено (наприклад, з URL), а ВЧ - ні, то викликаємо handleOidChange
+        // (це може статися, якщо ВЧ не була в initial, але ОІД був)
+        // Це менш імовірний сценарій, якщо форма правильно ініціалізується з initial_unit
+        const initialOidOnPage = oidSelectElement.value;
+        console.log("UpdateOidStatus JS: OID pre-selected on page load (value: " + initialOidOnPage + "), but Unit not. Triggering OID change.");
+        if (initialOidOnPage) {
+            handleOidChange(initialOidOnPage);
+        }
+    } else {
+         console.log("UpdateOidStatus JS: No unit initially selected.");
+    }
+});
+</script>
+{% endblock %}
