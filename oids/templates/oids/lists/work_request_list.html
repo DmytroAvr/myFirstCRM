@@ -109,7 +109,7 @@
                             </td>
                             <td>{{ wr.incoming_number }}</td>
                             <td>{{ wr.incoming_date|date:"d.m.Y" }}</td>
-                            <td><span class="badge bg-{{ wr.status|lower }}">{{ wr.get_status_display }}</span></td> {# Додав трохи стилю для статусу #}
+                            <td><span class=" bg-{{ wr.status.name }}">{{ wr.get_status_display }}</span></td> {# Додав трохи стилю для статусу #}
                             <td>
                                 {% if wr.items.all %}
                                 <ul class="list-unstyled mb-0">

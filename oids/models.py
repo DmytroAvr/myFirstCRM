@@ -239,7 +239,7 @@ class WorkRequestItem(models.Model):
 
     def __str__(self):
         # return f"{self.oid.cipher} - {self.get_work_type_display()} ({self.get_status_display()})"
-        return f"ОІД: {self.oid.cipher} ({self.get_oid_type_display()}) - Робота: {self.get_work_type_display()} (Статус: {self.get_status_display()})"
+        return f"ОІД: {self.oid.cipher} ({self.oid.oid_type}) - Робота: {self.get_work_type_display()} (Статус: {self.status})"
     # Твоя логіка оновлення статусу заявки:
     def check_and_update_status_based_on_documents(self):
         """
@@ -251,9 +251,9 @@ class WorkRequestItem(models.Model):
             return # Немає потреби в оновленні
 
         key_document_fulfilled = False
-
+        wri_oid_type = self.oid.oid_type
         if self.work_type == WorkTypeChoices.IK:
-            # Умова для ІК: наявність документа з duration_months=20 для цього work_request_item
+            target_duration = 20 # Умова для ІК: наявність документа з duration_months=20 для цього work_request_item
             # (припускаємо, що це "Висновок ІК")
             try:
                 # Шукаємо тип документа "Висновок ІК" (або аналог з duration_months=20)
@@ -261,48 +261,69 @@ class WorkRequestItem(models.Model):
                 # та мав oid_type, що відповідає self.oid.oid_type або 'СПІЛЬНИЙ'
                 key_doc_type_qs = DocumentType.objects.filter(
                     (Q(work_type=WorkTypeChoices.IK) | Q(work_type='СПІЛЬНИЙ')),
-                    (Q(oid_type=self.oid.oid_type) | Q(oid_type='СПІЛЬНИЙ')),
-                    duration_months=20
+                    (Q(oid_type=wri_oid_type) | Q(oid_type='СПІЛЬНИЙ')),
+                    duration_months=target_duration
                 )
                 if key_doc_type_qs.exists():
-                    key_doc_type = key_doc_type_qs.first() # Беремо перший знайдений, якщо їх декілька
-                    if Document.objects.filter(
-                        work_request_item=self, # Документ має бути прямо пов'язаний з цим елементом заявки
-                        oid=self.oid,
-                        document_type=key_doc_type
-                    ).exists():
-                        key_document_fulfilled = True
+                    for dt_candidate in key_doc_type_qs:
+                        print(f"[DEBUG] Checking IK with DocumentType candidate: '{dt_candidate.name}' (ID: {dt_candidate.id})")
+                        if Document.objects.filter(
+                            work_request_item=self,
+                            oid=self.oid,
+                            document_type=dt_candidate
+                        ).exists():
+                            key_document_fulfilled = True
+                            print(f"[DEBUG] >>> Key document for IK FOUND (DocType ID: {dt_candidate.id}) for WRI ID: {self.id}")
+                            break # Знайшли, виходимо
+                    if not key_document_fulfilled:
+                         print(f"[DEBUG] No Document found linked to WRI {self.id} for any suitable IK DocumentTypes.")
                 else:
-                    print(f"DEBUG: Ключовий DocumentType для IK (duration_months=20) не знайдено для OID типу {self.oid.oid_type}.")
-            except Exception as e: # Будь-яка помилка при пошуку
-                print(f"DEBUG: Помилка при пошуку DocumentType для IK: {e}")
+                    print(f"[DEBUG] No DocumentType configured for IK (duration={target_duration}, OID Type='{wri_oid_type}' or СПІЛЬНИЙ, Work Type='IK' or СПІЛЬНИЙ).")
+            except Exception as e:
+                print(f"[DEBUG] ERROR during IK DocumentType/Document search: {e}")
 
 
         elif self.work_type == WorkTypeChoices.ATTESTATION:
+            target_duration = 60
             # Умова для Атестації: наявність документа з duration_months=60 (Акт атестації),
             # який зареєстрований в ДССЗЗІ.
             try:
                 # Шукаємо тип документа "Акт атестації" (або аналог з duration_months=60)
                 key_doc_type_qs = DocumentType.objects.filter(
                     (Q(work_type=WorkTypeChoices.ATTESTATION) | Q(work_type='СПІЛЬНИЙ')),
-                    (Q(oid_type=self.oid.oid_type) | Q(oid_type='СПІЛЬНИЙ')),
-                    duration_months=60
+                    (Q(oid_type=wri_oid_type) | Q(oid_type='СПІЛЬНИЙ')),
+                    duration_months=target_duration
                 )
+                print(f"[DEBUG] Found {key_doc_type_qs.count()} potential DocumentType(s) for ATTESTATION.")
                 if key_doc_type_qs.exists():
-                    key_doc_type = key_doc_type_qs.first()
-                    if Document.objects.filter(
-                        work_request_item=self, # Документ має бути прямо пов'язаний
-                        oid=self.oid,
-                        document_type=key_doc_type,
-                        dsszzi_registered_number__isnull=False, # Має бути номер реєстрації
-                        dsszzi_registered_number__exact_ne='',   # і він не порожній
-                        dsszzi_registered_date__isnull=False    # і дата реєстрації
-                    ).exists():
-                        key_document_fulfilled = True
+                    for dt_candidate in key_doc_type_qs:
+                        print(f"[DEBUG] Checking ATTESTATION with DocumentType candidate: '{dt_candidate.name}' (ID: {dt_candidate.id})")
+                        # Знаходимо всі документи цього типу, пов'язані з WRI
+                        linked_documents = Document.objects.filter(
+                            work_request_item=self,
+                            oid=self.oid,
+                            document_type=dt_candidate
+                        )
+                        if not linked_documents.exists():
+                            print(f"[DEBUG] No Document of type '{dt_candidate.name}' found for WRI ID {self.id}.")
+                            continue # Переходимо до наступного кандидата DocumentType
+
+                        for doc_instance in linked_documents:
+                            print(f"[DEBUG] Checking Document ID {doc_instance.id}: DSSZZI Num='{doc_instance.dsszzi_registered_number}', Date={doc_instance.dsszzi_registered_date}")
+                            if doc_instance.dsszzi_registered_number and \
+                               doc_instance.dsszzi_registered_number.strip() != '' and \
+                               doc_instance.dsszzi_registered_date:
+                                key_document_fulfilled = True
+                                print(f"[DEBUG] >>> Key document for ATTESTATION FOUND AND REGISTERED (DocType ID: {dt_candidate.id}, Doc ID: {doc_instance.id}) for WRI ID: {self.id}")
+                                break # Знайшли зареєстрований, виходимо з циклу документів
+                        if key_document_fulfilled:
+                            break # Виходимо з циклу DocumentType кандидатів
+                    if not key_document_fulfilled:
+                         print(f"[DEBUG] No REGISTERED Document found linked to WRI {self.id} for any suitable ATTESTATION DocumentTypes.")
                 else:
-                     print(f"DEBUG: Ключовий DocumentType для Атестації (duration_months=60) не знайдено для OID типу {self.oid.oid_type}.")
+                    print(f"[DEBUG] No DocumentType configured for ATTESTATION (duration={target_duration}, OID Type='{wri_oid_type}' or СПІЛЬНИЙ, Work Type='ATTESTATION' or СПІЛЬНИЙ).")
             except Exception as e:
-                print(f"DEBUG: Помилка при пошуку DocumentType для Атестації: {e}")
+                print(f"[DEBUG] ERROR during ATTESTATION DocumentType/Document search: {e}")
 
         if key_document_fulfilled:
             if self.status != WorkRequestStatusChoices.COMPLETED:
@@ -348,7 +369,9 @@ class WorkRequestItem(models.Model):
             for item in all_items
         )
 
-        new_request_status = None
+        original_request_status = work_request.status
+        new_request_status = original_request_status # За замовчуванням не змінюємо
+
 
         if is_all_items_processed:
             # Якщо всі елементи оброблені, визначаємо фінальний статус заявки
@@ -373,12 +396,13 @@ class WorkRequestItem(models.Model):
             # Можливий випадок: немає IN_PROGRESS, немає PENDING, але не всі processed.
             # Це може статися, якщо є власні статуси. Для стандартних це малоймовірно.
             # У такому разі, можна залишити поточний статус заявки або встановити PENDING.
-
-        if new_request_status and work_request.status != new_request_status:
+        if original_request_status != new_request_status:
             work_request.status = new_request_status
             work_request.save(update_fields=['status', 'updated_at'])
-            print(f"DEBUG: WorkRequest ID {work_request.id} статус оновлено на {work_request.status}.")
-
+            print(f"[DEBUG] WorkRequest ID {work_request.id} status successfully saved as '{work_request.get_status_display()}'.")
+        else:
+            print(f"[DEBUG] WorkRequest ID {work_request.id} status '{work_request.get_status_display()}' remains unchanged.")
+        print(f"--- [DEBUG] WRI.update_request_status() FINISHED for WRI ID: {self.id} ---")
 # Потрібно також імпортувати OID, WorkRequest, Person, AttestationRegistration вище в файлі models.py
 # from .models import OID, WorkRequest, Person, AttestationRegistration (приклад, залежить від структури)
 
@@ -786,3 +810,5 @@ class Meta:
         verbose_name = "Опрацьований ТЗ"
         verbose_name_plural = "Опрацьовані ТЗ"
         ordering = ['-input_date', '-read_till_date']
+        
+# 
