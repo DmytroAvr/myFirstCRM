@@ -296,9 +296,10 @@ class DocumentType(models.Model):
         unique_together = ('oid_type', 'work_type', 'name') # Документ унікальний для комбінації тип ОІД/робота/назва
         verbose_name = "Тип документа"
         verbose_name_plural = "Типи документів"
-
+        ordering = ['oid_type', 'work_type', 'name'] # Додано сортування
     def __str__(self):
-        return f"{self.name} ({self.oid_type}, {self.work_type})"
+    #     return f"{self.name} ({self.oid_type}, {self.work_type})"
+        return f"{self.name} ({self.get_oid_type_display()}, {self.get_work_type_display()})"
 
 class AttestationRegistration(models.Model):
     """
