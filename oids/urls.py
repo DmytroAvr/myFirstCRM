@@ -17,11 +17,19 @@ urlpatterns = [
 	path('ajax/load-document-types-for-oid-and-work/', views.ajax_load_document_types_for_oid_and_work, name='ajax_load_document_types_for_oid_and_work'),
 	path('ajax/get-oid-current-status/', views.ajax_get_oid_current_status, name='ajax_get_oid_current_status'),
 	path('ajax/load-attestation-acts-for-oid/', views.ajax_load_attestation_acts_for_oid, name='ajax_load_attestation_acts_for_oid'),
+	path('ajax/load-attestation-acts-for-multiple-oids/', views.ajax_load_attestation_acts_for_multiple_oids, name='ajax_load_attestation_acts_for_multiple_oids'),
+	path('ajax/load-units-for-trip/', views.ajax_load_units_for_trip, name='ajax_load_units_for_trip'),
+	path('ajax/load-oids-for-trip-inits/', views.ajax_load_oids_for_trip_units, name='ajax_load_oids_for_trip_units'),
+	path('ajax/load-documents-for-trip-oids/', views.ajax_load_documents_for_trip_oids, name='ajax_load_documents_for_trip_oids'),
 
+	# 
+	# 
+	# 
 
     # URLs для форм
     path('trip/plan/', views.plan_trip_view, name='plan_trip_view_name'),
     path('document/add/', views.add_document_processing_view, name='add_document_processing_view_name'),
+    path('trip/result/', views.send_trip_results_view, name='send_trip_results_form'),
     # Якщо форма додавання документа викликається з контексту ОІД:
     path('oid/<int:oid_id>/document/add/', views.add_document_processing_view, name='add_document_for_oid_view_name'),
     path('ajax/oid/create/', views.ajax_create_oid_view, name='ajax_create_oid'),

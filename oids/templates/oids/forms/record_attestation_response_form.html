@@ -71,8 +71,8 @@
         </fieldset>
 
         {% if selected_att_reg_sent and act_update_formset %}
+		<legend class="w-auto px-2 h5">Внесення реєстраційних даних для Актів Атестації</legend>
         <fieldset class="mb-4 p-3 border rounded">
-            <legend class="w-auto px-2 h5">Внесення реєстраційних даних для Актів Атестації</legend>
             {{ act_update_formset.management_form }}
             {% if act_update_formset.non_form_errors %}
                 <div class="alert alert-danger" role="alert">

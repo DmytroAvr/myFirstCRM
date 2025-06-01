@@ -14,7 +14,7 @@ from .models import (Unit, UnitGroup, OID, OIDStatusChange, TerritorialManagemen
 	Document, DocumentType, WorkRequest, WorkRequestItem, Trip,TripResultForUnit, 
     Person, TechnicalTask, AttestationRegistration, AttestationResponse, 
 )
-from .forms import ( TripForm, DocumentProcessingMainForm, DocumentItemFormSet, DocumentForm, 
+from .forms import ( TripForm, TripResultSendForm, DocumentProcessingMainForm, DocumentItemFormSet, DocumentForm, 
 	WorkRequestForm, WorkRequestItemFormSet, OIDForm, OIDStatusUpdateForm, 
 	AttestationRegistrationSendForm, AttestationResponseMainForm, AttestationActUpdateFormSet,
 )
@@ -312,6 +312,40 @@ def ajax_load_attestation_acts_for_oid(request):
             
     return JsonResponse(acts_data, safe=False)
 
+def ajax_load_attestation_acts_for_multiple_oids(request):
+    oid_ids_str = request.GET.getlist('oid_ids[]')
+    acts_data = []
+    
+    oid_ids = []
+    for oid_str in oid_ids_str:
+        if oid_str.isdigit():
+            oid_ids.append(int(oid_str))
+
+    if oid_ids:
+        try:
+            # Ваш спосіб ідентифікації типу документа "Акт атестації"
+            attestation_act_doc_type = DocumentType.objects.filter(duration_months=60).first() 
+            # Переконайтеся, що цей фільтр надійний, або використовуйте ID/slug типу документа
+
+            if attestation_act_doc_type:
+                acts_queryset = Document.objects.filter(
+                    oid_id__in=oid_ids, # Акти, що належать до будь-якого з обраних ОІДів
+                    document_type=attestation_act_doc_type,
+                    attestation_registration_sent__isnull=True # Ще не відправлені
+                ).select_related('oid__unit').order_by('oid__unit__code', 'oid__cipher', '-work_date')
+                
+                for doc in acts_queryset:
+                    acts_data.append({
+                        'id': doc.id,
+                        'text': f"Акт №{doc.document_number} від {doc.work_date.strftime('%d.%m.%Y')} (ОІД: {doc.oid.cipher}, ВЧ: {doc.oid.unit.code})"
+                    })
+            else:
+                print("AJAX_LOAD_ACTS_MULTIPLE_OIDS: DocumentType 'Акт атестації' (duration_months=60) not found.")
+        except Exception as e:
+            print(f"Error in ajax_load_attestation_acts_for_multiple_oids: {e}")
+            return JsonResponse({'error': 'Серверна помилка при завантаженні актів'}, status=500)
+            
+    return JsonResponse(acts_data, safe=False)
 
 def ajax_create_oid_view(request):
     if request.method == 'POST':
@@ -352,6 +386,140 @@ def ajax_create_oid_view(request):
     return JsonResponse({'error': 'Only POST requests are allowed for creating OID via AJAX here'}, status=405)
 
 
+# trip results
+def ajax_load_units_for_trip(request):
+    trip_id_str = request.GET.get('trip_id')
+    units_data = []
+    if trip_id_str and trip_id_str.isdigit():
+        trip_id = int(trip_id_str)
+        try:
+            trip = Trip.objects.get(pk=trip_id)
+            # Беремо ВЧ, що були задіяні у відрядженні
+            for unit in trip.units.all().order_by('code'):
+                units_data.append({'id': unit.id, 'text': f"{unit.code} - {unit.name or unit.city}"})
+        except Trip.DoesNotExist:
+            pass # Повернемо порожній список
+        except Exception as e:
+            print(f"Error in ajax_load_units_for_trip: {e}")
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse(units_data, safe=False)
+
+def ajax_load_oids_for_trip_units(request):
+    trip_id_str = request.GET.get('trip_id')
+    unit_ids_str = request.GET.getlist('unit_ids[]')
+    oids_data = []
+
+    unit_ids = [int(uid) for uid in unit_ids_str if uid.isdigit()]
+
+    if trip_id_str and trip_id_str.isdigit() and unit_ids:
+        trip_id = int(trip_id_str)
+        try:
+            trip = Trip.objects.get(pk=trip_id)
+            # ОІДи, які були у відрядженні ТА належать до обраних ВЧ
+            oids_queryset = trip.oids.filter(unit_id__in=unit_ids).select_related('unit').distinct().order_by('unit__code', 'cipher')
+            for oid in oids_queryset:
+                oids_data.append({
+                    'id': oid.id, 
+                    'text': f"{oid.cipher} (ВЧ: {oid.unit.code}) - {oid.full_name or oid.unit.city}",
+                    'oid_type': oid.oid_type # Передаємо тип ОІД для подальшої фільтрації документів
+                })
+        except Trip.DoesNotExist:
+            pass
+        except Exception as e:
+            print(f"Error in ajax_load_oids_for_trip_units: {e}")
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse(oids_data, safe=False)
+
+def ajax_load_documents_for_trip_oids(request):
+    trip_id_str = request.GET.get('trip_id')
+    oid_ids_str = request.GET.getlist('oid_ids[]')
+    documents_data = []
+
+    oid_ids = [int(oid_str) for oid_str in oid_ids_str if oid_str.isdigit()]
+
+    if trip_id_str and trip_id_str.isdigit() and oid_ids:
+        trip_id = int(trip_id_str)
+        try:
+            trip = Trip.objects.get(pk=trip_id)
+            # Знаходимо WorkRequestItems, пов'язані з цим відрядженням та обраними ОІДами
+            # Це допоможе визначити тип робіт (Атестація/ІК) для кожного ОІД у контексті відрядження
+            
+            # Отримуємо всі документи для обраних ОІДів
+            relevant_documents = Document.objects.filter(
+                oid_id__in=oid_ids
+            ).select_related('document_type', 'oid__unit').order_by('oid__cipher', '-work_date')
+
+            # Фільтруємо документи за логікою:
+            # - Якщо ІК: всі документи до "Висновок ІК" включно.
+            # - Якщо Атестація: пакет з "Акт атестації", тільки якщо він зареєстрований.
+            
+            # Для визначення типу робіт, нам потрібен зв'язок Trip -> WorkRequest -> WorkRequestItem -> OID
+            # Це може бути складним запитом. Спрощений підхід:
+            # Ми знаємо ОІДи. Для кожного ОІД шукаємо WorkRequestItem, який пов'язаний з цим відрядженням.
+            
+            # Збираємо work_types для кожного обраного ОІД у цьому відрядженні
+            oid_work_types = {} # {oid_id: work_type}
+            work_request_items_in_trip = WorkRequestItem.objects.filter(
+                request__trips=trip, # Зв'язок через M2M Trip <-> WorkRequest
+                oid_id__in=oid_ids
+            ).select_related('oid', 'request')
+
+            for wri in work_request_items_in_trip:
+                if wri.oid_id not in oid_work_types: # Беремо перший знайдений тип роботи для ОІД в рамках відрядження
+                    oid_work_types[wri.oid_id] = wri.work_type
+
+            # Визначаємо DocumentType для "Акт атестації" та "Висновок ІК"
+            # Краще мати константи або slug для цих типів
+            attestation_act_type = DocumentType.objects.filter(name__icontains="Акт атестації").first()
+            ik_conclusion_type = DocumentType.objects.filter(name__icontains="Висновок ІК").first()
+            # Інші типи документів, які входять до пакетів (за потреби)
+            # program_method_type = DocumentType.objects.filter(name__icontains="Програма і методика").first()
+            # plan_search_type = DocumentType.objects.filter(name__icontains="План пошуку ЗП").first()
+            # act_search_type = DocumentType.objects.filter(name__icontains="Акт пошуку ЗП").first()
+            # protocol1a_type = ... protocol2a_type = ... protocol_ik_type = ...
+            # prescription_type = DocumentType.objects.filter(name__icontains="Припис").first()
+
+
+            for doc in relevant_documents:
+                work_type_for_this_oid = oid_work_types.get(doc.oid_id)
+                
+                add_document = False
+                if work_type_for_this_oid == WorkTypeChoices.IK:
+                    # Для ІК додаємо всі документи, що традиційно входять до пакету
+                    # Або, якщо простіше, тільки Висновок ІК (або всі до нього)
+                    # Наприклад, якщо doc.document_type є одним з документів пакету ІК
+                    if doc.document_type == ik_conclusion_type: # Або більш розширена логіка
+                        add_document = True
+                    # Тут можна додати інші типи документів для ІК: План пошуку, Акт пошуку, Протоколи...
+                    # if doc.document_type in [plan_search_type, act_search_type, protocol_ik_type, ik_conclusion_type]:
+                    # add_document = True
+
+                elif work_type_for_this_oid == WorkTypeChoices.ATTESTATION:
+                    # Для Атестації додаємо пакет документів, якщо Акт Атестації зареєстрований
+                    if doc.document_type == attestation_act_type and \
+                       doc.dsszzi_registered_number and doc.dsszzi_registered_date:
+                        add_document = True # Додаємо сам зареєстрований акт
+                        # Тут можна додати логіку для додавання інших документів з пакету атестації,
+                        # якщо головний акт зареєстрований.
+                        # Наприклад:
+                        # if doc.document_type in [program_method_type, plan_search_type, ... , attestation_act_type, prescription_type]:
+                        #    # Потрібно перевірити, чи основний акт для цього ОІД/роботи зареєстрований
+                        #    main_att_act = Document.objects.filter(oid=doc.oid, document_type=attestation_act_type, work_request_item__work_type=WorkTypeChoices.ATTESTATION, dsszzi_registered_number__isnull=False).exists()
+                        #    if main_att_act:
+                        #        add_document = True
+
+                if add_document:
+                    documents_data.append({
+                        'id': doc.id,
+                        'text': f"{doc.document_type.name} №{doc.document_number} від {doc.work_date.strftime('%d.%m.%Y')} (ОІД: {doc.oid.cipher})"
+                    })
+        except Trip.DoesNotExist:
+            pass
+        except Exception as e:
+            print(f"Error in ajax_load_documents_for_trip_oids: {e}")
+            return JsonResponse({'error': str(e)}, status=500)
+            
+    return JsonResponse(documents_data, safe=False)
 
 def main_dashboard(request):
     """
@@ -418,6 +586,29 @@ def main_dashboard(request):
         'oids_cancelled': oids_cancelled_list,
     }
     return render(request, 'oids/main_dashboard.html', context)
+
+@transaction.atomic
+def send_trip_results_view(request):
+    if request.method == 'POST':
+        form = TripResultSendForm(request.POST, request.FILES)
+        if form.is_valid():
+            # Метод save() форми тепер обробляє збереження M2M та оновлення статусів
+            trip_result = form.save() 
+            messages.success(request, f"Результати відрядження (для відправки до ВЧ) успішно збережено.")
+            # Перенаправлення на список результатів або на деталі цього запису
+            return redirect('oids:list_trip_results_for_units') # Потрібно створити цей URL та view
+        else:
+            messages.error(request, "Будь ласка, виправте помилки у формі.")
+            print(f"TripResultSendForm errors: {form.errors.as_json()}")
+    else:
+        form = TripResultSendForm() # Порожня форма для GET-запиту
+
+    context = {
+        'form': form,
+        'page_title': 'Сформувати пакет документів (результати відрядження) для відправки до ВЧ'
+    }
+    return render(request, 'oids/forms/send_trip_results_form.html', context)
+
 
 # ... (решта ваших views: oid_detail_view, форми для додавання тощо) ...
 # Не забудьте додати oid_detail_view з попередньої відповіді.
@@ -796,19 +987,12 @@ def send_attestation_for_registration_view(request):
     if request.method == 'POST':
         form = AttestationRegistrationSendForm(request.POST, request.FILES)
         if form.is_valid():
-            # Метод save() форми AttestationRegistrationSendForm тепер відповідає за:
-            # 1. Створення/збереження екземпляра AttestationRegistration.
-            # 2. Оновлення поля attestation_registration_sent для кожного обраного документа "Акт атестації".
-            # 3. Автоматичне заповнення поля units (ManyToMany) в AttestationRegistration на основі ВЧ обраних актів.
-            attestation_registration = form.save() # commit=True за замовчуванням, save() форми все обробляє
-
+            attestation_registration = form.save() # Тепер save() форми робить всю роботу
             messages.success(request, f'Відправку №{attestation_registration.outgoing_letter_number} на реєстрацію успішно сформовано.')
-            # Перенаправлення на список відправок або на деталі цієї відправки
-            return redirect('oids:list_attestation_registrations') # Переконайтесь, що цей URL існує
+            return redirect('oids:list_attestation_registrations') 
         else:
             messages.error(request, 'Будь ласка, виправте помилки у формі.')
-            # Для дебагу можна вивести помилки форми в консоль сервера
-            print(f"AttestationRegistrationSendForm errors: {form.errors.as_json()}")
+            print(f"SendAttestationForm errors: {form.errors.as_json()}") # Для дебагу
     else: # GET request
         form = AttestationRegistrationSendForm()
 
@@ -817,7 +1001,6 @@ def send_attestation_for_registration_view(request):
         'page_title': 'Сформувати відправку Актів Атестації на реєстрацію'
     }
     return render(request, 'oids/forms/send_attestation_form.html', context)
-
 
 # list info 
 def summary_information_hub_view(request):
@@ -1486,18 +1669,34 @@ def attestation_registration_list_view(request):
     return render(request, 'oids/lists/attestation_registration_list.html', context)
 
 def attestation_response_list_view(request):
+    """
+    Відображає список Отриманих відповідей від ДССЗЗІ.
+    """
     response_list_queryset = AttestationResponse.objects.select_related(
-        'registration' # Для доступу до даних оригінальної реєстрації
-    ).order_by('-registered_date', '-recorded_date') # Сортуємо за датою реєстрації, потім за датою внесення
+        'attestation_registration_sent__sent_by', 
+        'received_by'
+    ).prefetch_related(
+        'attestation_registration_sent__registered_documents__oid__unit', # Для доступу до ВЧ ОІДа
+        'attestation_registration_sent__registered_documents__document_type' # Для доступу до типу документа
+    ).order_by('-response_letter_date', '-id')
+
+    # --- Фільтрація (приклад, якщо потрібна) ---
+    filter_att_reg_id_str = request.GET.get('att_reg_id') 
+    current_filter_att_reg_id = None
+    if filter_att_reg_id_str and filter_att_reg_id_str.isdigit():
+        current_filter_att_reg_id = int(filter_att_reg_id_str)
+        response_list_queryset = response_list_queryset.filter(attestation_registration_sent__id=current_filter_att_reg_id)
 
     paginator = Paginator(response_list_queryset, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-        
+    
     context = {
-        'page_title': 'Список Відповідей на Реєстрацію Актів Атестації',
+        'page_title': 'Відповіді від ДССЗЗІ на реєстрацію Актів',
         'object_list': page_obj,
-        'page_obj': page_obj
+        'page_obj': page_obj,
+        'all_registrations_sent': AttestationRegistration.objects.order_by('-outgoing_letter_date'),
+        'current_filter_att_reg_id': current_filter_att_reg_id,
     }
     return render(request, 'oids/lists/attestation_response_list.html', context)
 

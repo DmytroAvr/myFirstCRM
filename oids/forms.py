@@ -6,12 +6,11 @@ from .models import (WorkRequestStatusChoices, WorkTypeChoices, OIDTypeChoices,
 	OIDStatusChoices, AttestationRegistrationStatusChoices, 
 )
 from .models import (
-    WorkRequest, WorkRequestItem, OID, Unit, Person, Trip, Document, DocumentType,
+    WorkRequest, WorkRequestItem, OID, Unit, Person, Trip, TripResultForUnit, Document, DocumentType,
     AttestationRegistration, AttestationResponse,  
 )
 from django_tomselect.forms import TomSelectModelChoiceField, TomSelectConfig
 
-# --- Форми для панелі керування ---
 
 class WorkRequestForm(forms.ModelForm):
     unit = forms.ModelChoiceField(
@@ -414,87 +413,119 @@ DocumentItemFormSet = formset_factory(DocumentItemForm, extra=1, can_delete=True
 
 # --- Форма для створення "Відправки на реєстрацію" ---
 class AttestationRegistrationSendForm(forms.ModelForm):
-    unit = forms.ModelChoiceField(
+    # 1. Поле для вибору ВІЙСЬКОВИХ ЧАСТИН (множинний вибір)
+    selected_units = forms.ModelMultipleChoiceField(
         queryset=Unit.objects.all().order_by('code'),
-        label="1. Військова частина",
-        widget=forms.Select(attrs={'class': 'form-select tomselect-field', 'id': 'id_att_reg_send_unit'}),
-        empty_label="Оберіть ВЧ...",
-        help_text="Оберіть військову частину, для ОІДів якої будуть відправлені акти."
+        label="1. Оберіть Військові Частини",
+        widget=forms.SelectMultiple(attrs={'class': 'form-select tomselect-field', 'id': 'id_att_reg_send_units_selector'}),
+        required=True,
+        help_text="Оберіть одну або декілька ВЧ, ОІДи яких потрібно обробити."
     )
     
-    oid = forms.ModelChoiceField(
+    # 2. Поле для вибору ОІДІВ (множинний вибір, залежить від selected_units)
+    selected_oids = forms.ModelMultipleChoiceField(
         queryset=OID.objects.none(), # Заповнюється динамічно JS
-        label="2. Об'єкт інформаційної діяльності (ОІД)",
-        widget=forms.Select(attrs={'class': 'form-select tomselect-field', 'id': 'id_att_reg_send_oid'}),
-        empty_label="Спочатку оберіть ВЧ...",
-        required=True, # Потрібно обрати ОІД, щоб побачити його акти
-        help_text="Оберіть ОІД, акти якого потрібно відправити."
-    )
-
-    attestation_acts = forms.ModelMultipleChoiceField(
-        queryset=Document.objects.none(), # Заповнюється динамічно JS
-        label="3. Акти Атестації для відправки",
-        widget=forms.SelectMultiple(attrs={'class': 'form-select tomselect-field', 'id': 'id_att_reg_send_acts', 'size': '8'}),
+        label="2. Оберіть ОІДи",
+        widget=forms.SelectMultiple(attrs={'class': 'form-select tomselect-field', 'id': 'id_att_reg_send_oids_selector'}),
         required=True,
-        help_text="Оберіть один або декілька Актів Атестації для цього ОІД, які ще не були відправлені."
+        help_text="Оберіть ОІДи з попередньо обраних ВЧ."
     )
 
-    # Інші поля залишаються, як у вашій моделі AttestationRegistration
-    # Поле 'units' (ManyToMany) з моделі ми будемо заповнювати у view, тому його тут немає
+    # 3. Поле для вибору АКТІВ АТЕСТАЦІЇ (множинний вибір, залежить від selected_oids)
+    attestation_acts_to_send = forms.ModelMultipleChoiceField(
+        queryset=Document.objects.none(), # Заповнюється динамічно JS
+        label="3. Оберіть Акти Атестації для відправки",
+        widget=forms.SelectMultiple(attrs={'class': 'form-select tomselect-field', 'id': 'id_att_reg_send_acts_selector', 'size': '10'}),
+        required=True,
+        help_text="Оберіть акти, які ще не були відправлені."
+    )
+
     class Meta:
         model = AttestationRegistration
         fields = [
             'outgoing_letter_number', 
             'outgoing_letter_date', 
             'sent_by', 
-            # 'units', # Заповнимо у view
+            # Поля 'selected_units' та 'selected_oids' є допоміжними для фільтрації,
+            # вони не є полями моделі AttestationRegistration.
+            # Поле 'units' (ManyToMany з моделі) буде заповнене у save()
             'note', 
-            'attachment'
+            # 'attachment' видалено з моделі
         ]
         widgets = {
             'outgoing_letter_number': forms.TextInput(attrs={'class': 'form-control'}),
             'outgoing_letter_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'sent_by': forms.Select(attrs={'class': 'form-select tomselect-field'}),
             'note': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
-            'attachment': forms.FileInput(attrs={'class': 'form-control'}),
         }
         labels = {
             'outgoing_letter_number': "Вихідний номер супровідного листа",
             'outgoing_letter_date': "Дата вихідного супровідного листа",
             'sent_by': "Хто відправив (підготував лист)",
             'note': "Примітки до відправки",
-            'attachment': "Скан-копія супровідного листа"
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
-        # Якщо форма обробляє POST-дані, потрібно оновити querysets для валідації
+        print(f"DEBUG AttestationRegSendForm __init__. is_bound: {self.is_bound}")
         if self.is_bound:
-            unit_id = self.data.get(self.add_prefix('unit'))
-            oid_id = self.data.get(self.add_prefix('oid'))
+            print(f"DEBUG AttestationRegSendForm DATA: {self.data}")
+            
+            # Встановлюємо queryset для selected_oids на основі POST-даних selected_units
+            unit_ids_from_data = self.data.getlist(self.add_prefix('selected_units'))
+            if unit_ids_from_data:
+                valid_unit_ids = [int(uid) for uid in unit_ids_from_data if uid.isdigit()]
+                if valid_unit_ids:
+                    self.fields['selected_oids'].queryset = OID.objects.filter(unit_id__in=valid_unit_ids).order_by('unit__code', 'cipher')
+                    print(f"DEBUG AttestationRegSendForm (POST): OID queryset set for unit_ids: {valid_unit_ids}")
 
-            if unit_id and unit_id.isdigit():
-                self.fields['oid'].queryset = OID.objects.filter(unit_id=int(unit_id)).order_by('cipher')
-            
-            if oid_id and oid_id.isdigit():
-                document_type_act_att = DocumentType.objects.filter(name__icontains='Акт атестації').first()
-                if document_type_act_att:
-                    self.fields['attestation_acts'].queryset = Document.objects.filter(
-                        oid_id=int(oid_id),
-                        document_type=document_type_act_att,
-                        attestation_registration_sent__isnull=True 
-                        # Тут можна додати додаткові фільтри статусу ОІД, якщо потрібно
-                    ).order_by('-work_date')
-                else:
-                    self.fields['attestation_acts'].queryset = Document.objects.none()
-            
-            # Для поля units (M2M в моделі), якщо воно було б у формі,
-            # Django б сам підхопив значення з POST, якщо віджет SelectMultiple.
-            # Оскільки ми його прибрали, то нічого тут для нього не робимо.
-            
+            # Встановлюємо queryset для attestation_acts_to_send на основі POST-даних selected_oids
+            oid_ids_from_data = self.data.getlist(self.add_prefix('selected_oids'))
+            if oid_ids_from_data:
+                valid_oid_ids = [int(oid_id) for oid_id in oid_ids_from_data if oid_id.isdigit()]
+                if valid_oid_ids:
+                    document_type_act_att = DocumentType.objects.filter(duration_months=60).first() # Ваш спосіб ідентифікації "Акту атестації"
+                    if document_type_act_att:
+                        self.fields['attestation_acts_to_send'].queryset = Document.objects.filter(
+                            oid_id__in=valid_oid_ids,
+                            document_type=document_type_act_att,
+                            attestation_registration_sent__isnull=True
+                        ).order_by('oid__cipher', '-work_date')
+                        print(f"DEBUG AttestationRegSendForm (POST): Acts queryset set for oid_ids: {valid_oid_ids}")
+        # Для GET запитів querysets для selected_oids та attestation_acts_to_send залишаються .none(),
+        # оскільки вони заповнюються JavaScript.
 
+    def save(self, commit=True):
+        # Спершу зберігаємо сам об'єкт AttestationRegistration з основними даними
+        registration_instance = super().save(commit=False) 
+        
+        if commit:
+            registration_instance.save() # Зберігаємо, щоб отримати ID
+
+            selected_acts = self.cleaned_data.get('attestation_acts_to_send', [])
+            units_involved = set()
+            
+            for act_document in selected_acts:
+                act_document.attestation_registration_sent = registration_instance
+                # Можливо, тут потрібно оновити статус самого документа (наприклад, "відправлено на реєстрацію")
+                # act_document.some_status_field = 'sent_for_registration' 
+                act_document.save(update_fields=['attestation_registration_sent', 'updated_at']) # Додайте 'some_status_field', якщо є
+                
+                if act_document.oid and act_document.oid.unit:
+                    units_involved.add(act_document.oid.unit)
+            
+            if units_involved:
+                registration_instance.units.set(list(units_involved))
+            else:
+                registration_instance.units.clear()
+            
+            # self.save_m2m() тут не потрібен, оскільки 'units' обробляється вручну,
+            # а 'attestation_acts_to_send' - це не поле моделі, а допоміжне поле форми.
+        
+        return registration_instance
 # --- Форма для внесення даних з "Відповіді ДССЗЗІ" ---
+
+
 # Це буде головна форма
 class AttestationResponseMainForm(forms.ModelForm):
     # Поле для вибору існуючої Відправки, на яку прийшла відповідь
@@ -514,14 +545,13 @@ class AttestationResponseMainForm(forms.ModelForm):
             'response_letter_date', 
             'received_by',
             'note', 
-            'attachment'
+            
         ]
         widgets = {
             'response_letter_number': forms.TextInput(attrs={'class': 'form-control'}),
             'response_letter_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'received_by': forms.Select(attrs={'class': 'form-select tomselect-field'}),
             'note': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
-            'attachment': forms.FileInput(attrs={'class': 'form-control'}),
         }
 
 # Форма для ОНОВЛЕННЯ окремого Акту Атестації (буде використовуватися у формсеті)
@@ -676,3 +706,193 @@ class OIDStatusUpdateForm(forms.Form):
         
         # Тут можна додати іншу логіку валідації, якщо потрібно
         return cleaned_data
+    
+
+class TripResultSendForm(forms.ModelForm):
+    trip = forms.ModelChoiceField(
+        queryset=Trip.objects.order_by('-start_date'), # Можна додати фільтр, наприклад, тільки завершені відрядження
+        label="1. Оберіть Відрядження",
+        widget=forms.Select(attrs={'class': 'form-select tomselect-field', 'id': 'id_trip_result_trip'}),
+        empty_label="Оберіть відрядження...",
+        help_text="Відрядження, результати якого відправляються."
+    )
+    
+    # Це поле буде заповнюватися динамічно на основі обраного відрядження
+    units_in_trip = forms.ModelMultipleChoiceField(
+        queryset=Unit.objects.none(), 
+        label="2. Оберіть Військові Частини з відрядження",
+        widget=forms.SelectMultiple(attrs={'class': 'form-select tomselect-field', 'id': 'id_trip_result_units'}),
+        required=True,
+        help_text="ВЧ, до яких будуть направлені результати."
+    )
+
+    # Це поле буде заповнюватися динамічно на основі обраного відрядження та ВЧ
+    oids_in_trip_units = forms.ModelMultipleChoiceField(
+        queryset=OID.objects.none(),
+        label="3. Оберіть ОІДи з обраних ВЧ (учасники відрядження)",
+        widget=forms.SelectMultiple(attrs={'class': 'form-select tomselect-field', 'id': 'id_trip_result_oids'}),
+        required=True,
+        help_text="ОІДи, для яких готуються документи."
+    )
+
+    # Це поле буде заповнюватися динамічно на основі обраних ОІДів та логіки (ІК/Атестація)
+    documents_to_send = forms.ModelMultipleChoiceField(
+        queryset=Document.objects.none(),
+        label="4. Документи для відправки",
+        widget=forms.SelectMultiple(attrs={'class': 'form-select tomselect-field', 'id': 'id_trip_result_documents', 'size': '10'}),
+        required=True,
+        help_text="Оберіть документи. Список залежить від типу робіт та статусу реєстрації Актів Атестації."
+    )
+
+    class Meta:
+        model = TripResultForUnit
+        fields = [
+            'trip', 
+            # 'units', # поле 'units' в TripResultForUnit буде заповнено з 'units_in_trip'
+            # 'oids',  # поле 'oids' в TripResultForUnit буде заповнено з 'oids_in_trip_units'
+            # 'documents', # поле 'documents' в TripResultForUnit буде заповнено з 'documents_to_send'
+			'outgoing_letter_number', 
+            'outgoing_letter_date', 
+            'note',             
+        ]
+        widgets = {
+            'outgoing_letter_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'outgoing_letter_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+
+            'process_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'note': forms.Textarea(attrs={'rows': 2, 'class': 'form-control'}),
+        }
+        labels = {
+            'outgoing_letter_number': "Вихідний номер супровідного листа",
+            'outgoing_letter_date': "Дата вихідного супровідного листа",
+            'note': "Примітки до відправки результатів",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Якщо форма обробляє POST-дані, потрібно встановити querysets для валідації
+        if self.is_bound:
+            print(f"DEBUG TripResultSendForm (is_bound) DATA: {self.data}")
+            trip_id_from_data = self.data.get(self.add_prefix('trip'))
+            selected_trip = None
+            if trip_id_from_data and trip_id_from_data.isdigit():
+                try:
+                    selected_trip = Trip.objects.prefetch_related('units', 'oids').get(pk=int(trip_id_from_data))
+                except Trip.DoesNotExist:
+                    pass
+            
+            if selected_trip:
+                # Встановлюємо queryset для units_in_trip
+                self.fields['units_in_trip'].queryset = selected_trip.units.all().order_by('code')
+                print(f"DEBUG TripResultSendForm (is_bound) Units queryset for trip {selected_trip.id} set.")
+
+                # Встановлюємо queryset для oids_in_trip_units
+                unit_ids_from_data = self.data.getlist(self.add_prefix('units_in_trip'))
+                valid_unit_ids = [int(uid) for uid in unit_ids_from_data if uid.isdigit()]
+                if valid_unit_ids:
+                    self.fields['oids_in_trip_units'].queryset = selected_trip.oids.filter(unit_id__in=valid_unit_ids).distinct().order_by('unit__code', 'cipher')
+                    print(f"DEBUG TripResultSendForm (is_bound) OIDs queryset for trip {selected_trip.id} and units {valid_unit_ids} set.")
+
+                    # Встановлюємо queryset для documents_to_send
+                    oid_ids_from_data = self.data.getlist(self.add_prefix('oids_in_trip_units'))
+                    valid_oid_ids = [int(oid_id) for oid_id in oid_ids_from_data if oid_id.isdigit()]
+                    if valid_oid_ids:
+                        # Ця логіка має точно відтворювати те, що JS показує користувачу
+                        # Потрібно отримати work_type для цих ОІДів в контексті цього відрядження
+                        # Це може бути складно зробити тут без додаткових даних.
+                        # Простіше покластися на те, що JS передасть валідні ID документів.
+                        # Для валідації, queryset може бути ширшим, але включати ті, що могли бути обрані.
+                        self.fields['documents_to_send'].queryset = Document.objects.filter(oid_id__in=valid_oid_ids).select_related('document_type', 'oid')
+                        print(f"DEBUG TripResultSendForm (is_bound) Documents queryset broadly set for OIDs {valid_oid_ids}.")
+                else:
+                     self.fields['oids_in_trip_units'].queryset = OID.objects.none()
+                     self.fields['documents_to_send'].queryset = Document.objects.none()
+            else:
+                self.fields['units_in_trip'].queryset = Unit.objects.none()
+                self.fields['oids_in_trip_units'].queryset = OID.objects.none()
+                self.fields['documents_to_send'].queryset = Document.objects.none()
+        else: # Для GET запиту
+             self.fields['units_in_trip'].queryset = Unit.objects.none()
+             self.fields['oids_in_trip_units'].queryset = OID.objects.none()
+             self.fields['documents_to_send'].queryset = Document.objects.none()
+
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        
+        if commit:
+            instance.save() # Спочатку зберігаємо TripResultForUnit, щоб отримати ID
+            
+            # Тепер зберігаємо ManyToMany зв'язки з даних форми
+            selected_units = self.cleaned_data.get('units_in_trip')
+            if selected_units:
+                instance.units.set(selected_units)
+
+            selected_oids = self.cleaned_data.get('oids_in_trip_units')
+            if selected_oids:
+                instance.oids.set(selected_oids)
+            
+            selected_documents = self.cleaned_data.get('documents_to_send')
+            if selected_documents:
+                instance.documents.set(selected_documents)
+            
+            # Оновлення статусу пов'язаних заявок
+            # Це більш складна логіка, оскільки WorkRequest пов'язаний з Trip, а не з TripResultForUnit напряму.
+            # І потрібно визначити, чи всі роботи по заявці завершено з відправкою цих документів.
+            trip_instance = self.cleaned_data.get('trip')
+            if trip_instance:
+                for work_request in trip_instance.work_requests.all():
+                    # Перевіряємо, чи всі WorkRequestItem для цієї заявки тепер можуть вважатися COMPLETED
+                    # на основі відправлених документів. Це потребує детальних бізнес-правил.
+                    # Приклад: якщо всі документи для всіх ОІД заявки відправлено.
+                    all_items_in_request = work_request.items.all()
+                    can_complete_request = True # Початкове припущення
+                    
+                    if not all_items_in_request.exists(): # Якщо заявка без елементів, можливо, її не треба оновлювати
+                        can_complete_request = False
+
+                    for item in all_items_in_request:
+                        # Чи є серед selected_documents ті, що закривають цей item?
+                        # Припустимо, якщо для ОІД цього item є хоча б один документ у selected_documents,
+                        # і цей item був IN_PROGRESS, то він стає COMPLETED.
+                        # Це дуже спрощена логіка!
+                        item_related_docs_sent = selected_documents.filter(oid=item.oid) # Або точніше через work_request_item
+                        
+                        if item.status == WorkRequestStatusChoices.IN_PROGRESS and item_related_docs_sent.exists():
+                            # Перевірка, чи всі необхідні документи для цього item відправлені
+                            # Наприклад, якщо це ІК, і Висновок ІК є серед відправлених документів для цього ОІД
+                            is_ik_conclusion_sent = selected_documents.filter(
+                                oid=item.oid, 
+                                document_type__name__icontains='Висновок ІК' # Або ваш надійний фільтр
+                            ).exists()
+                            # Якщо це Атестація, і зареєстрований Акт Атестації відправлено
+                            is_att_act_sent_and_registered = selected_documents.filter(
+                                oid=item.oid,
+                                document_type__name__icontains='Акт атестації',
+                                dsszzi_registered_number__isnull=False # Перевірка, що він зареєстрований
+                            ).exists()
+
+                            if (item.work_type == WorkTypeChoices.IK and is_ik_conclusion_sent) or \
+                               (item.work_type == WorkTypeChoices.ATTESTATION and is_att_act_sent_and_registered):
+                                item.status = WorkRequestStatusChoices.COMPLETED
+                                item.save(update_fields=['status', 'updated_at'])
+                                print(f"DEBUG: WorkRequestItem {item.id} status updated to COMPLETED.")
+                            else:
+                                can_complete_request = False # Не всі елементи завершені
+                                break 
+                        elif item.status != WorkRequestStatusChoices.COMPLETED and item.status != WorkRequestStatusChoices.CANCELED:
+                            can_complete_request = False # Є незавершені елементи
+                            break
+                    
+                    if can_complete_request:
+                        # Метод save() для WorkRequestItem має викликати оновлення статусу WorkRequest
+                        # Якщо ні, то викликаємо тут, але краще, щоб це робила модель WorkRequestItem
+                        # Наприклад, просто перезберігаємо останній оновлений item, щоб спрацював його save()
+                        last_updated_item = work_request.items.order_by('-updated_at').first()
+                        if last_updated_item:
+                            last_updated_item.update_request_status() # Припускаючи, що цей метод існує і працює
+                        print(f"DEBUG: Attempted to update overall status for WorkRequest {work_request.id}")
+
+
+        return instance

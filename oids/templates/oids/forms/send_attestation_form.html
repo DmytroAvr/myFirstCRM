@@ -8,10 +8,9 @@
 <div class="container form-container">
     <h2 class="mb-4">{{ page_title }}</h2>
 
-    <form method="post" enctype="multipart/form-data" novalidate id="sendAttestationForm">
+    <form method="post" enctype="multipart/form-data" novalidate id="sendAttestationRegForm">
         {% csrf_token %}
-        {# {{ form.media }} #}
-
+        
         {% if form.non_field_errors %}
             <div class="alert alert-danger" role="alert">
                 {% for error in form.non_field_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
@@ -19,11 +18,40 @@
         {% endif %}
 
         <fieldset class="mb-3 p-3 border rounded">
-            <legend class="w-auto px-2 h6">Дані вихідного листа та вибір об'єктів</legend>
+            <legend class="w-auto px-2 h6">Крок 1: Оберіть Військові Частини</legend>
+            <div class="mb-3">
+                <label for="{{ form.selected_units.id_for_label }}" class="form-label fw-bold">{{ form.selected_units.label }}:</label>
+                {{ form.selected_units }}
+                {% if form.selected_units.help_text %}<small class="form-text text-muted d-block">{{ form.selected_units.help_text }}</small>{% endif %}
+                {% for error in form.selected_units.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+        </fieldset>
 
-            {# Явний рендеринг полів головної частини форми #}
+        <fieldset class="mb-3 p-3 border rounded">
+            <legend class="w-auto px-2 h6">Крок 2: Оберіть ОІДи</legend>
+            <div class="mb-3">
+                <label for="{{ form.selected_oids.id_for_label }}" class="form-label fw-bold">{{ form.selected_oids.label }}:</label>
+                {{ form.selected_oids }}
+                {% if form.selected_oids.help_text %}<small class="form-text text-muted d-block">{{ form.selected_oids.help_text }}</small>{% endif %}
+                {% for error in form.selected_oids.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+        </fieldset>
+
+        <fieldset class="mb-3 p-3 border rounded">
+            <legend class="w-auto px-2 h6">Крок 3: Оберіть Акти Атестації для відправки</legend>
+            <div class="mb-3">
+                <label for="{{ form.attestation_acts_to_send.id_for_label }}" class="form-label fw-bold">{{ form.attestation_acts_to_send.label }}:</label>
+                {{ form.attestation_acts_to_send }}
+                {% if form.attestation_acts_to_send.help_text %}<small class="form-text text-muted d-block">{{ form.attestation_acts_to_send.help_text }}</small>{% endif %}
+                {% for error in form.attestation_acts_to_send.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+        </fieldset>
+
+        <fieldset class="mb-3 p-3 border rounded">
+            <legend class="w-auto px-2 h6">Дані вихідного супровідного листа</legend>
+            {# Рендеримо решту полів форми #}
             {% for field in form %}
-                {% if field.name != 'attestation_acts' and field.name != 'oid' and field.name != 'unit' %}
+                {% if field.name != 'selected_units' and field.name != 'selected_oids' and field.name != 'attestation_acts_to_send' %}
                 <div class="row mb-3 align-items-center">
                     <label for="{{ field.id_for_label }}" class="col-sm-3 col-form-label text-sm-end fw-bold">
                         {{ field.label }}{% if field.field.required %}<span class="text-danger">*</span>{% endif %}:
@@ -36,42 +64,6 @@
                 </div>
                 {% endif %}
             {% endfor %}
-            
-            {# Поле Unit #}
-            <div class="row mb-3 align-items-center">
-                <label for="{{ form.unit.id_for_label }}" class="col-sm-3 col-form-label text-sm-end fw-bold">
-                    {{ form.unit.label }}{% if form.unit.field.required %}<span class="text-danger">*</span>{% endif %}:
-                </label>
-                <div class="col-sm-9">
-                    {{ form.unit }}
-                    {% if form.unit.help_text %}<small class="form-text text-muted d-block">{{ form.unit.help_text }}</small>{% endif %}
-                    {% for error in form.unit.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
-                </div>
-            </div>
-
-            {# Поле OID #}
-            <div class="row mb-3 align-items-center">
-                <label for="{{ form.oid.id_for_label }}" class="col-sm-3 col-form-label text-sm-end fw-bold">
-                    {{ form.oid.label }}{% if form.oid.field.required %}<span class="text-danger">*</span>{% endif %}:
-                </label>
-                <div class="col-sm-9">
-                    {{ form.oid }}
-                    {% if form.oid.help_text %}<small class="form-text text-muted d-block">{{ form.oid.help_text }}</small>{% endif %}
-                    {% for error in form.oid.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
-                </div>
-            </div>
-        </fieldset>
-
-        <fieldset class="mb-3 p-3 border rounded">
-            <legend class="w-auto px-2 h6">Акти Атестації для відправки</legend>
-            <div class="mb-3">
-                <label for="{{ form.attestation_acts.id_for_label }}" class="form-label fw-bold">
-                    {{ form.attestation_acts.label }}{% if form.attestation_acts.field.required %}<span class="text-danger">*</span>{% endif %}:
-                </label>
-                {{ form.attestation_acts }}
-                {% if form.attestation_acts.help_text %}<small class="form-text text-muted d-block">{{ form.attestation_acts.help_text }}</small>{% endif %}
-                {% for error in form.attestation_acts.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
-            </div>
         </fieldset>
 
         <div class="form-actions mt-4">
@@ -85,119 +77,114 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("SendAttestation JS: DOMContentLoaded.");
+    console.log("SendAttestationRegForm JS: DOMContentLoaded.");
 
-    const unitSelect = document.getElementById('id_att_reg_send_unit');
-    const oidSelect = document.getElementById('id_att_reg_send_oid');
-    const actsSelect = document.getElementById('id_att_reg_send_acts');
-    // Інші поля TomSelect, наприклад, sent_by
-    const sentBySelect = document.getElementById('{{ form.sent_by.id_for_label }}'); 
-    // const unitsM2MSelect = document.getElementById('{{ form.units.id_for_label }}'); // Якщо поле units є у формі
+    const unitsSelectorElement = document.getElementById('id_att_reg_send_units_selector');
+    const oidsSelectorElement = document.getElementById('id_att_reg_send_oids_selector');
+    const actsSelectorElement = document.getElementById('id_att_reg_send_acts_selector');
+    const sentBySelectorElement = document.getElementById('{{ form.sent_by.id_for_label }}'); // ID з форми
 
-    const oidsForUnitUrl = window.AJAX_LOAD_OIDS_FOR_UNIT_URL || "{% url 'oids:ajax_load_oids_for_unit' %}";
-    const actsForOidUrl = window.AJAX_LOAD_ATTESTATION_ACTS_FOR_OID_URL || "{% url 'oids:ajax_load_attestation_acts_for_oid' %}";
+    const oidsForUnitsUrl = window.AJAX_LOAD_OIDS_FOR_MULTIPLE_UNITS_URL || "{% url 'oids:ajax_load_oids_for_multiple_units' %}";
+    const actsForOidsUrl = window.AJAX_LOAD_ATTESTATION_ACTS_FOR_MULTIPLE_OIDS_URL || "{% url 'oids:ajax_load_attestation_acts_for_multiple_oids' %}";
 
-    if (typeof TomSelect === 'undefined') { console.error("SendAttestation JS: TomSelect NOT loaded!"); return; }
-    console.log("SendAttestation JS: TomSelect library loaded.");
+    if (typeof TomSelect === 'undefined') { console.error("SendAttestationRegForm JS: TomSelect NOT loaded!"); return; }
+    console.log("SendAttestationRegForm JS: TomSelect library loaded.");
 
-    let tsUnit, tsOid, tsActs, tsSentBy; // tsUnitsM2M;
+    let tsUnits, tsOids, tsActs, tsSentBy;
 
-    function initTomSelect(element, placeholder, isDisabled = false, isMulti = false, initialOpts = null) {
-        if (!element) { console.warn(`TomSelect init: Element not found for ${placeholder}`); return null; }
-        console.log(`TomSelect init: Initializing for ${element.id}, placeholder: ${placeholder}, disabled: ${isDisabled}, multi: ${isMulti}`);
+    function initTomSelect(element, placeholder, isDisabled = false, isMulti = true, initialOpts = []) {
+        if (!element) { console.warn("TomSelect init: Element not found for placeholder:", placeholder); return null; }
+        console.log(`TomSelect init: For #${element.id}. Placeholder: "${placeholder}", Disabled: ${isDisabled}, Multi: ${isMulti}`);
         let config = {
-            plugins: isMulti ? ['remove_button'] : [],
-            create: false, placeholder: placeholder, allowEmptyOption: true,
+            plugins: isMulti ? ['remove_button'] : [], create: false, placeholder: placeholder,
+            allowEmptyOption: !isMulti, // Для single select дозволяємо порожню опцію, для multi - ні, якщо required
             valueField: 'id', labelField: 'text', searchField: ['text'],
-            options: initialOpts || [], disabled: isDisabled
+            options: initialOpts, disabled: isDisabled
         };
         const instance = new TomSelect(element, config);
         element.tomselectInstance = instance;
         
-        // Перевірка опцій після ініціалізації
         let htmlOptions = [];
-        Array.from(element.options).forEach(opt => { if (opt.value) htmlOptions.push({id:opt.value, text:opt.text, selected: opt.selected});});
+        Array.from(element.options).forEach(opt => { if (opt.value) htmlOptions.push({id:opt.value, text:opt.text, selected:opt.selected});});
         const domOptsCount = instance.dropdown_content.querySelectorAll('.option').length;
-        console.log(`TomSelect init: For ${element.id} - HTML opts: ${htmlOptions.length}, TS DOM opts: ${domOptsCount}`);
-        if (domOptsCount === 0 && htmlOptions.length > 0) {
-            console.warn(`TomSelect init: For ${element.id} - empty after init, manual add.`);
+        if (domOptsCount === 0 && htmlOptions.length > 0 && !initialOpts.length) { // Якщо не передавали опції в config
+            console.warn(`TomSelect init: #${element.id} empty, manual add.`);
             instance.addOptions(htmlOptions);
             instance.refreshOptions(false);
             htmlOptions.forEach(opt => { if(opt.selected) instance.addItem(opt.id, true); });
-            console.log(`TomSelect init: For ${element.id} - DOM opts after manual add: ${instance.dropdown_content.querySelectorAll('.option').length}`);
         }
         return instance;
     }
 
-    // Ініціалізація основних полів
-    if (unitSelect) tsUnit = initTomSelect(unitSelect, 'Оберіть ВЧ...', false, false);
-    if (oidSelect) tsOid = initTomSelect(oidSelect, 'Спочатку оберіть ВЧ...', true, false);
-    if (actsSelect) tsActs = initTomSelect(actsSelect, 'Спочатку оберіть ОІД...', true, true); // Multi-select
-    if (sentBySelect) tsSentBy = initTomSelect(sentBySelect, 'Оберіть...', false, false);
-    // if (unitsM2MSelect) tsUnitsM2M = initTomSelect(unitsM2MSelect, 'Оберіть ВЧ для листа...', false, true);
+    // Ініціалізація
+    if (unitsSelectorElement) tsUnits = initTomSelect(unitsSelectorElement, 'Оберіть ВЧ...', false, true);
+    if (oidsSelectorElement) tsOids = initTomSelect(oidsSelectorElement, 'Спочатку оберіть ВЧ...', true, true);
+    if (actsSelectorElement) tsActs = initTomSelect(actsSelectorElement, 'Спочатку оберіть ОІД(и)...', true, true);
+    if (sentBySelectorElement) tsSentBy = initTomSelect(sentBySelectorElement, 'Оберіть...', false, false);
 
+    function loadOidsForUnits(unitIds) {
+        if (!tsOids) return;
+        tsOids.clear(); tsOids.clearOptions(); tsOids.sync();
+        loadActsForOids([]); // Очистити акти, бо ОІДи зміняться
 
-    function loadOids(unitId) {
-        if (!tsOid) { console.warn("SendAttestation JS: OID TomSelect not ready for loadOids."); return; }
-        tsOid.clear(); tsOid.clearOptions(); tsOid.sync();
-        loadActs(null); // Очистити акти, оскільки ОІД зміниться
-
-        if (unitId && unitId !== "") {
-            tsOid.enable(); tsOid.placeholder = 'Завантаження ОІДів...';
-            fetch(`${oidsForUnitUrl}?unit_id=${unitId}`)
+        if (unitIds && unitIds.length > 0) {
+            tsOids.enable(); tsOids.placeholder = 'Завантаження ОІДів...';
+            const params = new URLSearchParams();
+            unitIds.forEach(id => params.append('unit_ids[]', id));
+            fetch(`${oidsForUnitsUrl}?${params.toString()}`)
                 .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t || `Error ${r.status}`); }))
                 .then(data => {
-                    console.log("SendAttestation JS: OIDs for Unit received:", data);
-                    const options = data.map(oid => ({ id: oid.id.toString(), text: `${oid.cipher} (${oid.full_name || 'Без назви'})` }));
-                    tsOid.addOptions(options);
-                    tsOid.refreshOptions(false);
-                    tsOid.placeholder = options.length ? 'Оберіть ОІД...' : 'Для ВЧ немає ОІДів';
-                    // Якщо є initial OID для цієї ВЧ, можна його обрати (логіка для редагування/помилок)
-                }).catch(e => { console.error("SendAttestation JS: Error loading OIDs:", e); if (tsOid) tsOid.placeholder = 'Помилка завантаження ОІДів'; });
+                    console.log("SendAttestationRegForm JS: OIDs for Units received:", data);
+                    const options = data.map(oid => ({ id: oid.id.toString(), text: `${oid.cipher} (${oid.full_name || oid.unit_code})` }));
+                    tsOids.addOptions(options);
+                    tsOids.refreshOptions(false);
+                    tsOids.placeholder = options.length ? 'Оберіть ОІД(и)...' : 'Для обраних ВЧ немає ОІДів';
+                }).catch(e => { console.error("SendAttestationRegForm JS: Error loading OIDs:", e); if (tsOids) tsOids.placeholder = 'Помилка завантаження ОІДів';});
         } else {
-            tsOid.disable(); tsOid.placeholder = 'Спочатку оберіть ВЧ';
+            tsOids.disable(); tsOids.placeholder = 'Спочатку оберіть ВЧ';
         }
     }
 
-    function loadActs(oidId) {
-        if (!tsActs) { console.warn("SendAttestation JS: Acts TomSelect not ready for loadActs."); return; }
+    function loadActsForOids(oidIds) {
+        if (!tsActs) return;
         tsActs.clear(); tsActs.clearOptions(); tsActs.sync();
 
-        if (oidId && oidId !== "") {
-            tsActs.enable(); tsActs.placeholder = 'Завантаження Актів Атестації...';
-            fetch(`${actsForOidUrl}?oid_id=${oidId}`)
+        if (oidIds && oidIds.length > 0) {
+            tsActs.enable(); tsActs.placeholder = 'Завантаження Актів...';
+            const params = new URLSearchParams();
+            oidIds.forEach(id => params.append('oid_ids[]', id));
+            fetch(`${actsForOidsUrl}?${params.toString()}`)
                 .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t || `Error ${r.status}`); }))
                 .then(data => {
-                    console.log("SendAttestation JS: Attestation Acts for OID received:", data);
+                    console.log("SendAttestationRegForm JS: Acts for OIDs received:", data);
                     const options = data.map(act => ({ id: act.id.toString(), text: act.text }));
                     tsActs.addOptions(options);
                     tsActs.refreshOptions(false);
-                    tsActs.placeholder = options.length ? 'Оберіть акти...' : 'Для ОІД немає доступних актів';
-                }).catch(e => { console.error("SendAttestation JS: Error loading Attestation Acts:", e); if (tsActs) tsActs.placeholder = 'Помилка завантаження актів'; });
+                    tsActs.placeholder = options.length ? 'Оберіть Акти Атестації...' : 'Для обраних ОІДів немає доступних Актів';
+                }).catch(e => { console.error("SendAttestationRegForm JS: Error loading Acts:", e); if (tsActs) tsActs.placeholder = 'Помилка завантаження Актів';});
         } else {
-            tsActs.disable(); tsActs.placeholder = 'Спочатку оберіть ОІД';
+            tsActs.disable(); tsActs.placeholder = 'Спочатку оберіть ОІД(и)';
         }
     }
 
     // Слухачі подій
-    if (tsUnit) {
-        tsUnit.on('change', function(value) {
-            console.log("SendAttestation JS: Unit changed to:", value);
-            loadOids(value);
+    if (tsUnits) {
+        tsUnits.on('change', function(value) { // value - це масив ID
+            console.log("SendAttestationRegForm JS: Units changed to:", value);
+            loadOidsForUnits(value);
         });
-        // Якщо є початкове значення для Unit, завантажуємо ОІДи
-        if (tsUnit.getValue() && tsUnit.getValue() !== "") {
-            loadOids(tsUnit.getValue());
-        }
+        // Початкове завантаження ОІДів, якщо ВЧ вже обрані (наприклад, при помилці валідації)
+        const initialUnits = tsUnits.getValue();
+        if (initialUnits && initialUnits.length > 0) loadOidsForUnits(initialUnits);
     }
 
-    if (tsOid) {
-        tsOid.on('change', function(value) {
-            console.log("SendAttestation JS: OID changed to:", value);
-            loadActs(value);
+    if (tsOids) {
+        tsOids.on('change', function(value) { // value - це масив ID
+            console.log("SendAttestationRegForm JS: OIDs changed to:", value);
+            loadActsForOids(value);
         });
-        // Якщо є початкове значення для OID (і Unit також), завантажуємо Акти
-        // (ця логіка спрацює, якщо `loadOids` викликає `setValue` для `tsOid`)
+        // Початкове завантаження Актів, якщо ОІДи вже обрані (складніше, бо залежить від ВЧ)
+        // Можна викликати, якщо initialUnits та initialOids встановлені
     }
 });
 </script>

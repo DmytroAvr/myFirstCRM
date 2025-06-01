@@ -1,0 +1,231 @@
+{# oids/forms/send_trip_results_form.html #}
+{% extends "oids/base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container form-container">
+    <h2 class="mb-4">{{ page_title }}</h2>
+
+    <form method="post" enctype="multipart/form-data" novalidate id="sendTripResultsForm">
+        {% csrf_token %}
+        
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger" role="alert">
+                {% for error in form.non_field_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
+            </div>
+        {% endif %}
+
+        <fieldset class="mb-3 p-3 border rounded">
+            <legend class="w-auto px-2 h6">1. Оберіть Відрядження</legend>
+            <div class="mb-3">
+                <label for="{{ form.trip.id_for_label }}" class="form-label fw-bold">{{ form.trip.label }}:</label>
+                {{ form.trip }}
+                {% if form.trip.help_text %}<small class="form-text text-muted d-block">{{ form.trip.help_text }}</small>{% endif %}
+                {% for error in form.trip.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+        </fieldset>
+
+        <fieldset class="mb-3 p-3 border rounded">
+            <legend class="w-auto px-2 h6">2. Оберіть Військові Частини з відрядження</legend>
+            <div class="mb-3">
+                <label for="{{ form.units_in_trip.id_for_label }}" class="form-label fw-bold">{{ form.units_in_trip.label }}:</label>
+                {{ form.units_in_trip }}
+                {% if form.units_in_trip.help_text %}<small class="form-text text-muted d-block">{{ form.units_in_trip.help_text }}</small>{% endif %}
+                {% for error in form.units_in_trip.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+        </fieldset>
+
+        <fieldset class="mb-3 p-3 border rounded">
+            <legend class="w-auto px-2 h6">3. Оберіть ОІДи з обраних ВЧ (учасники відрядження)</legend>
+            <div class="mb-3">
+                <label for="{{ form.oids_in_trip_units.id_for_label }}" class="form-label fw-bold">{{ form.oids_in_trip_units.label }}:</label>
+                {{ form.oids_in_trip_units }}
+                {% if form.oids_in_trip_units.help_text %}<small class="form-text text-muted d-block">{{ form.oids_in_trip_units.help_text }}</small>{% endif %}
+                {% for error in form.oids_in_trip_units.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+        </fieldset>
+        
+        <fieldset class="mb-3 p-3 border rounded">
+            <legend class="w-auto px-2 h6">4. Оберіть Документи для відправки</legend>
+            <div class="mb-3">
+                <label for="{{ form.documents_to_send.id_for_label }}" class="form-label fw-bold">{{ form.documents_to_send.label }}:</label>
+                {{ form.documents_to_send }}
+                {% if form.documents_to_send.help_text %}<small class="form-text text-muted d-block">{{ form.documents_to_send.help_text }}</small>{% endif %}
+                {% for error in form.documents_to_send.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+        </fieldset>
+
+        <fieldset class="mb-3 p-3 border rounded">
+            <legend class="w-auto px-2 h6">Інформація про відправку</legend>
+            {# Рендеринг полів outgoing_letter_number, outgoing_letter_date, note, attachment #}
+             <div class="row mb-3 align-items-center">
+                <label for="{{ form.outgoing_letter_number.id_for_label }}" class="col-sm-3 col-form-label text-sm-end fw-bold">
+                    {{ form.outgoing_letter_number.label }}{% if form.outgoing_letter_number.field.required %}<span class="text-danger">*</span>{% endif %}:
+                </label>
+                <div class="col-sm-9">
+                    {{ form.outgoing_letter_number }}
+                    {% for error in form.outgoing_letter_number.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+             <div class="row mb-3 align-items-center">
+                <label for="{{ form.outgoing_letter_date.id_for_label }}" class="col-sm-3 col-form-label text-sm-end fw-bold">
+                    {{ form.outgoing_letter_date.label }}{% if form.outgoing_letter_date.field.required %}<span class="text-danger">*</span>{% endif %}:
+                </label>
+                <div class="col-sm-9">
+                    {{ form.outgoing_letter_date }}
+                    {% for error in form.outgoing_letter_date.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+             <div class="row mb-3 align-items-center">
+                <label for="{{ form.note.id_for_label }}" class="col-sm-3 col-form-label text-sm-end fw-bold">
+                    {{ form.note.label }}{% if form.note.field.required %}<span class="text-danger">*</span>{% endif %}:
+                </label>
+                <div class="col-sm-9">
+                    {{ form.note }}
+                    {% for error in form.note.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+           
+        </fieldset>
+
+        <div class="form-actions mt-4">
+            <button type="submit" class="btn btn-primary">Зберегти та відправити результати</button>
+            <a href="{% url 'oids:list_trip_results_for_units' %}" class="btn btn-secondary">Скасувати</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("SendTripResults JS: DOMContentLoaded.");
+
+    const tripSelectElem = document.getElementById('id_trip_result_trip');
+    const unitsInTripSelectElem = document.getElementById('id_trip_result_units');
+    const oidsInTripUnitsSelectElem = document.getElementById('id_trip_result_oids');
+    const documentsToSendSelectElem = document.getElementById('id_trip_result_documents');
+
+    // URL-и для AJAX (переконайтесь, що вони правильно визначені)
+    const unitsForTripUrl = "{% url 'oids:ajax_load_units_for_trip' %}"; // Створіть цей URL
+    const oidsForTripUnitsUrl = "{% url 'oids:ajax_load_oids_for_trip_units' %}"; 
+    const docsForTripOidsUrl = "{% url 'oids:ajax_load_documents_for_trip_oids' %}"; 
+
+    if (typeof TomSelect === 'undefined') { console.error("SendTripResults JS: TomSelect NOT loaded!"); return; }
+
+    let tsTrip, tsUnitsInTrip, tsOidsInTripUnits, tsDocsToSend;
+
+    function initTomSelect(element, placeholder, isDisabled = false, isMulti = false, initialOpts = []) {
+        if (!element) { console.warn("TomSelect init: Element missing for placeholder:", placeholder); return null; }
+        let config = {
+            plugins: isMulti ? ['remove_button'] : [], create: false, placeholder: placeholder,
+            allowEmptyOption: !isMulti, valueField: 'id', labelField: 'text', searchField: ['text'],
+            options: initialOpts, disabled: isDisabled
+        };
+        const instance = new TomSelect(element, config);
+        element.tomselectInstance = instance;
+        // Автоматичне завантаження опцій з HTML <select>, якщо initialOpts порожній
+        let htmlOptions = [];
+        Array.from(element.options).forEach(opt => { if (opt.value) htmlOptions.push({id:opt.value, text:opt.text, selected:opt.selected});});
+        if (instance.dropdown_content.querySelectorAll('.option').length === 0 && htmlOptions.length > 0 && initialOpts.length === 0) {
+            instance.addOptions(htmlOptions);
+            instance.refreshOptions(false);
+            htmlOptions.forEach(opt => { if(opt.selected) instance.addItem(opt.id, true); });
+        }
+        console.log(`TomSelect init: For #${element.id}. Options in DOM: ${instance.dropdown_content.querySelectorAll('.option').length}`);
+        return instance;
+    }
+
+    // Ініціалізація
+    if (tripSelectElem) tsTrip = initTomSelect(tripSelectElem, 'Оберіть відрядження...', false, false);
+    if (unitsInTripSelectElem) tsUnitsInTrip = initTomSelect(unitsInTripSelectElem, 'Спочатку оберіть відрядження', true, true);
+    if (oidsInTripUnitsSelectElem) tsOidsInTripUnits = initTomSelect(oidsInTripUnitsSelectElem, 'Спочатку оберіть ВЧ...', true, true);
+    if (documentsToSendSelectElem) tsDocsToSend = initTomSelect(documentsToSendSelectElem, 'Спочатку оберіть ОІД(и)...', true, true);
+
+
+    function loadUnitsForTrip(tripId) {
+        if (!tsUnitsInTrip) return;
+        tsUnitsInTrip.clear(); tsUnitsInTrip.clearOptions(); tsUnitsInTrip.sync();
+        loadOidsForTripUnits(tripId, []); // Очистити ОІДи
+        
+        if (tripId && tripId !== "") {
+            tsUnitsInTrip.enable(); tsUnitsInTrip.placeholder = 'Завантаження ВЧ...';
+            fetch(`${unitsForTripUrl}?trip_id=${tripId}`)
+                .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t); }))
+                .then(data => {
+                    const options = data.map(u => ({ id: u.id.toString(), text: u.text }));
+                    tsUnitsInTrip.addOptions(options); tsUnitsInTrip.refreshOptions(false);
+                    tsUnitsInTrip.placeholder = options.length ? 'Оберіть ВЧ...' : 'Для відрядження немає ВЧ';
+                }).catch(e => { console.error("Error loading units for trip:", e); if(tsUnitsInTrip) tsUnitsInTrip.placeholder = 'Помилка завантаження ВЧ'; });
+        } else {
+            tsUnitsInTrip.disable(); tsUnitsInTrip.placeholder = 'Спочатку оберіть відрядження';
+        }
+    }
+
+    function loadOidsForTripUnits(tripId, unitIds) {
+        if (!tsOidsInTripUnits) return;
+        tsOidsInTripUnits.clear(); tsOidsInTripUnits.clearOptions(); tsOidsInTripUnits.sync();
+        loadDocumentsForTripOids(tripId, []); // Очистити документи
+
+        if (tripId && unitIds && unitIds.length > 0) {
+            tsOidsInTripUnits.enable(); tsOidsInTripUnits.placeholder = 'Завантаження ОІДів...';
+            const params = new URLSearchParams({ trip_id: tripId });
+            unitIds.forEach(id => params.append('unit_ids[]', id));
+            fetch(`${oidsForTripUnitsUrl}?${params.toString()}`)
+                .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t); }))
+                .then(data => {
+                    const options = data.map(o => ({ id: o.id.toString(), text: o.text, oid_type: o.oid_type }));
+                    tsOidsInTripUnits.addOptions(options); tsOidsInTripUnits.refreshOptions(false);
+                    tsOidsInTripUnits.placeholder = options.length ? 'Оберіть ОІД(и)...' : 'Для обраних ВЧ/відрядження немає ОІДів';
+                }).catch(e => { console.error("Error loading OIDs for trip/units:", e); if(tsOidsInTripUnits) tsOidsInTripUnits.placeholder = 'Помилка завантаження ОІДів';});
+        } else {
+            tsOidsInTripUnits.disable(); tsOidsInTripUnits.placeholder = 'Спочатку оберіть відрядження та ВЧ';
+        }
+    }
+
+    function loadDocumentsForTripOids(tripId, oidIds) {
+        if (!tsDocsToSend) return;
+        tsDocsToSend.clear(); tsDocsToSend.clearOptions(); tsDocsToSend.sync();
+
+        if (tripId && oidIds && oidIds.length > 0) {
+            tsDocsToSend.enable(); tsDocsToSend.placeholder = 'Завантаження документів...';
+            const params = new URLSearchParams({ trip_id: tripId });
+            oidIds.forEach(id => params.append('oid_ids[]', id));
+            fetch(`${docsForTripOidsUrl}?${params.toString()}`)
+                .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t); }))
+                .then(data => {
+                    const options = data.map(d => ({ id: d.id.toString(), text: d.text }));
+                    tsDocsToSend.addOptions(options); tsDocsToSend.refreshOptions(false);
+                    tsDocsToSend.placeholder = options.length ? 'Оберіть документи...' : 'Документи для відправки не знайдено';
+                }).catch(e => { console.error("Error loading documents for trip/OIDs:", e); if(tsDocsToSend) tsDocsToSend.placeholder = 'Помилка завантаження документів';});
+        } else {
+            tsDocsToSend.disable(); tsDocsToSend.placeholder = 'Спочатку оберіть відрядження, ВЧ та ОІД(и)';
+        }
+    }
+
+    // Слухачі подій
+    if (tsTrip) {
+        tsTrip.on('change', function(value) { loadUnitsForTrip(value); });
+        if (tsTrip.getValue()) loadUnitsForTrip(tsTrip.getValue()); // Початкове завантаження
+    }
+    if (tsUnitsInTrip) {
+        tsUnitsInTrip.on('change', function(value) { 
+            const tripId = tsTrip ? tsTrip.getValue() : null;
+            loadOidsForTripUnits(tripId, value); 
+        });
+    }
+    if (tsOidsInTripUnits) {
+        tsOidsInTripUnits.on('change', function(value) {
+            const tripId = tsTrip ? tsTrip.getValue() : null;
+            loadDocumentsForTripOids(tripId, value);
+        });
+    }
+    
+    // Обмеження для полів дат (якщо є)
+    const processDateInput = document.getElementById('{{ form.process_date.id_for_label }}');
+    // ... (інші дати, якщо потрібно)
+});
+</script>
+{% endblock %}

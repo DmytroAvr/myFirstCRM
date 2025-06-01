@@ -1,3 +1,4 @@
+{# oids/lists/attestation_response_list.html #}
 {% extends "oids/base.html" %}
 {% block title %}{{ page_title }}{% endblock %}
 
@@ -7,7 +8,8 @@
     <a href="{% url 'oids:record_attestation_response' %}" class="btn btn-primary mb-3">
         <i class="fas fa-plus"></i> Внести нову відповідь
     </a>
-     {# Форма фільтрації - проста #}
+    
+    {# Форма фільтрації (якщо є) ... #}
     <form method="get" class="mb-3 p-3 border bg-light rounded">
         <div class="row g-2">
             <div class="col-md-6">
@@ -35,10 +37,9 @@
         <table class="table table-striped table-bordered table-hover">
             <thead class="thead-dark">
                 <tr>
-                    <th>Вхідний № листа-відповіді</th>
-                    <th>Дата вх. листа</th>
+                    <th>Вхідний лист № (дата)</th>
                     <th>На вих. лист № (дата)</th>
-                    <th>К-ть актів у відповіді</th>
+                    <th>Акти атестації у відповіді (ОІД - № акту - № реєстр. ДССЗЗІ - Дата реєстр. ДССЗЗІ)</th>
                     <th>Хто отримав/вніс</th>
                     <th>Дата внесення запису</th>
                     {# <th>Дії</th> #}
@@ -47,16 +48,38 @@
             <tbody>
                 {% for response_item in object_list %}
                 <tr>
-                    <td>{{ response_item.response_letter_number }}</td>
-                    <td>{{ response_item.response_letter_date|date:"d.m.Y" }}</td>
+                    <td>№ {{ response_item.response_letter_number }}  
+						від  {{ response_item.response_letter_date|date:"d.m.Y" }}</td>
+                   
                     <td>
-                        №{{ response_item.attestation_registration_sent.outgoing_letter_number }}
+                        № {{ response_item.attestation_registration_sent.outgoing_letter_number }}
                         від {{ response_item.attestation_registration_sent.outgoing_letter_date|date:"d.m.Y" }}
                     </td>
                     <td>
-                        {{ response_item.attestation_registration_sent.registered_documents.count }}
-                        {# Або, якщо потрібно кількість саме з зареєстрованими номерами: #}
-                        {# {{ response_item.attestation_registration_sent.registered_documents.filter(dsszzi_registered_number__isnull=False).count }} #}
+                        {% with acts_in_response=response_item.attestation_registration_sent.registered_documents.all %}
+                            {% if acts_in_response %}
+                                <ul class="list-unstyled mb-0">
+                                    {% for act_doc in acts_in_response %}
+                                    <li>
+                                        <a href="{% url 'oids:oid_detail_view_name' act_doc.oid.id %}#doc-{{act_doc.id}}">
+                                            <strong>{{ act_doc.oid.cipher }}</strong> (ВЧ: {{ act_doc.oid.unit.code }})
+                                        </a>
+                                        - Акт № {{ act_doc.document_number }}
+                                        {% if act_doc.dsszzi_registered_number %}
+                                            (Реєстр. ДССЗЗІ: №{{ act_doc.dsszzi_registered_number }}
+                                            {% if act_doc.dsszzi_registered_date %}
+                                                від {{ act_doc.dsszzi_registered_date|date:"d.m.Y" }}
+                                            {% endif %})
+                                        {% else %}
+                                            (не зареєстровано)
+                                        {% endif %}
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <span class="text-muted">Акти не знайдено</span>
+                            {% endif %}
+                        {% endwith %}
                     </td>
                     <td>{{ response_item.received_by.full_name|default:"-" }}</td>
                     <td>{{ response_item.created_at|date:"d.m.Y H:i" }}</td>
@@ -66,7 +89,7 @@
             </tbody>
         </table>
     </div>
-        {% include "../includes/pagination.html" with page_obj=page_obj att_reg_id=current_filter_att_reg_id %}
+        {% include "../includes/pagination.html" with page_obj=page_obj att_reg_id=current_filter_att_reg_id %} {# Передаємо параметри фільтрації для пагінації #}
     {% else %}
         <p>Відповіді від ДССЗЗІ не знайдено.</p>
     {% endif %}

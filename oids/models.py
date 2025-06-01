@@ -304,17 +304,15 @@ class AttestationRegistration(models.Model):
     """
     Відправка пакету актів атестації на реєстрацію в ДССЗЗІ (вихідний лист).
     """
-    # Поле units залишається ManyToManyField. один вихідний лист може містити акти, що стосуються різних ВЧ 
     units = models.ManyToManyField(
         Unit,
         verbose_name="Військові частини (акти яких включено)",
-        related_name='sent_for_attestation_registrations', # Оновлено related_name
-        blank=True # Може бути порожнім, якщо ВЧ визначаються через ОІДи в документах
+        related_name='sent_for_attestation_registrations',
+        blank=True 
     )
     outgoing_letter_number = models.CharField(
         max_length=50,
         verbose_name="Вихідний номер листа до ДССЗЗІ"
-        # unique=True, # Розгляньте, чи має бути унікальним
     )
     outgoing_letter_date = models.DateField(
         verbose_name="Дата вихідного листа"
@@ -323,22 +321,18 @@ class AttestationRegistration(models.Model):
         Person,
         on_delete=models.SET_NULL,
         null=True,
-        blank=True, # Може бути не обов'язковим, якщо фіксує система або не завжди відомо
+        blank=True,
         verbose_name="Хто відправив лист",
-        related_name='sent_attestation_packages' # Змінив related_name для ясності
+        related_name='sent_attestation_packages'
     )
     status = models.CharField(
-        max_length=25, # Збільшив для можливих довших значень
+        max_length=25,
         choices=AttestationRegistrationStatusChoices.choices,
         default=AttestationRegistrationStatusChoices.SENT,
         verbose_name="Статус відправки"
     )
-    attachment = models.FileField(
-        upload_to="attestation_registrations_sent/", # Оновив шлях
-        blank=True,
-        null=True,
-        verbose_name="Скан-копія вихідного листа (опційно)"
-    )
+    # Поле attachment видалено
+    # attachment = models.FileField(...) 
     note = models.TextField(
         blank=True,
         null=True,
@@ -353,8 +347,8 @@ class AttestationRegistration(models.Model):
     class Meta:
         verbose_name = "Відправка актів на реєстрацію (ДССЗЗІ)"
         verbose_name_plural = "Відправки актів на реєстрацію (ДССЗЗІ)"
-        ordering = ['-outgoing_letter_date', '-id'] # Додав -id для стабільного сортування
-        
+        ordering = ['-outgoing_letter_date', '-id']     
+
 class AttestationResponse(models.Model):
     """
     Відповідь від ДССЗЗІ на відправку актів атестації (вхідний лист).
@@ -379,12 +373,6 @@ class AttestationResponse(models.Model):
         blank=True,
         verbose_name="Хто отримав/вніс відповідь",
         related_name='processed_attestation_responses'
-    )
-    attachment = models.FileField(
-        upload_to="attestation_responses_received/", # Оновив шлях
-        blank=True, 
-        null=True, 
-        verbose_name="Скан-копія листа-відповіді (опційно)"
     )
     note = models.TextField(blank=True, null=True, verbose_name="Примітка до відповіді")
     created_at = models.DateTimeField(auto_now_add=True) 
@@ -615,8 +603,14 @@ class TripResultForUnit(models.Model):
         verbose_name="Документи до відправки",
         related_name='sent_in_trip_results' # Дозволить дізнатися, в яких результатах відрядження був відправлений документ
     )
+    outgoing_letter_number = models.CharField(
+        max_length=50,
+        verbose_name="Вих. номер супровідного листа"
+    )
+    outgoing_letter_date = models.DateField(
+        verbose_name="Вих. дата супровідного листа"
+    )
     process_date = models.DateField(verbose_name="Дата відправки до частини")
-    attachment = models.FileField(upload_to="trip_results_docs/", blank=True, null=True, verbose_name="Файл (опційно)")
     note = models.TextField(blank=True, null=True, verbose_name="Примітка")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
