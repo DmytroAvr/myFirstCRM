@@ -40,6 +40,13 @@ class DocumentReviewResultChoices(models.TextChoices):
     APPROVED = 'погоджено', 'Погоджено'
     FOR_REVISION = 'на доопрацювання', 'На доопрацювання'
 
+class AttestationRegistrationStatusChoices(models.TextChoices):
+    SENT = 'sent', 'Відправлено, очікує відповіді'
+    RESPONSE_RECEIVED = 'received', 'Відповідь отримано'
+    # PARTIALLY_RECEIVED = 'partially_received', 'Відповідь отримано частково' # Можна додати, якщо потрібно
+    CANCELED = 'canceled', 'Скасовано (відправку)'
+    
+
 # --- Models ---
 
 class TerritorialManagement(models.Model):
@@ -290,6 +297,116 @@ class DocumentType(models.Model):
     def __str__(self):
         return f"{self.name} ({self.oid_type}, {self.work_type})"
 
+class AttestationRegistration(models.Model):
+    """
+    Відправка пакету актів атестації на реєстрацію в ДССЗЗІ (вихідний лист).
+    """
+    # Поле units залишається ManyToManyField. один вихідний лист може містити акти, що стосуються різних ВЧ 
+    units = models.ManyToManyField(
+        Unit,
+        verbose_name="Військові частини (акти яких включено)",
+        related_name='sent_for_attestation_registrations', # Оновлено related_name
+        blank=True # Може бути порожнім, якщо ВЧ визначаються через ОІДи в документах
+    )
+    outgoing_letter_number = models.CharField(
+        max_length=50,
+        verbose_name="Вихідний номер листа до ДССЗЗІ"
+        # unique=True, # Розгляньте, чи має бути унікальним
+    )
+    outgoing_letter_date = models.DateField(
+        verbose_name="Дата вихідного листа"
+    )
+    sent_by = models.ForeignKey(
+        Person,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True, # Може бути не обов'язковим, якщо фіксує система або не завжди відомо
+        verbose_name="Хто відправив лист",
+        related_name='sent_attestation_packages' # Змінив related_name для ясності
+    )
+    status = models.CharField(
+        max_length=25, # Збільшив для можливих довших значень
+        choices=AttestationRegistrationStatusChoices.choices,
+        default=AttestationRegistrationStatusChoices.SENT,
+        verbose_name="Статус відправки"
+    )
+    attachment = models.FileField(
+        upload_to="attestation_registrations_sent/", # Оновив шлях
+        blank=True,
+        null=True,
+        verbose_name="Скан-копія вихідного листа (опційно)"
+    )
+    note = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Примітка до відправки"
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
+
+    def __str__(self):
+        return f"Відправка до ДССЗЗІ №{self.outgoing_letter_number} від {self.outgoing_letter_date.strftime('%d.%m.%Y')}"
+
+    class Meta:
+        verbose_name = "Відправка актів на реєстрацію (ДССЗЗІ)"
+        verbose_name_plural = "Відправки актів на реєстрацію (ДССЗЗІ)"
+        ordering = ['-outgoing_letter_date', '-id'] # Додав -id для стабільного сортування
+        
+class AttestationResponse(models.Model):
+    """
+    Відповідь від ДССЗЗІ на відправку актів атестації (вхідний лист).
+    """
+    attestation_registration_sent = models.OneToOneField( 
+        AttestationRegistration, 
+        on_delete=models.CASCADE, 
+        verbose_name="Пов'язана відправка (вихідний лист)",
+        related_name='response_received' 
+    )
+    response_letter_number = models.CharField(
+        max_length=50, 
+        verbose_name="Вхідний номер листа-відповіді"
+    )
+    response_letter_date = models.DateField(
+        verbose_name="Дата вхідного листа-відповіді"
+    )
+    received_by = models.ForeignKey(
+        Person,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Хто отримав/вніс відповідь",
+        related_name='processed_attestation_responses'
+    )
+    attachment = models.FileField(
+        upload_to="attestation_responses_received/", # Оновив шлях
+        blank=True, 
+        null=True, 
+        verbose_name="Скан-копія листа-відповіді (опційно)"
+    )
+    note = models.TextField(blank=True, null=True, verbose_name="Примітка до відповіді")
+    created_at = models.DateTimeField(auto_now_add=True) 
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Відповідь №{self.response_letter_number} від {self.response_letter_date.strftime('%d.%m.%Y')} на вих. №{self.attestation_registration_sent.outgoing_letter_number}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Після збереження відповіді, оновлюємо статус батьківської відправки
+        if self.attestation_registration_sent:
+            # Тут можна додати логіку перевірки, чи всі акти з відправки отримали реєстраційні номери,
+            # щоб встановити статус RESPONSE_RECEIVED або PARTIALLY_RECEIVED.
+            # Поки що просто змінюємо на RESPONSE_RECEIVED.
+            if self.attestation_registration_sent.status == AttestationRegistrationStatusChoices.SENT:
+                self.attestation_registration_sent.status = AttestationRegistrationStatusChoices.RESPONSE_RECEIVED
+                self.attestation_registration_sent.save(update_fields=['status', 'updated_at'])
+
+
+    class Meta:
+        verbose_name = "Відповідь на реєстрацію (ДССЗЗІ)"
+        verbose_name_plural = "Відповіді на реєстрацію (ДССЗЗІ)"
+        ordering = ['-response_letter_date', '-id']
+   
 class Document(models.Model):
     """
     Опрацьовані документи
@@ -299,20 +416,19 @@ class Document(models.Model):
         OID, 
         on_delete=models.CASCADE, 
         verbose_name="ОІД",
-        related_name='documents' # Дозволить отримати всі документи для ОІД: `oid_instance.documents.all()`
+        related_name='documents'
     )
-    # Зверніть увагу: unit можна отримати через oid.unit, тому не потрібно дублювати.
     work_request_item = models.ForeignKey(
         WorkRequestItem, 
         on_delete=models.SET_NULL, 
         blank=True, 
         null=True, 
         verbose_name="Елемент заявки",
-        related_name='produced_documents' # Дозволить отримати всі документи, створені в рамках цього елемента заявки
+        related_name='produced_documents'
     )
     document_type = models.ForeignKey(
         DocumentType, 
-        on_delete=models.PROTECT, # Не дозволяти видаляти тип документа, якщо він використовується
+        on_delete=models.PROTECT,
         verbose_name="Тип документа"
     )
     document_number = models.CharField(max_length=50, default='27/14-', verbose_name="Підготовлений № документа")
@@ -324,29 +440,59 @@ class Document(models.Model):
         null=True, 
         blank=True, 
         verbose_name="Автор документа",
-        related_name='authored_documents' # Дозволить отримати всі документи, створені особою
+        related_name='authored_documents'
     )
     attachment = models.FileField(upload_to="attestation_docs/", blank=True, null=True, verbose_name="Прикріплений файл (Опційно)")
     note = models.TextField(blank=True, null=True, verbose_name="Примітки")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
-
-    # Додамо поле для автоматичного обчислення терміну дії
     expiration_date = models.DateField(verbose_name="Дата завершення дії", blank=True, null=True)
 
+    # --- НОВІ ПОЛЯ для реєстрації в ДССЗЗІ (для актів атестації) ---
+    # Посилання на запис про відправку (вихідний лист)
+    attestation_registration_sent = models.ForeignKey(
+        AttestationRegistration,
+        on_delete=models.SET_NULL, # Якщо запис про відправку видаляється, інформація в документі залишається, але без зв'язку
+        null=True,
+        blank=True,
+        verbose_name="Відправлено на реєстрацію ДССЗЗІ (в складі листа)",
+        related_name="registered_documents" # Дозволить отримати всі документи в цій відправці
+    )
+    # Номер, присвоєний ДССЗЗІ цьому конкретному акту
+    dsszzi_registered_number = models.CharField(
+        max_length=50, 
+        blank=True, 
+        null=True, 
+        verbose_name="Зареєстрований номер в ДССЗЗІ (для цього акту)"
+    )
+    # Дата, якою ДССЗЗІ зареєстрував цей акт
+    dsszzi_registered_date = models.DateField(
+        blank=True, 
+        null=True, 
+        verbose_name="Дата реєстрації в ДССЗЗІ (для цього акту)"
+    )
+    # Можна додати статус реєстрації саме для цього документа, якщо потрібно більш детально
+    # dsszzi_document_status = models.CharField(max_length=20, choices=..., null=True, blank=True)
+
     def save(self, *args, **kwargs):
-        # Автоматичне обчислення терміну дії, якщо документ має термін дії
-        if self.document_type.has_expiration and self.document_type.duration_months > 0:
-            self.expiration_date = self.work_date + timezone.timedelta(days=self.document_type.duration_months * 30) # Приблизне обчислення
+        if self.document_type and self.document_type.has_expiration and self.document_type.duration_months > 0 and self.work_date:
+            # Приблизне обчислення, можна уточнити за допомогою dateutil.relativedelta
+            from dateutil.relativedelta import relativedelta 
+            self.expiration_date = self.work_date + relativedelta(months=self.document_type.duration_months)
+        else:
+            # Якщо у документа немає терміну дії або не вказана дата робіт, дата завершення дії не встановлюється
+             if not (self.document_type and self.document_type.has_expiration and self.document_type.duration_months > 0):
+                self.expiration_date = None # Очищаємо, якщо умови не виконані
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.document_type.name} / {self.document_number} ({self.oid.cipher})"
+        return f"{self.document_type.name} / {self.document_number} (ОІД: {self.oid.cipher})"
 
     class Meta:
         verbose_name = "Опрацьований документ"
         verbose_name_plural = "Опрацьовані документи"
-
+        ordering = ['-process_date', '-work_date']
+        
 class Trip(models.Model):
     """
     Відрядження
@@ -437,89 +583,7 @@ class OIDStatusChange(models.Model):
 
 # --- Додаткові сутності, які були в оригінальному файлі, але не були інтегровані в бізнес-логіку ---
 
-class AttestationRegistration(models.Model):
-    """
-    Реєстрація актів атестації в ДССЗЗІ 
-    """
-    units = models.ManyToManyField(
-        Unit, 
-        verbose_name="Військові частини, що стосуються реєстрації",
-        related_name='attestation_registrations'
-    )
-    # Зв'язок з OID через AttestationItem є більш гнучким.
-    # oids = models.ManyToManyField("OID", through='AttestationItem', verbose_name="ОІД що реєструються")
-    registration_number = models.CharField(max_length=50, blank=True, null=True, verbose_name="Реєстраційний номер листа до ДССЗЗІ")
-    process_date = models.DateField(verbose_name="Дата відправки на реєстрацію в ДССЗЗІ")
-    attachment = models.FileField(upload_to="attestation_docs/", blank=True, null=True, verbose_name="Файл (опційно)")
-    note = models.TextField(blank=True, null=True, verbose_name="Примітка")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
-
-    def __str__(self):
-        return f"Реєстрація Актів від {self.process_date}"
-
-    class Meta:
-        verbose_name = "Реєстрація актів атестації"
-        verbose_name_plural = "Реєстрації актів атестації"
-
-class AttestationItem(models.Model):
-    """
-    Окремий акт атестації, що реєструється.
-    """
-    registration = models.ForeignKey(
-        AttestationRegistration, 
-        on_delete=models.CASCADE,
-        related_name='attestation_items' # Дозволить отримати всі акти, що реєструються в рамках цієї реєстрації
-    )
-    oid = models.ForeignKey(
-        OID, 
-        on_delete=models.CASCADE, 
-        verbose_name="ОІД",
-        related_name='attestation_registrations' # Дозволить отримати всі реєстрації, що стосуються цього ОІД
-    )
-    document = models.OneToOneField(
-        Document, # Зв'язок з фактичним документом "Акт атестації"
-        on_delete=models.CASCADE, 
-        verbose_name="Акт атестації",
-        related_name='attestation_item'
-    )
-    # document_number можна отримати з поля document.document_number, тому не дублюємо.
-    # document_number = models.CharField(max_length=50, verbose_name="Номер Акту Атестації")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
-
-    def __str__(self):
-        return f"Акт {self.document.document_number} для {self.oid.cipher}"
-
-    class Meta:
-        verbose_name = "Акт атестації в реєстрації"
-        verbose_name_plural = "Акти атестації в реєстраціях"
-        unique_together = ('registration', 'oid', 'document') # Акт для ОІД унікальний в рамках реєстрації
-
-class AttestationResponse(models.Model):
-    """
-    Відповідь від ДССЗЗІ на реєстрацію.
-    """
-    registration = models.OneToOneField(
-        AttestationRegistration, 
-        on_delete=models.CASCADE,
-        verbose_name="Пов'язана реєстрація",
-        related_name='response' # Дозволить отримати відповідь для реєстрації: `registration_instance.response`
-    )
-    registered_number = models.CharField(max_length=50, verbose_name="Зареєстровано за номером")
-    registered_date = models.DateField(verbose_name="Дата реєстрації")
-    note = models.TextField(blank=True, null=True, verbose_name="Примітка")
-    recorded_date = models.DateTimeField(auto_now_add=True, verbose_name="Дата внесення")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
-
-    def __str__(self):
-        return f"Відповідь на реєстрацію {self.registration.registration_number} від {self.registered_date}"
-
-    class Meta:
-        verbose_name = "Відповідь на реєстрацію атестації"
-        verbose_name_plural = "Відповіді на реєстрацію атестації"
-
+     
 class TripResultForUnit(models.Model):
     """
     Результати відрядження, що відправляються до військових частин.

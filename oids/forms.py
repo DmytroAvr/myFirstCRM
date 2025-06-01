@@ -1,10 +1,13 @@
 # C:\myFirstCRM\oids\forms.py
 
 from django import forms
-from django.forms import inlineformset_factory
+from django.forms import inlineformset_factory, modelformset_factory
+from .models import (WorkRequestStatusChoices, WorkTypeChoices, OIDTypeChoices, 
+	OIDStatusChoices, AttestationRegistrationStatusChoices, 
+)
 from .models import (
     WorkRequest, WorkRequestItem, OID, Unit, Person, Trip, Document, DocumentType,
-    WorkRequestStatusChoices, WorkTypeChoices, OIDTypeChoices, OIDStatusChoices, 
+    AttestationRegistration, AttestationResponse,  
 )
 from django_tomselect.forms import TomSelectModelChoiceField, TomSelectConfig
 
@@ -356,13 +359,136 @@ class DocumentProcessingMainForm(forms.Form):
             if oid_id:
                  self.fields['work_request_item'].queryset = WorkRequestItem.objects.filter(oid_id=oid_id).select_related('request').order_by('-request__incoming_date')
 
-
 # Створюємо формсет для DocumentItemForm
 # extra=1 - одна порожня форма за замовчуванням
 DocumentItemFormSet = formset_factory(DocumentItemForm, extra=1, can_delete=True)
 
 # end end new form for documents
 
+# --- Форма для створення "Відправки на реєстрацію" ---
+class AttestationRegistrationSendForm(forms.ModelForm):
+    # Поле для вибору документів типу "Акт атестації", які ще не були відправлені
+    # або для яких ще не отримано остаточну відповідь (залежить від вашої логіки).
+    attestation_acts = forms.ModelMultipleChoiceField(
+        queryset=Document.objects.filter(
+            document_type__name__icontains='Акт атестації', # Обираємо тільки "Акти атестації"
+            attestation_registration_sent__isnull=True # Тільки ті, що ще не включені в іншу відправку
+            # Можна додати інші фільтри, наприклад, за статусом ОІД, до якого належить акт
+        ).select_related('oid__unit', 'document_type').order_by('oid__unit__code', 'oid__cipher', '-work_date'),
+        widget=forms.SelectMultiple(attrs={'class': 'form-select tomselect-field', 'size': '10'}),
+        label="Оберіть Акти Атестації для відправки",
+        required=True
+    )
+
+    class Meta:
+        model = AttestationRegistration
+        fields = [
+            'outgoing_letter_number', 
+            'outgoing_letter_date', 
+            'sent_by', 
+            'units', # Якщо ви хочете, щоб користувач міг явно вказати ВЧ, до яких це стосується
+                     # Або це поле можна заповнювати автоматично на основі ВЧ обраних актів
+            'note', 
+            'attachment'
+        ]
+        widgets = {
+            'outgoing_letter_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'outgoing_letter_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'sent_by': forms.Select(attrs={'class': 'form-select tomselect-field'}),
+            'units': forms.SelectMultiple(attrs={'class': 'form-select tomselect-field', 'size': '5'}), # Якщо units залишається
+            'note': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+            'attachment': forms.FileInput(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # self.fields['sent_by'].queryset = Person.objects.filter(is_active=True) # Вже встановлено в моделі, але для прикладу
+        # self.fields['units'].queryset = Unit.objects.all().order_by('code') # Вже встановлено в моделі
+
+    def save(self, commit=True):
+        # Спершу зберігаємо сам об'єкт AttestationRegistration
+        registration_instance = super().save(commit=False)
+        
+        # Якщо поле 'units' заповнюється вручну, його потрібно зберегти після commit=False, якщо це M2M
+        # Але якщо воно заповнюється автоматично, то логіка буде іншою.
+        # Поки що припускаємо, що units обираються у формі.
+
+        if commit:
+            registration_instance.save() # Зберігаємо registration_instance, щоб отримати ID
+            self.save_m2m() # Для поля units, якщо воно ManyToMany
+
+            # Тепер для кожного обраного документа "Акт атестації" оновлюємо його поле
+            # attestation_registration_sent, пов'язуючи його з щойно створеною відправкою.
+            selected_acts = self.cleaned_data.get('attestation_acts', [])
+            for act_document in selected_acts:
+                act_document.attestation_registration_sent = registration_instance
+                # Можливо, потрібно оновити статус самого документа або ОІД, якщо це передбачено
+                act_document.save(update_fields=['attestation_registration_sent', 'updated_at'])
+        
+        return registration_instance
+
+
+# --- Форма для внесення даних з "Відповіді ДССЗЗІ" ---
+# Це буде головна форма
+class AttestationResponseMainForm(forms.ModelForm):
+    # Поле для вибору існуючої Відправки, на яку прийшла відповідь
+    attestation_registration_sent = forms.ModelChoiceField(
+        queryset=AttestationRegistration.objects.filter(
+            status=AttestationRegistrationStatusChoices.SENT # Тільки ті, що очікують відповіді
+        ).order_by('-outgoing_letter_date'),
+        label="Вихідний лист (відправка), на який отримано відповідь",
+        widget=forms.Select(attrs={'class': 'form-select tomselect-field', 'id': 'id_response_for_registration_sent'})
+    )
+
+    class Meta:
+        model = AttestationResponse
+        fields = [
+            'attestation_registration_sent', 
+            'response_letter_number', 
+            'response_letter_date', 
+            'received_by',
+            'note', 
+            'attachment'
+        ]
+        widgets = {
+            'response_letter_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'response_letter_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'received_by': forms.Select(attrs={'class': 'form-select tomselect-field'}),
+            'note': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+            'attachment': forms.FileInput(attrs={'class': 'form-control'}),
+        }
+
+# Форма для ОНОВЛЕННЯ окремого Акту Атестації (буде використовуватися у формсеті)
+# Ми не створюємо новий Document, а оновлюємо існуючий
+class AttestationActUpdateForm(forms.ModelForm):
+    # Поля, які користувач буде заповнювати для кожного акту з відповіді ДССЗЗІ
+    dsszzi_registered_number = forms.CharField(
+        label="Присвоєний № реєстрації ДССЗЗІ", 
+        required=False, # Може бути не для всіх актів
+        widget=forms.TextInput(attrs={'class': 'form-control form-control-sm'})
+    )
+    dsszzi_registered_date = forms.DateField(
+        label="Дата реєстрації ДССЗЗІ", 
+        required=False,
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-sm'})
+    )
+    # Можна додати поле для коментаря/статусу саме цього акту з відповіді, якщо потрібно
+
+    class Meta:
+        model = Document # Ми оновлюємо існуючі документи
+        fields = ['dsszzi_registered_number', 'dsszzi_registered_date']
+        # Ми не хочемо, щоб користувач міг змінювати сам документ тут, тільки його реєстраційні дані.
+        # Тому інші поля Document не включаємо.
+
+# Формсет для оновлення Актів Атестації
+# Ми будемо використовувати modelformset_factory, оскільки ми працюємо з існуючими об'єктами Document
+AttestationActUpdateFormSet = modelformset_factory(
+    Document,                                     # Модель
+    form=AttestationActUpdateForm,                # Форма для кожного елемента
+    extra=0,                                      # Не додавати порожніх форм за замовчуванням
+    can_delete=False,                             # Не дозволяти видаляти документи з цієї форми
+    edit_only=True                                # Тільки редагування, не створення нових
+)
 
 
 class OIDForm(forms.ModelForm):

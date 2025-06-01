@@ -32,6 +32,18 @@ urlpatterns = [
 	path('oid/<int:oid_id_from_url>/update-status/', views.update_oid_status_view, name='update_specific_oid_status'),
 
 
+    
+    # URL для форми внесення відповіді ДССЗЗІ
+    path('attestation-response/record/', views.record_attestation_response_view, name='record_attestation_response'),
+    # Якщо ви хочете передавати ID відправки в URL для форми відповіді:
+    path('attestation-registration/<int:att_reg_sent_id>/record-response/', views.record_attestation_response_view, name='record_attestation_response_for_registration'),
+
+    # URL для форми створення нової відправки на реєстрацію
+    path('attestation-registration/send/', views.send_attestation_for_registration_view, name='send_attestation_for_registration'),
+
+
+
+
 	path('summary-hub/', views.summary_information_hub_view, name='summary_information_hub'),
     # Далі будемо додавати URL-и для кожного списку моделей
     path('documents/', views.document_list_view, name='list_documents'),
@@ -52,6 +64,8 @@ urlpatterns = [
     path('attestation-responses/', views.attestation_response_list_view, name='list_attestation_responses'),
     path('trip-results/', views.trip_result_for_unit_list_view, name='list_trip_results_for_units'),
     path('oid-status-changes/', views.oid_status_change_list_view, name='list_oid_status_changes'),
+   	path('attestation-registrations/', views.attestation_registration_list_view, name='list_attestation_registrations'), # URL для списку Відправок на реєстрацію
+    path('attestation-responses/', views.attestation_response_list_view, name='list_attestation_responses'),  # URL для списку Отриманих відповідей на реєстрацію
 
 	# path("person-autocomplete/", PersonAutocompleteView.as_view(), name="person_autocomplete"),
 

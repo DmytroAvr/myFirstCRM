@@ -1,0 +1,88 @@
+{% extends "oids/base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container form-container">
+    <h2 class="mb-4">{{ page_title }}</h2>
+
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        {{ form.media }}
+
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger" role="alert">
+                {% for error in form.non_field_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
+            </div>
+        {% endif %}
+
+        <fieldset class="mb-3 p-3 border rounded">
+            <legend class="w-auto px-2 h6">Дані вихідного листа</legend>
+            {# Явний рендеринг полів form: outgoing_letter_number, outgoing_letter_date, sent_by, units, note, attachment #}
+            {% for field in form %}
+                {% if field.name != 'attestation_acts' %} {# Поки що не рендеримо поле актів тут, якщо units заповнюються вручну #}
+                <div class="row mb-3 align-items-center">
+                    <label for="{{ field.id_for_label }}" class="col-sm-3 col-form-label text-sm-end fw-bold">
+                        {{ field.label }}{% if field.field.required %}<span class="text-danger">*</span>{% endif %}:
+                    </label>
+                    <div class="col-sm-9">
+                        {{ field }}
+                        {% if field.help_text %}<small class="form-text text-muted d-block">{{ field.help_text }}</small>{% endif %}
+                        {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </fieldset>
+
+        <fieldset class="mb-3 p-3 border rounded">
+            <legend class="w-auto px-2 h6">Акти Атестації для відправки</legend>
+            {# Поле attestation_acts #}
+            <div class="mb-3">
+                <label for="{{ form.attestation_acts.id_for_label }}" class="form-label fw-bold">
+                    {{ form.attestation_acts.label }}{% if form.attestation_acts.field.required %}<span class="text-danger">*</span>{% endif %}:
+                </label>
+                {{ form.attestation_acts }} {# TomSelect має підхопити клас 'form-select tomselect-field' #}
+                {% if form.attestation_acts.help_text %}<small class="form-text text-muted d-block">{{ form.attestation_acts.help_text }}</small>{% endif %}
+                {% for error in form.attestation_acts.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+        </fieldset>
+
+        <div class="form-actions mt-4">
+            <button type="submit" class="btn btn-primary">Сформувати та зберегти відправку</button>
+            <a href="{% url 'oids:list_attestation_registrations' %}" class="btn btn-secondary">Скасувати</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("SendAttestationForm JS: DOMContentLoaded.");
+    if (typeof TomSelect === 'undefined') {
+        console.error("SendAttestationForm JS: TomSelect library is NOT loaded!");
+        return; 
+    }
+    // Ініціалізація TomSelect для полів з класом 'tomselect-field'
+    document.querySelectorAll('#sendAttestationForm .tomselect-field').forEach(function(selectElement) {
+        if(selectElement) { // Перевірка, чи елемент існує
+             let config = {
+                plugins: selectElement.multiple ? ['remove_button'] : [],
+                create: false,
+                placeholder: selectElement.querySelector('option[value=""]')?.textContent || 'Оберіть...',
+                allowEmptyOption: true,
+            };
+            if (selectElement.id === '{{ form.attestation_acts.id_for_label }}') { // Специфічно для актів
+                config.placeholder = 'Оберіть акти для відправки...';
+                // Тут можна додати кастомний рендерінг, щоб показувати ОІД, ВЧ, дату акту
+                // config.render = { option: function(data, escape) { return `<div>...</div>`; } };
+            }
+            new TomSelect(selectElement, config);
+            console.log(`SendAttestationForm JS: TomSelect initialized for #${selectElement.id}`);
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,46 +1,74 @@
 {% extends "oids/base.html" %}
-
 {% block title %}{{ page_title }}{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
     <h2 class="mb-4">{{ page_title }}</h2>
-    {# <a href="URL_ДЛЯ_ДОДАВАННЯ_ВІДПОВІДІ" class="btn btn-primary mb-3">Додати Відповідь</a> #}
+    <a href="{% url 'oids:record_attestation_response' %}" class="btn btn-primary mb-3">
+        <i class="fas fa-plus"></i> Внести нову відповідь
+    </a>
+     {# Форма фільтрації - проста #}
+    <form method="get" class="mb-3 p-3 border bg-light rounded">
+        <div class="row g-2">
+            <div class="col-md-6">
+                <label for="id_filter_att_reg" class="form-label">Пов'язана відправка:</label>
+                 <select name="att_reg_id" id="id_filter_att_reg" class="form-select form-select-sm">
+                    <option value="">Всі відправки</option>
+                    {% for reg_sent_opt in all_registrations_sent %}
+                        <option value="{{ reg_sent_opt.id }}" {% if current_filter_att_reg_id == reg_sent_opt.id %}selected{% endif %}>
+                           №{{ reg_sent_opt.outgoing_letter_number }} від {{ reg_sent_opt.outgoing_letter_date|date:"d.m.Y" }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-secondary btn-sm w-100">Фільтрувати</button>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <a href="{% url 'oids:list_attestation_responses' %}" class="btn btn-outline-secondary btn-sm w-100">Скинути</a>
+            </div>
+        </div>
+    </form>
 
     {% if object_list %}
+    <div class="table-responsive">
         <table class="table table-striped table-bordered table-hover">
             <thead class="thead-dark">
                 <tr>
-                    <th>Пов'язана Реєстрація (Лист до ДССЗЗІ)</th>
-                    <th>Зареєстровано за №</th>
-                    <th>Дата реєстрації ДССЗЗІ</th>
-                    <th>Дата внесення відповіді</th>
-                    <th>Примітки</th>
+                    <th>Вхідний № листа-відповіді</th>
+                    <th>Дата вх. листа</th>
+                    <th>На вих. лист № (дата)</th>
+                    <th>К-ть актів у відповіді</th>
+                    <th>Хто отримав/вніс</th>
+                    <th>Дата внесення запису</th>
                     {# <th>Дії</th> #}
                 </tr>
             </thead>
             <tbody>
-                {% for response_item in object_list %} {# Змінив response на response_item #}
-                    <tr>
-                        <td>
-                            Лист №{{ response_item.registration.registration_number|default:"N/A" }} 
-                            від {{ response_item.registration.process_date|date:"d.m.Y" }}
-                        </td>
-                        <td>{{ response_item.registered_number }}</td>
-                        <td>{{ response_item.registered_date|date:"d.m.Y" }}</td>
-                        <td>{{ response_item.recorded_date|date:"d.m.Y H:i" }}</td>
-                        <td>{{ response_item.note|truncatewords:10|default:"-" }}</td>
-                        {# <td>
-                            <a href="#" class="btn btn-sm btn-info">Деталі</a>
-                            <a href="#" class="btn btn-sm btn-warning">Редагувати</a>
-                        </td> #}
-                    </tr>
+                {% for response_item in object_list %}
+                <tr>
+                    <td>{{ response_item.response_letter_number }}</td>
+                    <td>{{ response_item.response_letter_date|date:"d.m.Y" }}</td>
+                    <td>
+                        №{{ response_item.attestation_registration_sent.outgoing_letter_number }}
+                        від {{ response_item.attestation_registration_sent.outgoing_letter_date|date:"d.m.Y" }}
+                    </td>
+                    <td>
+                        {{ response_item.attestation_registration_sent.registered_documents.count }}
+                        {# Або, якщо потрібно кількість саме з зареєстрованими номерами: #}
+                        {# {{ response_item.attestation_registration_sent.registered_documents.filter(dsszzi_registered_number__isnull=False).count }} #}
+                    </td>
+                    <td>{{ response_item.received_by.full_name|default:"-" }}</td>
+                    <td>{{ response_item.created_at|date:"d.m.Y H:i" }}</td>
+                    {# <td> <a href="#" class="btn btn-sm btn-info">Деталі</a> </td> #}
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
-        {% include "../includes/pagination.html" %}
+    </div>
+        {% include "../includes/pagination.html" with page_obj=page_obj att_reg_id=current_filter_att_reg_id %}
     {% else %}
-        <p>Відповіді на реєстрацію актів атестації не знайдено.</p>
+        <p>Відповіді від ДССЗЗІ не знайдено.</p>
     {% endif %}
 </div>
 {% endblock %}
