@@ -235,35 +235,152 @@ class WorkRequestItem(models.Model):
         unique_together = ('request', 'oid', 'work_type') # Один ОІД не може мати двічі одну і ту ж роботу в одній заявці
         verbose_name = "Елемент заявки"
         verbose_name_plural = "Елементи заявки"
+        ordering = ['request', 'oid'] # Додано сортування
 
     def __str__(self):
-        return f"{self.oid.cipher} - {self.get_work_type_display()} ({self.get_status_display()})"
-
+        # return f"{self.oid.cipher} - {self.get_work_type_display()} ({self.get_status_display()})"
+        return f"ОІД: {self.oid.cipher} ({self.get_oid_type_display()}) - Робота: {self.get_work_type_display()} (Статус: {self.get_status_display()})"
     # Твоя логіка оновлення статусу заявки:
+    def check_and_update_status_based_on_documents(self):
+        """
+        Перевіряє, чи виконані умови для завершення цього WorkRequestItem,
+        ґрунтуючись на наявних та "виконаних" документах.
+        Викликається після збереження пов'язаного документа.
+        """
+        if self.status in [WorkRequestStatusChoices.COMPLETED, WorkRequestStatusChoices.CANCELED]:
+            return # Немає потреби в оновленні
+
+        key_document_fulfilled = False
+
+        if self.work_type == WorkTypeChoices.IK:
+            # Умова для ІК: наявність документа з duration_months=20 для цього work_request_item
+            # (припускаємо, що це "Висновок ІК")
+            try:
+                # Шукаємо тип документа "Висновок ІК" (або аналог з duration_months=20)
+                # Важливо, щоб цей DocumentType був налаштований для work_type='ІК' або 'СПІЛЬНИЙ'
+                # та мав oid_type, що відповідає self.oid.oid_type або 'СПІЛЬНИЙ'
+                key_doc_type_qs = DocumentType.objects.filter(
+                    (Q(work_type=WorkTypeChoices.IK) | Q(work_type='СПІЛЬНИЙ')),
+                    (Q(oid_type=self.oid.oid_type) | Q(oid_type='СПІЛЬНИЙ')),
+                    duration_months=20
+                )
+                if key_doc_type_qs.exists():
+                    key_doc_type = key_doc_type_qs.first() # Беремо перший знайдений, якщо їх декілька
+                    if Document.objects.filter(
+                        work_request_item=self, # Документ має бути прямо пов'язаний з цим елементом заявки
+                        oid=self.oid,
+                        document_type=key_doc_type
+                    ).exists():
+                        key_document_fulfilled = True
+                else:
+                    print(f"DEBUG: Ключовий DocumentType для IK (duration_months=20) не знайдено для OID типу {self.oid.oid_type}.")
+            except Exception as e: # Будь-яка помилка при пошуку
+                print(f"DEBUG: Помилка при пошуку DocumentType для IK: {e}")
+
+
+        elif self.work_type == WorkTypeChoices.ATTESTATION:
+            # Умова для Атестації: наявність документа з duration_months=60 (Акт атестації),
+            # який зареєстрований в ДССЗЗІ.
+            try:
+                # Шукаємо тип документа "Акт атестації" (або аналог з duration_months=60)
+                key_doc_type_qs = DocumentType.objects.filter(
+                    (Q(work_type=WorkTypeChoices.ATTESTATION) | Q(work_type='СПІЛЬНИЙ')),
+                    (Q(oid_type=self.oid.oid_type) | Q(oid_type='СПІЛЬНИЙ')),
+                    duration_months=60
+                )
+                if key_doc_type_qs.exists():
+                    key_doc_type = key_doc_type_qs.first()
+                    if Document.objects.filter(
+                        work_request_item=self, # Документ має бути прямо пов'язаний
+                        oid=self.oid,
+                        document_type=key_doc_type,
+                        dsszzi_registered_number__isnull=False, # Має бути номер реєстрації
+                        dsszzi_registered_number__exact_ne='',   # і він не порожній
+                        dsszzi_registered_date__isnull=False    # і дата реєстрації
+                    ).exists():
+                        key_document_fulfilled = True
+                else:
+                     print(f"DEBUG: Ключовий DocumentType для Атестації (duration_months=60) не знайдено для OID типу {self.oid.oid_type}.")
+            except Exception as e:
+                print(f"DEBUG: Помилка при пошуку DocumentType для Атестації: {e}")
+
+        if key_document_fulfilled:
+            if self.status != WorkRequestStatusChoices.COMPLETED:
+                self.status = WorkRequestStatusChoices.COMPLETED
+                # Зберігаємо тільки якщо статус дійсно змінився, щоб уникнути рекурсії
+                # і викликати update_request_status (який вже є в save)
+                self.save(update_fields=['status', 'updated_at'])
+                print(f"DEBUG: WorkRequestItem ID {self.id} (OID: {self.oid.cipher}) статус оновлено на COMPLETED.")
+        # Якщо ключовий документ не виконано, статус WorkRequestItem не змінюється цим методом.
+        # Логіка повернення статусу (наприклад, якщо документ видалено) тут не розглядається.
+
+   
     def save(self, *args, **kwargs):
+        """
+        Викликає оновлення статусу батьківської заявки після збереження елемента.
+        """
+        # current_status = self.status # Можна зберегти для порівняння, якщо потрібно
         super().save(*args, **kwargs)
+        # Викликаємо update_request_status тільки якщо це не створення,
+        # або якщо статус змінився (щоб уникнути зайвих викликів при масовому створенні).
+        # Однак, простіше викликати завжди, а update_request_status зробить перевірку.
         self.update_request_status()
-
     def update_request_status(self):
-        # Якщо всі елементи заявки "Виконано" або "Скасовано", то і заявка "Виконано" або "Скасовано"
-        all_items = self.request.items.all()
-        completed_items = all_items.filter(status=WorkRequestStatusChoices.COMPLETED).count()
-        canceled_items = all_items.filter(status=WorkRequestStatusChoices.CANCELED).count()
-        total_items = all_items.count()
+        """
+        Оновлює статус батьківської заявки WorkRequest на основі статусів
+        всіх її елементів WorkRequestItem.
+        """
+        work_request = self.request
+        all_items = work_request.items.all()
 
-        if completed_items + canceled_items == total_items:
-            if completed_items == total_items:
-                self.request.status = WorkRequestStatusChoices.COMPLETED
-            elif canceled_items == total_items:
-                self.request.status = WorkRequestStatusChoices.CANCELED
-            else: # Частина виконана, частина скасована - вважаємо виконаною (або можна ввести "Частково виконано")
-                self.request.status = WorkRequestStatusChoices.COMPLETED 
-        elif all_items.filter(status=WorkRequestStatusChoices.IN_PROGRESS).exists() or \
-             all_items.filter(status=WorkRequestStatusChoices.PENDING).exists():
-            self.request.status = WorkRequestStatusChoices.IN_PROGRESS # Якщо хоча б один елемент в роботі або очікує
+        if not all_items.exists():
+            # Якщо заявка не має елементів (наприклад, щойно створена і ще не додані, або всі видалені)
+            # Можна встановити PENDING або залишити як є, залежно від бізнес-логіки.
+            # Якщо це відбувається після видалення останнього елемента, можливо, заявку треба скасувати або повернути в PENDING.
+            if work_request.status != WorkRequestStatusChoices.PENDING: # Якщо вже не PENDING
+                work_request.status = WorkRequestStatusChoices.PENDING # або інший логічний статус
+                work_request.save(update_fields=['status', 'updated_at'])
+            return
+
+        # Перевіряємо, чи всі елементи завершені або скасовані
+        is_all_items_processed = all(
+            item.status in [WorkRequestStatusChoices.COMPLETED, WorkRequestStatusChoices.CANCELED]
+            for item in all_items
+        )
+
+        new_request_status = None
+
+        if is_all_items_processed:
+            # Якщо всі елементи оброблені, визначаємо фінальний статус заявки
+            if all_items.filter(status=WorkRequestStatusChoices.COMPLETED).exists():
+                # Якщо є хоча б один виконаний елемент, заявка вважається виконаною
+                new_request_status = WorkRequestStatusChoices.COMPLETED
+            elif all_items.filter(status=WorkRequestStatusChoices.CANCELED).count() == all_items.count():
+                # Якщо всі елементи скасовані (і немає виконаних)
+                new_request_status = WorkRequestStatusChoices.CANCELED
+            else:
+                # Ситуація, коли всі CANCELED, але був хоча б один COMPLETED, вже покрита першою умовою.
+                # Якщо всі CANCELED і не було COMPLETED - це друга умова.
+                # Якщо є суміш COMPLETED і CANCELED, то COMPLETED має пріоритет.
+                # Якщо логіка інша (напр. "Частково виконано"), її треба додати.
+                 new_request_status = WorkRequestStatusChoices.COMPLETED # За замовчуванням для змішаних processed
         else:
-            self.request.status = WorkRequestStatusChoices.PENDING # За замовчуванням
-        self.request.save()
+            # Якщо не всі елементи оброблені, перевіряємо наявність "В роботі" або "Очікує"
+            if all_items.filter(status=WorkRequestStatusChoices.IN_PROGRESS).exists():
+                new_request_status = WorkRequestStatusChoices.IN_PROGRESS
+            elif all_items.filter(status=WorkRequestStatusChoices.PENDING).exists():
+                new_request_status = WorkRequestStatusChoices.PENDING
+            # Можливий випадок: немає IN_PROGRESS, немає PENDING, але не всі processed.
+            # Це може статися, якщо є власні статуси. Для стандартних це малоймовірно.
+            # У такому разі, можна залишити поточний статус заявки або встановити PENDING.
+
+        if new_request_status and work_request.status != new_request_status:
+            work_request.status = new_request_status
+            work_request.save(update_fields=['status', 'updated_at'])
+            print(f"DEBUG: WorkRequest ID {work_request.id} статус оновлено на {work_request.status}.")
+
+# Потрібно також імпортувати OID, WorkRequest, Person, AttestationRegistration вище в файлі models.py
+# from .models import OID, WorkRequest, Person, AttestationRegistration (приклад, залежить від структури)
 
 class DocumentType(models.Model):
     """
@@ -427,7 +544,7 @@ class Document(models.Model):
     process_date = models.DateField(verbose_name="Дата опрацювання") # Дата внесення документа
     work_date = models.DateField(verbose_name="Дата проведення робіт") # Дата, коли роботи фактично проводилися
     author = models.ForeignKey(
-        Person, 
+        'Person', # Використовуємо рядок
         on_delete=models.SET_NULL, 
         null=True, 
         blank=True, 
@@ -443,7 +560,7 @@ class Document(models.Model):
     # --- НОВІ ПОЛЯ для реєстрації в ДССЗЗІ (для актів атестації) ---
     # Посилання на запис про відправку (вихідний лист)
     attestation_registration_sent = models.ForeignKey(
-        AttestationRegistration,
+        'AttestationRegistration', # Використовуємо рядок
         on_delete=models.SET_NULL, # Якщо запис про відправку видаляється, інформація в документі залишається, але без зв'язку
         null=True,
         blank=True,
@@ -467,8 +584,8 @@ class Document(models.Model):
     # dsszzi_document_status = models.CharField(max_length=20, choices=..., null=True, blank=True)
 
     def save(self, *args, **kwargs):
+         # Логіка обчислення expiration_date
         if self.document_type and self.document_type.has_expiration and self.document_type.duration_months > 0 and self.work_date:
-            # Приблизне обчислення, можна уточнити за допомогою dateutil.relativedelta
             from dateutil.relativedelta import relativedelta 
             self.expiration_date = self.work_date + relativedelta(months=self.document_type.duration_months)
         else:
@@ -476,6 +593,12 @@ class Document(models.Model):
              if not (self.document_type and self.document_type.has_expiration and self.document_type.duration_months > 0):
                 self.expiration_date = None # Очищаємо, якщо умови не виконані
         super().save(*args, **kwargs)
+        if self.work_request_item:
+            # Переконуємося, що work_request_item ще не COMPLETED або CANCELED,
+            # і що тип роботи work_request_item відповідає типу роботи документа (або документ "СПІЛЬНИЙ")
+            if self.work_request_item.status not in [WorkRequestStatusChoices.COMPLETED, WorkRequestStatusChoices.CANCELED] and \
+               (self.work_request_item.work_type == self.document_type.work_type or self.document_type.work_type == 'СПІЛЬНИЙ'):
+                self.work_request_item.check_and_update_status_based_on_documents()
 
     def __str__(self):
         return f"{self.document_type.name} / {self.document_number} (ОІД: {self.oid.cipher})"
@@ -659,3 +782,7 @@ class TechnicalTask(models.Model):
 
     def __str__(self):
         return f"ТЗ №{self.input_number} для {self.oid.cipher}"
+class Meta:
+        verbose_name = "Опрацьований ТЗ"
+        verbose_name_plural = "Опрацьовані ТЗ"
+        ordering = ['-input_date', '-read_till_date']
