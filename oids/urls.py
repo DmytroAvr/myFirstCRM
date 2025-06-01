@@ -33,16 +33,15 @@ urlpatterns = [
 
 
     
-    # URL для форми внесення відповіді ДССЗЗІ
-    path('attestation-response/record/', views.record_attestation_response_view, name='record_attestation_response'),
-    # Якщо ви хочете передавати ID відправки в URL для форми відповіді:
-    path('attestation-registration/<int:att_reg_sent_id>/record-response/', views.record_attestation_response_view, name='record_attestation_response_for_registration'),
+    
+    path('attestation-registration/send/', views.send_attestation_for_registration_view, name='send_attestation_for_registration'), # URL для форми створення нової відправки на реєстрацію
+    path('attestation-response/record/', views.record_attestation_response_view, name='record_attestation_response'), # URL для форми внесення відповіді ДССЗЗІ
+    path('attestation-registration/<int:att_reg_sent_id>/record-response/', views.record_attestation_response_view, name='record_attestation_response_for_registration'), # передавати ID відправки в URL для форми відповіді
 
-    # URL для форми створення нової відправки на реєстрацію
-    path('attestation-registration/send/', views.send_attestation_for_registration_view, name='send_attestation_for_registration'),
-
+    
 
 
+ 
 
 	path('summary-hub/', views.summary_information_hub_view, name='summary_information_hub'),
     # Далі будемо додавати URL-и для кожного списку моделей

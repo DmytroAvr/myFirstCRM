@@ -274,8 +274,11 @@ from .models import Document, OID, Unit, WorkRequestItem, DocumentType, Person
 # Форма для одного документа (буде використовуватися у формсеті)
 class DocumentItemForm(forms.ModelForm):
     document_type = forms.ModelChoiceField(
-        queryset=DocumentType.objects.all().order_by('name'), # Поки що всі, потім буде фільтрація
-        label="Тип документа",
+        # queryset=DocumentType.objects.all().order_by('name'), # Поки що всі, потім буде фільтрація
+        queryset=DocumentType.objects.all().extra(
+            select={'oid_type_order': "CASE oid_type WHEN 'СПІЛЬНИЙ' THEN 1 WHEN 'ПЕМІН' THEN 2 WHEN 'МОВНА' THEN 3 ELSE 4 END"}
+        ).order_by('oid_type_order', 'name'),
+		label="Тип документа",
         widget=forms.Select(attrs={'class': 'form-select tomselect-doc-type'}), # Клас для JS
         required=True
     )
@@ -553,7 +556,7 @@ class OIDStatusUpdateForm(forms.Form):
         required=True
     )
     reason = forms.CharField(
-        label="Причина зміни статусу",
+        label="Причина зміни статусу (Обов'язково)",
         widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         required=True
     )

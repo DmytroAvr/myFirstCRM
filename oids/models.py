@@ -33,7 +33,7 @@ class OIDTypeChoices(models.TextChoices):
 class WorkTypeChoices(models.TextChoices):
     ATTESTATION = 'Атестація', 'Атестація'
     IK = 'ІК', 'ІК'
-
+    
 class DocumentReviewResultChoices(models.TextChoices): 
     READ = 'працювати', 'Опрацювати'
     AWAITING_DOCS = 'очікує в папері', 'Очікує в папері'
@@ -270,15 +270,18 @@ class DocumentType(models.Model):
     Тип документа
     Для динамічного визначення, які документи очікуються при опрацюванні конкретного ОІД.
     """
+    # oid_type = models.CharField(max_length=30, choices=OIDTypeChoices.choices, default=OIDTypeChoices.SAMEDOC, verbose_name="Тип ОІД")
+    # work_type = models.CharField(max_length=30, choices=WorkTypeChoices.choices, default=WorkTypeChoices.SAMEDOC, verbose_name="Тип робіт")
+
     oid_type = models.CharField(
         "Тип ОІД",
         max_length=20,
-        choices=[('МОВНА', 'МОВНА'), ('ПЕМІН', 'ПЕМІН')],
+        choices=[('МОВНА', 'МОВНА'), ('ПЕМІН', 'ПЕМІН'), ('СПІЛЬНИЙ', 'СПІЛЬНИЙ')],
     )
     work_type = models.CharField(
         "Тип робіт",
         max_length=20,
-        choices=[('Атестація', 'Атестація'), ('ІК', 'ІК')], 
+        choices=[('Атестація', 'Атестація'), ('ІК', 'ІК'), ('СПІЛЬНИЙ', 'СПІЛЬНИЙ')], 
     )
     name = models.CharField("Назва документа", max_length=100) # Прибрав unique=True, оскільки назва може повторюватись для різних типів ОІД/робіт (наприклад, "План пошуку ЗП")
     has_expiration = models.BooleanField("Має термін дії", default=False) # Змінив на Boolean

@@ -20,9 +20,6 @@ from .forms import ( TripForm, DocumentProcessingMainForm, DocumentItemFormSet, 
 )
 
 
-
-
-
 # Твоя допоміжна функція (залишається без змін, але буде викликатися в AJAX view)
 def get_last_document_expiration_date(oid_instance, document_name_keyword, work_type_choice=None):
     try:
@@ -45,7 +42,6 @@ def get_last_document_expiration_date(oid_instance, document_name_keyword, work_
     except Exception as e:
         print(f"Помилка get_last_document_expiration_date для ОІД {oid_instance.cipher if oid_instance else 'N/A'} ({document_name_keyword}): {e}")
         return None
-
 
 def ajax_get_oid_current_status(request):
     oid_id_str = request.GET.get('oid_id')
@@ -148,7 +144,6 @@ def ajax_load_oids_for_multiple_units(request):
             
     return JsonResponse(oids_data, safe=False)
 
-
 def ajax_load_work_request_items_for_oid(request):
     oid_id_str = request.GET.get('oid_id')
     items_data = []
@@ -217,8 +212,6 @@ def ajax_load_document_types_for_oid_and_work(request):
             return JsonResponse({'error': str(e)}, status=500)
             
     return JsonResponse(doc_types_data, safe=False)
-
-
 # AJAX view для завантаження ОІДів для Select2 у формах (якщо потрібно)
 # Цей view НЕ використовується для оновлення списків ОІД на головній панелі в цьому сценарії
 def ajax_load_oids_for_unit(request):
@@ -237,7 +230,8 @@ def ajax_load_oids_for_unit(request):
                     'id': oid.id,
                     'cipher': oid.cipher, 
                     'full_name': oid.full_name or "", # Повертаємо порожній рядок, якщо full_name None
-                    # Додайте інші поля, якщо вони потрібні для відображення в TomSelect у JS:
+					'oid_type': oid.oid_type, # <--- ПЕРЕВІРТЕ ЦЕЙ РЯДОК!
+				    # Додайте інші поля, якщо вони потрібні для відображення в TomSelect у JS:
                     # наприклад, 'unit_code': oid.unit.code (якщо unit вже завантажено через select_related у запиті)
                 })
         except ValueError: # На випадок, якщо unit_id не є валідним числом (хоча isdigit вже перевіряє)
@@ -250,7 +244,6 @@ def ajax_load_oids_for_unit(request):
 
 # oids/urls.py - не забудьте додати:
 # path('ajax/load-oids-for-unit/', views.ajax_load_oids_for_unit, name='ajax_load_oids_for_unit'),
-
 
 def ajax_load_work_requests_for_oids(request):
     oid_ids_str = request.GET.getlist('oid_ids[]') # Отримуємо список ID ОІДів
@@ -323,8 +316,6 @@ def ajax_create_oid_view(request):
 
 
 
-
-
 def main_dashboard(request):
     """
     Головна сторінка. Фільтрація ВЧ -> ОІД відбувається на сервері 
@@ -391,8 +382,6 @@ def main_dashboard(request):
     }
     return render(request, 'oids/main_dashboard.html', context)
 
-
-
 # ... (решта ваших views: oid_detail_view, форми для додавання тощо) ...
 # Не забудьте додати oid_detail_view з попередньої відповіді.
 def oid_detail_view(request, oid_id):
@@ -405,26 +394,27 @@ def oid_detail_view(request, oid_id):
     )
     
     status_changes = oid.status_changes.select_related(
-        'initiating_document__document_type',
+        'initiating_document__document_type', # initiating_document може бути null
         'changed_by'
     ).order_by('-changed_at')
 
-    work_request_items = oid.work_request_items.select_related(
-        'request',
-        'request__unit'
-    ).order_by('-request__incoming_date')
-    
     work_requests_for_oid = WorkRequest.objects.filter(
         items__oid=oid
+    ).select_related('unit').prefetch_related(
+        Prefetch('items', queryset=WorkRequestItem.objects.filter(oid=oid).select_related('oid'))
     ).distinct().order_by('-incoming_date')
-
+    
     technical_tasks = oid.technical_tasks.select_related('reviewed_by').order_by('-input_date')
 
     documents = oid.documents.select_related(
         'document_type',
         'author',
-        'work_request_item__request'
+        'work_request_item__request',
+        'attestation_registration_sent' # Додаємо для доступу до даних відправки
     ).order_by('-process_date', '-work_date')
+
+    # Отримуємо тільки документи типу "Акт атестації" для цього ОІД для секції реєстрації
+    attestation_acts_for_oid = documents.filter(document_type__name__icontains='Акт атестації')
 
     trips_for_oid = oid.trips.prefetch_related(
         'units',
@@ -432,16 +422,15 @@ def oid_detail_view(request, oid_id):
         'work_requests'
     ).order_by('-start_date')
     
-    attestation_registrations_for_oid = AttestationRegistration.objects.filter(
-        attestation_items__oid=oid
-    ).prefetch_related(
-        Prefetch('attestation_items', queryset=AttestationItem.objects.filter(oid=oid).select_related('document__document_type')),
-        'response'
-    ).distinct().order_by('-process_date')
-    
-    trip_results_for_oid = TripResultForUnit.objects.filter(
-        oids=oid
-    ).select_related('trip').prefetch_related('units', 'documents__document_type').order_by('-process_date')
+    # Видаляємо логіку, пов'язану з AttestationItem, оскільки її більше немає
+    # attestation_registrations_for_oid = AttestationRegistration.objects.filter(
+    #     items_sent__attestation_document__oid=oid # Оновлений шлях доступу через Document
+    # ).prefetch_related(
+    #     Prefetch('items_sent', queryset=Document.objects.filter(oid=oid, document_type__name__icontains='Акт атестації').select_related('document_type')),
+    #     'response_received' # related_name з AttestationResponse
+    # ).distinct().order_by('-outgoing_letter_date')
+    # Натомість, ми будемо використовувати attestation_acts_for_oid та їх зв'язок з AttestationRegistration
+
 
     last_attestation_expiration = get_last_document_expiration_date(oid, 'Акт атестації', WorkTypeChoices.ATTESTATION)
     last_ik_expiration = get_last_document_expiration_date(oid, 'Висновок', WorkTypeChoices.IK)
@@ -451,18 +440,17 @@ def oid_detail_view(request, oid_id):
         'oid': oid,
         'status_changes': status_changes,
         'work_requests_for_oid': work_requests_for_oid,
-        'work_request_items_for_oid': work_request_items,
+        # 'work_request_items_for_oid': work_request_items, # Це тепер всередині work_requests_for_oid
         'technical_tasks': technical_tasks,
-        'documents': documents,
+        'documents': documents, # Всі документи
+        'attestation_acts_for_oid': attestation_acts_for_oid, # Тільки акти атестації для цього ОІД
         'trips_for_oid': trips_for_oid,
-        'attestation_registrations_for_oid': attestation_registrations_for_oid,
-        'trip_results_for_oid': trip_results_for_oid,
+        # 'attestation_registrations': attestation_registrations_for_oid, # Видалено, використовуємо attestation_acts_for_oid
         'last_attestation_expiration': last_attestation_expiration,
         'last_ik_expiration': last_ik_expiration,
         'last_prescription_expiration': last_prescription_expiration,
     }
     return render(request, 'oids/oid_detail.html', context)
-
 
 
 # ... (main_dashboard, ajax_load_oids_for_unit_categorized, ajax_load_oids_for_unit, oid_detail_view) ...
@@ -611,7 +599,6 @@ def add_work_request_view(request):
         # **context_modal_choices
     }
     return render(request, 'oids/forms/add_work_request_form.html', context)
-
 
 def add_document_processing_view(request, oid_id=None, work_request_item_id=None):
     selected_oid_instance = None
@@ -765,9 +752,8 @@ def update_oid_status_view(request, oid_id_from_url=None):
     }
     return render(request, 'oids/forms/update_oid_status_form.html', context)
 
+
 # list info 
-
-
 def summary_information_hub_view(request):
     """
     Сторінка-хаб з посиланнями на списки об'єктів різних моделей.

@@ -213,7 +213,6 @@
             <label for="{{ item_form.note.id_for_label }}" class="form-label">{{ item_form.note.label }}:</label>
             {{ item_form.note }}
         </div>
-        <hr class="my-3">
     </div>
     {% endwith %}
     {% endspaceless %}
@@ -434,8 +433,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const container = document.getElementById('document-items-formset-container');
         const addButton = document.getElementById('add-document-item-button');
         const emptyFormTemplateElement = document.getElementById('document-item-empty-form-template');
-        let formsetPrefix;
-        let totalFormsInput; /*...*/ let minFormsCount; let maxFormsCount; let canDeleteForms;
+        // ... (formsetPrefix, totalFormsInput, etc. ініціалізуються в init) ...
+        let formsetPrefix, totalFormsInput, minFormsCount, maxFormsCount, canDeleteForms;
 		
 	
 		function initializeTomSelectForDocTypeInForm(formDiv) {

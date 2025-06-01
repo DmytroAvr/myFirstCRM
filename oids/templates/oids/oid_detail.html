@@ -223,35 +223,51 @@
 {% endif %}
 
 <h3>Реєстрації актів атестації</h3>
-{% if attestation_registrations %}
-    <table>
-        <thead>
+{% if attestation_acts_for_oid %}
+    <table class="table table-sm table-bordered"> {# Додав table-sm та table-bordered для кращого вигляду #}
+        <thead class="thead-light"> {# Змінив thead-dark на thead-light #}
             <tr>
-                <th>Дата відправки на реєстрацію</th>
-                <th>Реєстраційний номер листа</th>
-                <th>Акти атестації (документи)</th>
-                <th>Відповідь ДССЗЗІ</th>
+                <th>Акт атестації (документ №)</th>
+                <th>Дата акту</th>
+                <th>Статус відправки / Вих. лист</th>
+                <th>Номер реєстрації ДССЗЗІ</th>
+                <th>Дата реєстрації ДССЗЗІ</th>
+                <th>Лист-відповідь ДССЗЗІ</th>
             </tr>
         </thead>
         <tbody>
-            {% for reg in attestation_registrations %}
+            {% for act_doc in attestation_acts_for_oid %}
                 <tr>
-                    <td>{{ reg.process_date|date:"d.m.Y" }}</td>
-                    <td>{{ reg.registration_number|default:"-" }}</td>
                     <td>
-                        <ul>
-                            {% for item in reg.attestation_items.all %}
-                                {% if item.oid == oid %} {# Перевіряємо, чи це елемент для поточного ОІД #}
-                                    <li>Акт: {{ item.document.document_number }} (від {{ item.document.work_date|date:"d.m.Y" }})</li>
-                                {% endif %}
-                            {% endfor %}
-                        </ul>
+                        <a href="#doc-{{ act_doc.id }}">{{ act_doc.document_number }}</a>
+                    </td>
+                    <td>{{ act_doc.work_date|date:"d.m.Y" }}</td>
+                    <td>
+                        {% if act_doc.attestation_registration_sent %}
+                            Відправлено листом 
+                            №{{ act_doc.attestation_registration_sent.outgoing_letter_number }}
+                            від {{ act_doc.attestation_registration_sent.outgoing_letter_date|date:"d.m.Y" }}
+                            ({{ act_doc.attestation_registration_sent.get_status_display }})
+                        {% else %}
+                            Не відправлено
+                        {% endif %}
+                    </td>
+                    <td>{{ act_doc.dsszzi_registered_number|default:"-" }}</td>
+                    <td>
+                        {% if act_doc.dsszzi_registered_date %}
+                            {{ act_doc.dsszzi_registered_date|date:"d.m.Y" }}
+                        {% else %}
+                            -
+                        {% endif %}
                     </td>
                     <td>
-                        {% if reg.response %}
-                            Зареєстровано №{{ reg.response.registered_number }} від {{ reg.response.registered_date|date:"d.m.Y" }}
-                        {% else %}
+                        {% if act_doc.attestation_registration_sent and act_doc.attestation_registration_sent.response_received %}
+                            Відповідь №{{ act_doc.attestation_registration_sent.response_received.response_letter_number }}
+                            від {{ act_doc.attestation_registration_sent.response_received.response_letter_date|date:"d.m.Y" }}
+                        {% elif act_doc.attestation_registration_sent and act_doc.attestation_registration_sent.status == 'sent' %}
                             Очікується
+                        {% else %}
+                            -
                         {% endif %}
                     </td>
                 </tr>
@@ -259,8 +275,12 @@
         </tbody>
     </table>
 {% else %}
-    <p>Реєстрації актів атестації для цього ОІД відсутні.</p>
+    <p>Акти атестації для цього ОІД, що потребують або пройшли реєстрацію, відсутні.</p>
 {% endif %}
+		{# Важливо: для посилань типу <a href="...#req-{{ doc.work_request_item.request.id }}"> #}
+		{# Переконайтеся, що у відповідних таблицях (наприклад, для Заявок) є елементи з такими id #}
+		{# Наприклад, для таблиці Заявок: #}
+		{# <tr id="req-{{ request_obj.id }}"> #}
 
 {% endblock %}
 
