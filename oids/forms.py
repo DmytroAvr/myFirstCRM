@@ -308,13 +308,13 @@ class DocumentProcessingMainForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-select tomselect-field', 'id': 'id_proc_form_unit'})
     )
     oid = forms.ModelChoiceField(
-        queryset=OID.objects.none(), # Заповнюється динамічно JS
+        queryset=OID.objects.none(), # Початково порожній
         label="Об'єкт інформаційної діяльності (ОІД)",
         widget=forms.Select(attrs={'class': 'form-select tomselect-field', 'id': 'id_proc_form_oid'}),
         required=True
     )
     work_request_item = forms.ModelChoiceField(
-        queryset=WorkRequestItem.objects.none(), # Заповнюється динамічно JS
+        queryset=WorkRequestItem.objects.none(), # Початково порожній
         label="Елемент заявки (якщо застосовно)",
         widget=forms.Select(attrs={'class': 'form-select tomselect-field', 'id': 'id_proc_form_work_request_item'}),
         required=False 
@@ -337,31 +337,75 @@ class DocumentProcessingMainForm(forms.Form):
     )
 
     def __init__(self, *args, **kwargs):
-        initial_oid_instance = kwargs.pop('initial_oid', None)
-        initial_work_request_item_instance = kwargs.pop('initial_work_request_item', None)
+        # Видаляємо кастомні kwargs перед викликом super().__init__
+        initial_oid_instance_from_view = kwargs.pop('initial_oid', None)
+        initial_wri_instance_from_view = kwargs.pop('initial_work_request_item', None) # Не використовується напряму тут
         
         super().__init__(*args, **kwargs)
+        print(f"DEBUG DocumentProcessingMainForm __init__ called. Args: {args}, Kwargs: {kwargs}")
+        print(f"DEBUG Form is_bound: {self.is_bound}")
+        if self.is_bound:
+            print(f"DEBUG Form data: {self.data}")
+        
+        # self.add_prefix(field_name) використовується для отримання правильного імені поля з POST, якщо форма має префікс
+        # У вашому view: main_form = DocumentProcessingMainForm(request.POST, prefix='main')
+        # Тому поля будуть 'main-unit', 'main-oid' і т.д.
 
-        # Встановлення початкових значень та queryset для головної форми
-        if initial_oid_instance:
-            self.fields['unit'].initial = initial_oid_instance.unit
-            self.fields['oid'].queryset = OID.objects.filter(unit=initial_oid_instance.unit).order_by('cipher')
-            self.fields['oid'].initial = initial_oid_instance
-            
-            if initial_work_request_item_instance and initial_work_request_item_instance.oid == initial_oid_instance:
-                self.fields['work_request_item'].queryset = WorkRequestItem.objects.filter(oid=initial_oid_instance).select_related('request').order_by('-request__incoming_date')
-                self.fields['work_request_item'].initial = initial_work_request_item_instance
-            else: # Якщо є ОІД, але немає конкретного WRI, завантажуємо всі WRI для цього ОІД
-                self.fields['work_request_item'].queryset = WorkRequestItem.objects.filter(oid=initial_oid_instance).select_related('request').order_by('-request__incoming_date')
+        selected_unit_id = None
+        if self.is_bound: # Обробка POST або GET з даними форми
+            unit_id_from_data = self.data.get(self.add_prefix('unit'))
+            print(f"DEBUG Unit ID from self.data['{self.add_prefix('unit')}']: {unit_id_from_data}")
+            if unit_id_from_data and unit_id_from_data.isdigit():
+                selected_unit_id = int(unit_id_from_data)
+        elif initial_oid_instance_from_view: # Для GET-запиту з початковими даними з view
+            if initial_oid_instance_from_view.unit:
+                selected_unit_id = initial_oid_instance_from_view.unit.id
+                self.fields['unit'].initial = initial_oid_instance_from_view.unit # Встановлюємо initial для поля unit
+            print(f"DEBUG Unit ID from initial_oid_instance_from_view: {selected_unit_id}")
+        
+        # Оновлення queryset для поля ОІД
+        if selected_unit_id:
+            print(f"DEBUG Setting OID queryset for unit_id: {selected_unit_id}")
+            self.fields['oid'].queryset = OID.objects.filter(unit_id=selected_unit_id).order_by('cipher')
+        else:
+            print("DEBUG No unit selected, OID queryset remains .none()")
+            self.fields['oid'].queryset = OID.objects.none()
 
-        elif self.is_bound: # Якщо форма обробляє POST-дані
-            unit_id = self.data.get('unit')
-            oid_id = self.data.get('oid')
-            if unit_id:
-                self.fields['oid'].queryset = OID.objects.filter(unit_id=unit_id).order_by('cipher')
-            if oid_id:
-                 self.fields['work_request_item'].queryset = WorkRequestItem.objects.filter(oid_id=oid_id).select_related('request').order_by('-request__incoming_date')
+        # Встановлення initial для ОІД, якщо він був переданий з view (для GET)
+        if not self.is_bound and initial_oid_instance_from_view:
+             self.fields['oid'].initial = initial_oid_instance_from_view
+             print(f"DEBUG Set initial OID: {initial_oid_instance_from_view.id if initial_oid_instance_from_view else 'None'}")
 
+
+        # Оновлення queryset для поля Елемент Заявки (work_request_item)
+        selected_oid_id_for_wri = None
+        if self.is_bound:
+            oid_id_from_data_for_wri = self.data.get(self.add_prefix('oid'))
+            print(f"DEBUG OID ID for WRI from self.data['{self.add_prefix('oid')}']: {oid_id_from_data_for_wri}")
+            if oid_id_from_data_for_wri and oid_id_from_data_for_wri.isdigit():
+                selected_oid_id_for_wri = int(oid_id_from_data_for_wri)
+        elif initial_oid_instance_from_view: # Для GET
+            selected_oid_id_for_wri = initial_oid_instance_from_view.id
+            print(f"DEBUG OID ID for WRI from initial_oid_instance_from_view: {selected_oid_id_for_wri}")
+
+        if selected_oid_id_for_wri:
+            print(f"DEBUG Setting WRI queryset for oid_id: {selected_oid_id_for_wri}")
+            self.fields['work_request_item'].queryset = WorkRequestItem.objects.filter(
+                oid_id=selected_oid_id_for_wri
+            ).select_related('request').order_by('-request__incoming_date')
+        else:
+            print("DEBUG No OID selected for WRI, WRI queryset remains .none()")
+            self.fields['work_request_item'].queryset = WorkRequestItem.objects.none()
+        
+        # Встановлення initial для WorkRequestItem, якщо він був переданий з view (для GET)
+        # і належить до initial_oid_instance_from_view
+        if not self.is_bound and initial_wri_instance_from_view:
+            if initial_oid_instance_from_view and initial_wri_instance_from_view.oid == initial_oid_instance_from_view:
+                self.fields['work_request_item'].initial = initial_wri_instance_from_view
+                print(f"DEBUG Set initial WRI: {initial_wri_instance_from_view.id if initial_wri_instance_from_view else 'None'}")
+            else:
+                print("DEBUG Initial WRI not set because its OID doesn't match initial_oid_instance_from_view.")
+                
 # Створюємо формсет для DocumentItemForm
 # extra=1 - одна порожня форма за замовчуванням
 DocumentItemFormSet = formset_factory(DocumentItemForm, extra=1, can_delete=True)
@@ -370,27 +414,40 @@ DocumentItemFormSet = formset_factory(DocumentItemForm, extra=1, can_delete=True
 
 # --- Форма для створення "Відправки на реєстрацію" ---
 class AttestationRegistrationSendForm(forms.ModelForm):
-    # Поле для вибору документів типу "Акт атестації", які ще не були відправлені
-    # або для яких ще не отримано остаточну відповідь (залежить від вашої логіки).
-    attestation_acts = forms.ModelMultipleChoiceField(
-        queryset=Document.objects.filter(
-            document_type__name__icontains='Акт атестації', # Обираємо тільки "Акти атестації"
-            attestation_registration_sent__isnull=True # Тільки ті, що ще не включені в іншу відправку
-            # Можна додати інші фільтри, наприклад, за статусом ОІД, до якого належить акт
-        ).select_related('oid__unit', 'document_type').order_by('oid__unit__code', 'oid__cipher', '-work_date'),
-        widget=forms.SelectMultiple(attrs={'class': 'form-select tomselect-field', 'size': '10'}),
-        label="Оберіть Акти Атестації для відправки",
-        required=True
+    unit = forms.ModelChoiceField(
+        queryset=Unit.objects.all().order_by('code'),
+        label="1. Військова частина",
+        widget=forms.Select(attrs={'class': 'form-select tomselect-field', 'id': 'id_att_reg_send_unit'}),
+        empty_label="Оберіть ВЧ...",
+        help_text="Оберіть військову частину, для ОІДів якої будуть відправлені акти."
+    )
+    
+    oid = forms.ModelChoiceField(
+        queryset=OID.objects.none(), # Заповнюється динамічно JS
+        label="2. Об'єкт інформаційної діяльності (ОІД)",
+        widget=forms.Select(attrs={'class': 'form-select tomselect-field', 'id': 'id_att_reg_send_oid'}),
+        empty_label="Спочатку оберіть ВЧ...",
+        required=True, # Потрібно обрати ОІД, щоб побачити його акти
+        help_text="Оберіть ОІД, акти якого потрібно відправити."
     )
 
+    attestation_acts = forms.ModelMultipleChoiceField(
+        queryset=Document.objects.none(), # Заповнюється динамічно JS
+        label="3. Акти Атестації для відправки",
+        widget=forms.SelectMultiple(attrs={'class': 'form-select tomselect-field', 'id': 'id_att_reg_send_acts', 'size': '8'}),
+        required=True,
+        help_text="Оберіть один або декілька Актів Атестації для цього ОІД, які ще не були відправлені."
+    )
+
+    # Інші поля залишаються, як у вашій моделі AttestationRegistration
+    # Поле 'units' (ManyToMany) з моделі ми будемо заповнювати у view, тому його тут немає
     class Meta:
         model = AttestationRegistration
         fields = [
             'outgoing_letter_number', 
             'outgoing_letter_date', 
             'sent_by', 
-            'units', # Якщо ви хочете, щоб користувач міг явно вказати ВЧ, до яких це стосується
-                     # Або це поле можна заповнювати автоматично на основі ВЧ обраних актів
+            # 'units', # Заповнимо у view
             'note', 
             'attachment'
         ]
@@ -398,38 +455,44 @@ class AttestationRegistrationSendForm(forms.ModelForm):
             'outgoing_letter_number': forms.TextInput(attrs={'class': 'form-control'}),
             'outgoing_letter_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'sent_by': forms.Select(attrs={'class': 'form-select tomselect-field'}),
-            'units': forms.SelectMultiple(attrs={'class': 'form-select tomselect-field', 'size': '5'}), # Якщо units залишається
             'note': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
             'attachment': forms.FileInput(attrs={'class': 'form-control'}),
+        }
+        labels = {
+            'outgoing_letter_number': "Вихідний номер супровідного листа",
+            'outgoing_letter_date': "Дата вихідного супровідного листа",
+            'sent_by': "Хто відправив (підготував лист)",
+            'note': "Примітки до відправки",
+            'attachment': "Скан-копія супровідного листа"
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # self.fields['sent_by'].queryset = Person.objects.filter(is_active=True) # Вже встановлено в моделі, але для прикладу
-        # self.fields['units'].queryset = Unit.objects.all().order_by('code') # Вже встановлено в моделі
-
-    def save(self, commit=True):
-        # Спершу зберігаємо сам об'єкт AttestationRegistration
-        registration_instance = super().save(commit=False)
         
-        # Якщо поле 'units' заповнюється вручну, його потрібно зберегти після commit=False, якщо це M2M
-        # Але якщо воно заповнюється автоматично, то логіка буде іншою.
-        # Поки що припускаємо, що units обираються у формі.
+        # Якщо форма обробляє POST-дані, потрібно оновити querysets для валідації
+        if self.is_bound:
+            unit_id = self.data.get(self.add_prefix('unit'))
+            oid_id = self.data.get(self.add_prefix('oid'))
 
-        if commit:
-            registration_instance.save() # Зберігаємо registration_instance, щоб отримати ID
-            self.save_m2m() # Для поля units, якщо воно ManyToMany
-
-            # Тепер для кожного обраного документа "Акт атестації" оновлюємо його поле
-            # attestation_registration_sent, пов'язуючи його з щойно створеною відправкою.
-            selected_acts = self.cleaned_data.get('attestation_acts', [])
-            for act_document in selected_acts:
-                act_document.attestation_registration_sent = registration_instance
-                # Можливо, потрібно оновити статус самого документа або ОІД, якщо це передбачено
-                act_document.save(update_fields=['attestation_registration_sent', 'updated_at'])
-        
-        return registration_instance
-
+            if unit_id and unit_id.isdigit():
+                self.fields['oid'].queryset = OID.objects.filter(unit_id=int(unit_id)).order_by('cipher')
+            
+            if oid_id and oid_id.isdigit():
+                document_type_act_att = DocumentType.objects.filter(name__icontains='Акт атестації').first()
+                if document_type_act_att:
+                    self.fields['attestation_acts'].queryset = Document.objects.filter(
+                        oid_id=int(oid_id),
+                        document_type=document_type_act_att,
+                        attestation_registration_sent__isnull=True 
+                        # Тут можна додати додаткові фільтри статусу ОІД, якщо потрібно
+                    ).order_by('-work_date')
+                else:
+                    self.fields['attestation_acts'].queryset = Document.objects.none()
+            
+            # Для поля units (M2M в моделі), якщо воно було б у формі,
+            # Django б сам підхопив значення з POST, якщо віджет SelectMultiple.
+            # Оскільки ми його прибрали, то нічого тут для нього не робимо.
+            
 
 # --- Форма для внесення даних з "Відповіді ДССЗЗІ" ---
 # Це буде головна форма

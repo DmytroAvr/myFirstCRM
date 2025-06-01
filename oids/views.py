@@ -276,6 +276,43 @@ def ajax_load_work_requests_for_oids(request):
             
     return JsonResponse(work_requests_data, safe=False)
 
+def ajax_load_attestation_acts_for_oid(request):
+    oid_id_str = request.GET.get('oid_id')
+    acts_data = []
+
+    if oid_id_str and oid_id_str.isdigit():
+        oid_id = int(oid_id_str)
+        try:
+            # Знаходимо тип документа "Акт атестації"
+            # Краще мати більш надійний спосіб ідентифікації типу, наприклад, по slug або константі
+            attestation_act_doc_type = DocumentType.objects.filter(duration_months=60).first()
+            
+            if attestation_act_doc_type:
+                # Обираємо документи типу "Акт атестації" для даного ОІД,
+                # які ще не були відправлені на реєстрацію
+                acts_queryset = Document.objects.filter(
+                    oid_id=oid_id,
+                    document_type=attestation_act_doc_type,
+                    attestation_registration_sent__isnull=True # Ключовий фільтр
+                ).select_related('oid__unit').order_by('-work_date', '-process_date')
+                
+                for doc in acts_queryset:
+                    acts_data.append({
+                        'id': doc.id,
+                        'text': f"Акт №{doc.document_number} від {doc.work_date.strftime('%d.%m.%Y')} (ОІД: {doc.oid.cipher})"
+                        # Можна додати більше інформації, якщо потрібно для відображення
+                    })
+            else:
+                print("AJAX_LOAD_ACTS: DocumentType 'Акт атестації'(duration_months=60) not found.")
+        except ValueError:
+            return JsonResponse({'error': 'Невірний ID ОІД'}, status=400)
+        except Exception as e:
+            print(f"Error in ajax_load_attestation_acts_for_oid: {e}")
+            return JsonResponse({'error': 'Серверна помилка при завантаженні актів'}, status=500)
+            
+    return JsonResponse(acts_data, safe=False)
+
+
 def ajax_create_oid_view(request):
     if request.method == 'POST':
         # Якщо ВЧ передається з форми заявки для попереднього заповнення
@@ -414,7 +451,7 @@ def oid_detail_view(request, oid_id):
     ).order_by('-process_date', '-work_date')
 
     # Отримуємо тільки документи типу "Акт атестації" для цього ОІД для секції реєстрації
-    attestation_acts_for_oid = documents.filter(document_type__name__icontains='Акт атестації')
+    attestation_acts_for_oid = documents.filter(document_type__duration_months=60)
 
     trips_for_oid = oid.trips.prefetch_related(
         'units',
@@ -426,7 +463,7 @@ def oid_detail_view(request, oid_id):
     # attestation_registrations_for_oid = AttestationRegistration.objects.filter(
     #     items_sent__attestation_document__oid=oid # Оновлений шлях доступу через Document
     # ).prefetch_related(
-    #     Prefetch('items_sent', queryset=Document.objects.filter(oid=oid, document_type__name__icontains='Акт атестації').select_related('document_type')),
+    #     Prefetch('items_sent', queryset=Document.objects.filter(oid=oid, document_type__duration_months=60).select_related('document_type')),
     #     'response_received' # related_name з AttestationResponse
     # ).distinct().order_by('-outgoing_letter_date')
     # Натомість, ми будемо використовувати attestation_acts_for_oid та їх зв'язок з AttestationRegistration
@@ -751,6 +788,35 @@ def update_oid_status_view(request, oid_id_from_url=None):
         'current_oid_status_display': selected_oid_instance.get_status_display() if selected_oid_instance else None,
     }
     return render(request, 'oids/forms/update_oid_status_form.html', context)
+
+
+
+@transaction.atomic # Використовуємо транзакцію для цілісності даних
+def send_attestation_for_registration_view(request):
+    if request.method == 'POST':
+        form = AttestationRegistrationSendForm(request.POST, request.FILES)
+        if form.is_valid():
+            # Метод save() форми AttestationRegistrationSendForm тепер відповідає за:
+            # 1. Створення/збереження екземпляра AttestationRegistration.
+            # 2. Оновлення поля attestation_registration_sent для кожного обраного документа "Акт атестації".
+            # 3. Автоматичне заповнення поля units (ManyToMany) в AttestationRegistration на основі ВЧ обраних актів.
+            attestation_registration = form.save() # commit=True за замовчуванням, save() форми все обробляє
+
+            messages.success(request, f'Відправку №{attestation_registration.outgoing_letter_number} на реєстрацію успішно сформовано.')
+            # Перенаправлення на список відправок або на деталі цієї відправки
+            return redirect('oids:list_attestation_registrations') # Переконайтесь, що цей URL існує
+        else:
+            messages.error(request, 'Будь ласка, виправте помилки у формі.')
+            # Для дебагу можна вивести помилки форми в консоль сервера
+            print(f"AttestationRegistrationSendForm errors: {form.errors.as_json()}")
+    else: # GET request
+        form = AttestationRegistrationSendForm()
+
+    context = {
+        'form': form,
+        'page_title': 'Сформувати відправку Актів Атестації на реєстрацію'
+    }
+    return render(request, 'oids/forms/send_attestation_form.html', context)
 
 
 # list info 
@@ -1655,38 +1721,6 @@ def attestation_response_list_view(request):
     }
     return render(request, 'oids/lists/attestation_response_list.html', context)
 
-# View для створення "Відправки на реєстрацію"
-@transaction.atomic 
-def send_attestation_for_registration_view(request):
-    if request.method == 'POST':
-        form = AttestationRegistrationSendForm(request.POST, request.FILES)
-        if form.is_valid():
-            attestation_registration = form.save() 
-            
-            # Оновлення поля units в AttestationRegistration на основі обраних актів,
-            # ЯКЩО воно не заповнюється вручну у формі і має заповнюватися автоматично.
-            # Припускаємо, що форма `AttestationRegistrationSendForm` вже містить поле `units` ManyToMany,
-            # яке користувач заповнює, або яке заповнюється автоматично в `save()` методі форми.
-            # Якщо потрібно заповнити units на основі `attestation_acts` тут:
-            selected_acts = form.cleaned_data.get('attestation_acts')
-            if selected_acts:
-                units_involved = set()
-                for act_document in selected_acts:
-                    if act_document.oid and act_document.oid.unit:
-                        units_involved.add(act_document.oid.unit)
-                if units_involved: # Тільки якщо є ВЧ для додавання
-                    attestation_registration.units.set(list(units_involved))
-
-            messages.success(request, f'Відправку №{attestation_registration.outgoing_letter_number} на реєстрацію ДССЗЗІ успішно створено.')
-            return redirect('oids:list_attestation_registrations') 
-    else:
-        form = AttestationRegistrationSendForm()
-
-    context = {
-        'form': form,
-        'page_title': 'Сформувати відправку Актів Атестації на реєстрацію ДССЗЗІ'
-    }
-    return render(request, 'oids/forms/send_attestation_form.html', context)
 
 # View для внесення "Відповіді від ДССЗЗІ"
 @transaction.atomic
@@ -1810,38 +1844,6 @@ def record_attestation_response_view(request, att_reg_sent_id=None): # Може 
     }
     return render(request, 'oids/forms/record_attestation_response_form.html', context)
 
-# # View для створення "Відправки на реєстрацію"
-# @transaction.atomic # Використовуємо транзакцію, щоб всі зміни були або застосовані, або відхилені
-# def send_attestation_for_registration_view(request):
-#     if request.method == 'POST':
-#         form = AttestationRegistrationSendForm(request.POST, request.FILES)
-#         if form.is_valid():
-#             # save() форми вже обробляє зв'язування документів з відправкою
-#             attestation_registration = form.save() 
-            
-#             # Оновлюємо поле units в AttestationRegistration на основі обраних актів (якщо воно не заповнюється вручну)
-#             # Якщо поле units заповнюється користувачем у формі, цей блок не потрібен.
-#             # Цей блок потрібен, якщо units має заповнюватися автоматично.
-#             # Поки що припускаємо, що units заповнюється у формі.
-#             # selected_acts = form.cleaned_data.get('attestation_acts')
-#             # if selected_acts:
-#             #     units_involved = set()
-#             #     for act in selected_acts:
-#             #         units_involved.add(act.oid.unit)
-#             #     attestation_registration.units.set(list(units_involved))
-
-
-#             messages.success(request, f'Відправку №{attestation_registration.outgoing_letter_number} на реєстрацію ДССЗЗІ успішно створено.')
-#             # Перенаправлення на список відправок або на деталі цієї відправки
-#             return redirect('oids:list_attestation_registrations') # Потрібно створити цей URL та view
-#     else:
-#         form = AttestationRegistrationSendForm()
-
-#     context = {
-#         'form': form,
-#         'page_title': 'Сформувати відправку Актів Атестації на реєстрацію ДССЗЗІ'
-#     }
-#     return render(request, 'oids/forms/send_attestation_form.html', context)
 
 # # View для внесення "Відповіді від ДССЗЗІ"
 # @transaction.atomic
