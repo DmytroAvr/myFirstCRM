@@ -4,6 +4,11 @@
 
 {% block page_title %}Деталі ОІД: {{ oid.cipher }} ({{ oid.full_name|default:"Без назви" }}){% endblock %}
 
+<style>
+		h3 {
+		padding-top: 20px;
+	}
+</style>
 {% block content %}
 <p><a href="{% url 'oids:main_dashboard' %}">← Повернутися до панелі керування</a></p>
 
