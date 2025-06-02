@@ -39,8 +39,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'multiselectfield', # Якщо ви використовуєте multiselectfield
     'oids', # Ваш додаток
-    "django_tomselect",
-
+    'django_tomselect',
+	'simple_history'
     
     # 'django_select2',
     # 'core',
@@ -61,6 +61,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 	"django_tomselect.middleware.TomSelectMiddleware",
+	'simple_history.middleware.HistoryRequestMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -133,6 +134,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+LOGIN_REDIRECT_URL = 'oids:main_dashboard'  # Або 'oids:main_dashboard', або інший URL
+LOGOUT_REDIRECT_URL = '/accounts/login/' # Сторінка, куди перенаправляти після виходу
+LOGIN_URL = '/accounts/login/' # Явно вказуємо URL для сторінки входу
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

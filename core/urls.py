@@ -22,5 +22,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('oids/', include('oids.urls')),  # Все що стосується oids – тут
     path('', main_dashboard, name='home'),  # ⬅ Головна сторінка
-	
+	path('accounts/', include('django.contrib.auth.urls')),
 ]

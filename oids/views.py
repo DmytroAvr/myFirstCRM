@@ -1,5 +1,6 @@
 # :\myFirstCRM\oids\views.py
 from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required
 from django_tomselect.autocompletes import AutocompleteModelView
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.http import JsonResponse
@@ -21,7 +22,7 @@ from .forms import ( TripForm, TripResultSendForm, DocumentProcessingMainForm, D
 )
 
 
-# Твоя допоміжна функція (залишається без змін, але буде викликатися в AJAX view)
+ # Твоя допоміжна функція (залишається без змін, але буде викликатися в AJAX view)
 def get_last_document_expiration_date(oid_instance, document_name_keyword, work_type_choice=None):
     try:
         doc_type_filters = Q(name__icontains=document_name_keyword)
@@ -43,7 +44,7 @@ def get_last_document_expiration_date(oid_instance, document_name_keyword, work_
     except Exception as e:
         print(f"Помилка get_last_document_expiration_date для ОІД {oid_instance.cipher if oid_instance else 'N/A'} ({document_name_keyword}): {e}")
         return None
-
+ 
 def ajax_get_oid_current_status(request):
     oid_id_str = request.GET.get('oid_id')
     if oid_id_str and oid_id_str.isdigit():
@@ -63,7 +64,7 @@ def ajax_get_oid_current_status(request):
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
     return JsonResponse({'status': 'error', 'message': 'Необхідно ID ОІДа'}, status=400)
 
-# changede by gemeni. перейшли від передачі словників до передачі повних екземплярів моделі OID у функцію get_last_document_expiration_date. Це важливо для коректної роботи сервера, незалежно від фронтенд-фільтрації.
+ # changede by gemeni. перейшли від передачі словників до передачі повних екземплярів моделі OID у функцію get_last_document_expiration_date. Це важливо для коректної роботи сервера, незалежно від фронтенд-фільтрації.
 def ajax_load_oids_for_unit_categorized(request):
     unit_id_str = request.GET.get('unit_id')
     data = {
@@ -112,7 +113,7 @@ def ajax_load_oids_for_unit_categorized(request):
             
     return JsonResponse(data)
 # Ваш ajax_load_oids_for_unit (якщо потрібен окремо для простого списку ОІДів, наприклад, для форм)
-
+ 
 def ajax_load_oids_for_multiple_units(request):
     unit_ids_str = request.GET.getlist('unit_ids[]') # Отримуємо список ID як рядки
     # Або якщо JS надсилає як 'unit_ids' через кому: request.GET.get('unit_ids', '').split(',')
@@ -144,7 +145,7 @@ def ajax_load_oids_for_multiple_units(request):
             return JsonResponse({'error': 'Невірні ID військових частин'}, status=400)
             
     return JsonResponse(oids_data, safe=False)
-
+ 
 def ajax_load_work_request_items_for_oid(request):
     oid_id_str = request.GET.get('oid_id')
     items_data = []
@@ -612,7 +613,7 @@ def send_trip_results_view(request):
 
 
 # ... (решта ваших views: oid_detail_view, форми для додавання тощо) ...
-# Не забудьте додати oid_detail_view з попередньої відповіді.
+@login_required # Не забудьте додати oid_detail_view з попередньої відповіді.
 def oid_detail_view(request, oid_id):
     oid = get_object_or_404(
         OID.objects.select_related(
@@ -684,7 +685,7 @@ def oid_detail_view(request, oid_id):
 
 # ... (main_dashboard, ajax_load_oids_for_unit_categorized, ajax_load_oids_for_unit, oid_detail_view) ...
 # Переконайся, що функція get_last_document_expiration_date визначена вище
-
+@login_required 
 def plan_trip_view(request):
     if request.method == 'POST':
         form = TripForm(request.POST)
@@ -705,7 +706,7 @@ def plan_trip_view(request):
         form = TripForm()
     
     return render(request, 'oids/forms/plan_trip_form.html', {'form': form, 'page_title': 'Запланувати відрядження'})
-
+@login_required 
 def add_document_processing_view(request, oid_id=None, work_request_item_id=None):
     initial_data = {}
     selected_oid = None
@@ -759,7 +760,7 @@ def add_document_processing_view(request, oid_id=None, work_request_item_id=None
         'page_title': 'Додати опрацювання документів',
         'selected_oid': selected_oid
     })
-
+@login_required 
 def add_work_request_view(request):
     # Отримуємо екземпляр Unit, якщо ID передано в GET-запиті
     unit_instance = None
@@ -828,7 +829,7 @@ def add_work_request_view(request):
         # **context_modal_choices
     }
     return render(request, 'oids/forms/add_work_request_form.html', context)
-
+@login_required 
 def add_document_processing_view(request, oid_id=None, work_request_item_id=None):
     selected_oid_instance = None
     selected_wri_instance = None # WorkRequestItem instance
@@ -916,7 +917,7 @@ def add_document_processing_view(request, oid_id=None, work_request_item_id=None
         'selected_oid': selected_oid_instance # Для відображення в заголовку
     }
     return render(request, 'oids/forms/add_document_processing_form.html', context)
-
+@login_required 
 def update_oid_status_view(request, oid_id_from_url=None):
     initial_unit = None
     initial_oid = None
@@ -1007,7 +1008,7 @@ def send_attestation_for_registration_view(request):
 from .forms import TechnicalTaskCreateForm, TechnicalTaskProcessForm # Додаємо нові форми
 from .models import TechnicalTask, DocumentReviewResultChoices, OID, Unit, Person # Додаємо моделі
 
-
+@login_required 
 def technical_task_create_view(request):
     initial_data_for_form = {}
     # Якщо передано Unit або OID через GET, використовуємо їх для початкового заповнення
@@ -1045,7 +1046,7 @@ def technical_task_create_view(request):
         'page_title': 'Внесення нового Технічного Завдання'
     }
     return render(request, 'oids/forms/technical_task_create_form.html', context)
-
+@login_required 
 def technical_task_process_view(request, task_id=None): # Може приймати ID ТЗ з URL
     # Якщо task_id передано, це форма для конкретного ТЗ.
     # Якщо ні, то перше поле форми - вибір ТЗ.
@@ -1117,7 +1118,7 @@ def technical_task_process_view(request, task_id=None): # Може прийма�
 
 
 
-# list info 
+@login_required # list info 
 def summary_information_hub_view(request):
     """
     Сторінка-хаб з посиланнями на списки об'єктів різних моделей.
@@ -1146,7 +1147,7 @@ def summary_information_hub_view(request):
         'model_views': model_views
     }
     return render(request, 'oids/summary_information_hub.html', context)
-
+@login_required 
 def document_list_view(request):
     documents_list = Document.objects.select_related(
         'oid__unit__territorial_management', # Оптимізація для доступу до Unit та OID
@@ -1167,7 +1168,7 @@ def document_list_view(request):
         'page_obj': page_obj # Для навігації пагінатора
     }
     return render(request, 'oids/lists/document_list.html', context)
-
+@login_required 
 def unit_list_view(request):
     units_list_qs = Unit.objects.select_related(
         'territorial_management'
@@ -1231,7 +1232,7 @@ def unit_list_view(request):
         'is_sorted_desc': sort_order == 'desc',
     }
     return render(request, 'oids/lists/unit_list.html', context)
-
+@login_required 
 def territorial_management_list_view(request):
     tm_list_queryset = TerritorialManagement.objects.all().order_by('name')
     
@@ -1245,7 +1246,7 @@ def territorial_management_list_view(request):
         'page_obj': page_obj     # Для самого шаблону пагінації
     }
     return render(request, 'oids/lists/territorial_management_list.html', context)
-
+@login_required 
 def unit_group_list_view(request):
     group_list_queryset = UnitGroup.objects.prefetch_related('units').order_by('name') # prefetch_related для units
     
@@ -1259,7 +1260,7 @@ def unit_group_list_view(request):
         'page_obj': page_obj
     }
     return render(request, 'oids/lists/unit_group_list.html', context)
-
+@login_required 
 def person_list_view(request):
     person_list_queryset = Person.objects.all().order_by('full_name')
     
@@ -1273,7 +1274,7 @@ def person_list_view(request):
         'page_obj': page_obj
     }
     return render(request, 'oids/lists/person_list.html', context)
-
+@login_required 
 def document_type_list_view(request):
     doc_type_list_queryset = DocumentType.objects.all().order_by('oid_type', 'work_type', 'name')
     
@@ -1287,7 +1288,7 @@ def document_type_list_view(request):
         'page_obj': page_obj
     }
     return render(request, 'oids/lists/document_type_list.html', context)
-
+@login_required 
 def oid_list_view(request):
     oid_list_queryset = OID.objects.select_related(
         'unit',  # Завантажуємо пов'язану військову частину
@@ -1397,7 +1398,7 @@ def oid_list_view(request):
         'current_sort_order_is_desc': actual_sort_order_is_desc, # Поточний напрямок desc (true/false)
     }
     return render(request, 'oids/lists/oid_list.html', context)
-
+@login_required 
 def work_request_list_view(request):
     work_request_list_queryset = WorkRequest.objects.select_related(
         'unit', 
@@ -1499,7 +1500,7 @@ def work_request_list_view(request):
         'current_sort_order_is_desc': actual_sort_order_is_desc,
     }
     return render(request, 'oids/lists/work_request_list.html', context)
- 
+@login_required  
 def trip_list_view(request):
     trip_list_queryset = Trip.objects.prefetch_related(
         'units', 
@@ -1612,7 +1613,7 @@ def trip_list_view(request):
         'current_sort_order_is_desc': actual_sort_order_is_desc,
     }
     return render(request, 'oids/lists/trip_list.html', context)
-
+@login_required 
 def technical_task_list_view(request):
     task_list_queryset = TechnicalTask.objects.select_related(
         'oid__unit', 
@@ -1766,7 +1767,7 @@ def technical_task_list_view(request):
         'current_sort_order_is_desc': actual_sort_order_is_desc,
     }
     return render(request, 'oids/lists/technical_task_list.html', context)
-
+@login_required 
 def attestation_registration_list_view(request):
     registration_list_queryset = AttestationRegistration.objects.prefetch_related(
         'units',  # ManyToMany зв'язок з Unit
@@ -1783,7 +1784,7 @@ def attestation_registration_list_view(request):
         'page_obj': page_obj
     }
     return render(request, 'oids/lists/attestation_registration_list.html', context)
-
+@login_required 
 def attestation_response_list_view(request):
     """
     Відображає список Отриманих відповідей від ДССЗЗІ.
@@ -1815,7 +1816,7 @@ def attestation_response_list_view(request):
         'current_filter_att_reg_id': current_filter_att_reg_id,
     }
     return render(request, 'oids/lists/attestation_response_list.html', context)
-
+@login_required 
 def trip_result_for_unit_list_view(request):
     result_list_queryset = TripResultForUnit.objects.select_related(
         'trip' # Якщо потрібно бачити деталі самого відрядження
@@ -1835,7 +1836,7 @@ def trip_result_for_unit_list_view(request):
         'page_obj': page_obj
     }
     return render(request, 'oids/lists/trip_result_for_unit_list.html', context)
-
+@login_required 
 def oid_status_change_list_view(request):
     status_change_list_queryset = OIDStatusChange.objects.select_related(
         'oid__unit', 
@@ -1964,7 +1965,7 @@ def oid_status_change_list_view(request):
         'current_sort_order_is_desc': actual_sort_order_is_desc,
     }
     return render(request, 'oids/lists/oid_status_change_list.html', context)
-
+@login_required 
 def attestation_registration_list_view(request):
     """
     Відображає список Відправок Актів Атестації на реєстрацію ДССЗЗІ.
@@ -2004,7 +2005,7 @@ def attestation_registration_list_view(request):
         'current_filter_unit_id': current_filter_unit_id,
     }
     return render(request, 'oids/lists/attestation_registration_list.html', context)
-
+@login_required 
 def attestation_response_list_view(request):
     """
     Відображає список Отриманих відповідей від ДССЗЗІ.
@@ -2161,7 +2162,7 @@ def record_attestation_response_view(request, att_reg_sent_id=None): # Може 
 
 
 # # View для внесення "Відповіді від ДССЗЗІ"
-# @transaction.atomic
+# @login_required @transaction.atomic
 # def record_attestation_response_view(request):
 #     # Цей view буде двокроковим або використовуватиме AJAX для завантаження формсету
 #     # після вибору AttestationRegistration.

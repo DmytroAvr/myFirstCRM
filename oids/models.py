@@ -2,7 +2,7 @@ from django.db import models
 from multiselectfield import MultiSelectField
 from django.utils import timezone
 from django.db.models import Q
-
+from simple_history.models import HistoricalRecords
 # --- CONSTANTS / CHOICES ---
 # Краще зберігати вибори в окремих файлах або в самих моделях, якщо вони специфічні для моделі.
 # Для загальних виборів, які використовуються в кількох моделях, можна тримати їх тут.
@@ -136,6 +136,8 @@ class OID(models.Model):
     note = models.TextField(verbose_name="Примітка", blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
+    history = HistoricalRecords()
+
 	# Прив'язка до першого та останнього документа для відстеження
     # OneToOneField для created_by_document може бути проблематичним, якщо один документ може "створити" кілька ОІД.
     # Краще використовувати ForeignKey, і вже на рівні логіки (service/views) забезпечувати, що це перший документ.
@@ -193,7 +195,7 @@ class WorkRequest(models.Model):
     # Зв'язок Many-to-Many з OID буде через WorkRequestItem, щоб можна було вказувати тип роботи для кожного ОІД в заявці.
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
-
+    history = HistoricalRecords()
     def __str__(self):
         return f"в/ч {self.unit.code} Заявка вх.№{self.incoming_number} від {self.incoming_date} ({self.get_status_display()})"
 
@@ -230,7 +232,7 @@ class WorkRequestItem(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
-
+    history = HistoricalRecords()
     class Meta:
         unique_together = ('request', 'oid', 'work_type') # Один ОІД не може мати двічі одну і ту ж роботу в одній заявці
         verbose_name = "Елемент заявки"
@@ -482,6 +484,7 @@ class AttestationRegistration(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
+    history = HistoricalRecords()
 
     def __str__(self):
         return f"Відправка до ДССЗЗІ №{self.outgoing_letter_number} від {self.outgoing_letter_date.strftime('%d.%m.%Y')}"
@@ -519,6 +522,7 @@ class AttestationResponse(models.Model):
     note = models.TextField(blank=True, null=True, verbose_name="Примітка до відповіді")
     created_at = models.DateTimeField(auto_now_add=True) 
     updated_at = models.DateTimeField(auto_now=True)
+    history = HistoricalRecords()
 
     def __str__(self):
         return f"Відповідь №{self.response_letter_number} від {self.response_letter_date.strftime('%d.%m.%Y')} на вих. №{self.attestation_registration_sent.outgoing_letter_number}"
@@ -580,6 +584,7 @@ class Document(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
     expiration_date = models.DateField(verbose_name="Дата завершення дії", blank=True, null=True)
+    history = HistoricalRecords()
 
     # --- НОВІ ПОЛЯ для реєстрації в ДССЗЗІ (для актів атестації) ---
     # Посилання на запис про відправку (вихідний лист)
@@ -667,6 +672,7 @@ class Trip(models.Model):
     purpose = models.TextField(blank=True, null=True, verbose_name="Мета відрядження")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
+    history = HistoricalRecords()
 
     def __str__(self):
         unit_names = ", ".join(unit.name for unit in self.units.all())
@@ -762,6 +768,7 @@ class TripResultForUnit(models.Model):
     note = models.TextField(blank=True, null=True, verbose_name="Примітка")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
+    history = HistoricalRecords()
     # related_request - можна отримати через trip.work_requests.all() або через documents.work_request_item.request
     # Тому, якщо це не критично для прямого доступу, можна прибрати для уникнення дублювання.
     # related_request = models.ForeignKey('WorkRequest', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Пов’язана заявка")
@@ -796,6 +803,7 @@ class TechnicalTask(models.Model):
     note = models.TextField(blank=True, null=True, verbose_name="Примітка")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
+    history = HistoricalRecords()
 
     def __str__(self):
         return f"ТЗ №{self.input_number} для ОІД: {self.oid.cipher} (статус: {self.get_review_result_display()})"

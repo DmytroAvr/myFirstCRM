@@ -36,6 +36,7 @@ python -m pip install Django
 pip install django-multiselectfield
 pip install django-tomselect
 pip install python-dateutil
+pip install django-simple-history
 <!-- 
  -->
 <!-- 

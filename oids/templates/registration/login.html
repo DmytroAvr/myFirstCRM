@@ -1,0 +1,46 @@
+{# templates/registration/login.html #}
+{% extends "oids/base.html" %} {# Або ваш базовий шаблон проекту #}
+
+{% block title %}Вхід в систему{% endblock %}
+
+{% block page_title %}Вхід в систему{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 500px; margin-top: 50px;">
+    {% if form.errors %}
+        <div class="alert alert-danger" role="alert">
+            Ім'я користувача або пароль невірні. Будь ласка, спробуйте ще раз.
+        </div>
+    {% endif %}
+
+    {% if next %}
+        {% if user.is_authenticated %}
+        <p>Ваш акаунт не має доступу до цієї сторінки. Щоб продовжити, будь ласка, увійдіть з акаунтом, що має доступ.</p>
+        {% else %}
+        <p>Будь ласка, увійдіть, щоб побачити цю сторінку.</p>
+        {% endif %}
+    {% endif %}
+
+    <form method="post" action="{% url 'login' %}">
+        {% csrf_token %}
+
+        <div class="mb-3">
+            <label for="{{ form.username.id_for_label }}" class="form-label">{{ form.username.label_tag }}</label>
+            {{ form.username }}
+        </div>
+
+        <div class="mb-3">
+            <label for="{{ form.password.id_for_label }}" class="form-label">{{ form.password.label_tag }}</label>
+            {{ form.password }}
+        </div>
+
+        <button type="submit" class="btn btn-primary">Увійти</button>
+        <input type="hidden" name="next" value="{{ next }}">
+    </form>
+
+    {# Опціонально: посилання на скидання пароля #}
+    {# <p class="mt-3"><a href="{% url 'password_reset' %}">Забули пароль?</a></p> #}
+    {# Опціонально: посилання на реєстрацію, якщо вона є #}
+    {# <p><a href="{% url 'oids:register' %}">Зареєструватися</a></p> #}
+</div>
+{% endblock %}

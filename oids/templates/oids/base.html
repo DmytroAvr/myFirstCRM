@@ -123,6 +123,27 @@
 			</nav>
 			<span class="text-muted">&copy; {% now "Y" %} Ваш Проект</span>
 		</div>
+
+	<div class="user-nav" style="text-align: center; padding: 10px;"> {# Додав трохи стилю для прикладу #}
+    {% if user.is_authenticated %}
+        Вітаємо, {{ user.username }}!
+        
+        {# ЗАМІСТЬ ЦЬОГО: <a href="{% url 'logout' %}" class="btn btn-sm btn-outline-secondary ms-2">Вийти</a> #}
+        
+        {# ВИКОРИСТОВУЙТЕ ЦЕ: #}
+        <form method="post" action="{% url 'logout' %}" style="display: inline; margin-left: 10px;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-outline-secondary">Вийти</button>
+        </form>
+        
+        {# Посилання на зміну пароля (якщо потрібно) #}
+        {# <a href="{% url 'password_change' %}" class="btn btn-sm btn-outline-info ms-2">Змінити пароль</a> #}
+    {% else %}
+        <a href="{% url 'login' %}" class="btn btn-sm btn-outline-primary">Увійти</a>
+        {# Якщо є реєстрація: #}
+        {# <a href="{% url 'oids:register' %}" class="btn btn-sm btn-primary ms-2">Реєстрація</a> #}
+    {% endif %}
+</div>
 	</footer>
 
 

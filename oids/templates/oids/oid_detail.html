@@ -4,25 +4,37 @@
 
 {% block page_title %}Деталі ОІД: {{ oid.cipher }} ({{ oid.full_name|default:"Без назви" }}){% endblock %}
 
-<style>
-		h3 {
-		padding-top: 20px;
-	}
-</style>
+
 {% block content %}
+<head>
+	<style>
+		h3 {
+			padding-top: 30px;
+		}
+		.oid-info {
+			font-size: 18px;
+		}
+		.oid-info__item-underline {
+			font-family: "Times New Roman", Times, serif;
+			font-size: 21px;
+			text-decoration: underline;
+		}
+		
+	</style>
+</head>
 <p><a href="{% url 'oids:main_dashboard' %}">← Повернутися до панелі керування</a></p>
 
 <h2>Основна інформація про ОІД</h2>
-<ul>
-    <li><strong>Шифр:</strong> {{ oid.cipher }}</li>
-    <li><strong>Повна назва:</strong> {{ oid.full_name|default:"Не вказано" }}</li>
-    <li><strong>Тип ОІД:</strong> {{ oid.get_oid_type_display }}</li>
-    <li><strong>Військова частина:</strong> <a href="{% url 'oids:main_dashboard' %}?unit={{ oid.unit.id }}">{{ oid.unit.code }} - {{ oid.unit.name|default:oid.unit.city }}</a></li>
-    <li><strong>Територіальне управління:</strong> {{ oid.unit.territorial_management.name|default:"Не вказано" }}</li>
-    <li><strong>Приміщення:</strong> {{ oid.room }}</li>
-    <li><strong>Поточний стан:</strong> {{ oid.get_status_display }} <a href="{% url 'oids:update_specific_oid_status' oid_id_from_url=oid.id %}"> ---> Змінити статус ОІД</a> </li> 
-    <li><strong>Гриф ОІД:</strong> {{ oid.get_sec_level_display }}</li>
-    <li><strong>Примітки:</strong> {{ oid.note|default:"-" }}</li>
+<ul class="oid-info">
+    <li class="oid-info__list-item"><strong>Шифр:</strong> <span class="oid-info__item-underline">{{ oid.cipher }}</span></li>
+    <li class="oid-info__list-item"><strong>Повна назва:</strong>  <span class="oid-info__item-underline"> {{ oid.full_name|default:"Не вказано" }}</span></li>
+    <li class="oid-info__list-item"><strong>Тип ОІД:</strong>  <span class="oid-info__item-underline"> {{ oid.get_oid_type_display }}</span></li>
+    <li class="oid-info__list-item"><strong>Військова частина:</strong>  <span class="oid-info__item-underline"> <a href="{% url 'oids:main_dashboard' %}?unit={{ oid.unit.id }}">{{ oid.unit.code }} - {{ oid.unit.name|default:oid.unit.city }}</a></span></li>
+    <li class="oid-info__list-item"><strong>Територіальне управління:</strong>  <span class="oid-info__item-underline"> {{ oid.unit.territorial_management.name|default:"Не вказано" }}</span></li>
+    <li class="oid-info__list-item"><strong>Приміщення:</strong>  <span class="oid-info__item-underline"> {{ oid.room }}</span></li>
+    <li class="oid-info__list-item"><strong>Поточний стан:</strong>  <span class="oid-info__item-underline"> {{ oid.get_status_display }} <a href="{% url 'oids:update_specific_oid_status' oid_id_from_url=oid.id %}"> ---> Змінити статус ОІД</a> </span></li> 
+    <li class="oid-info__list-item"><strong>Гриф ОІД:</strong>  <span class="oid-info__item-underline"> {{ oid.get_sec_level_display }}</span></li>
+    <li class="oid-info__list-item"><strong>Примітки:</strong>  <span class="oid-info__item-underline"> {{ oid.note|default:"-" }}</span></li>
     {% if last_attestation_expiration %}
         <li><strong>Атестація дійсна до:</strong> {{ last_attestation_expiration|date:"d.m.Y" }}</li>
     {% endif %}

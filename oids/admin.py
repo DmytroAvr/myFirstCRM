@@ -1,4 +1,5 @@
 from django.contrib import admin
+from simple_history.admin import SimpleHistoryAdmin 
 from .models import (
     TerritorialManagement, UnitGroup, Unit, OID,
     Person, WorkRequest, WorkRequestItem,
@@ -6,7 +7,6 @@ from .models import (
     AttestationRegistration, AttestationResponse,
     TripResultForUnit, TechnicalTask,
 )
-
 
 @admin.register(TerritorialManagement)
 class TerritorialManagementAdmin(admin.ModelAdmin):
@@ -28,11 +28,12 @@ class UnitAdmin(admin.ModelAdmin):
 
 
 @admin.register(OID)
-class OIDAdmin(admin.ModelAdmin):
+class OIDAdmin(SimpleHistoryAdmin):
     list_display = ('cipher', 'oid_type', 'unit', 'room', 'status', 'created_at') # Додав created_at для інформації
     list_filter = ('oid_type', 'status', 'unit__territorial_management')
     search_fields = ('cipher', 'full_name', 'room')
     date_hierarchy = 'created_at' # Дозволяє навігацію по даті створення
+    history_list_display = ["status"]
 
 
 @admin.register(Person)
@@ -43,7 +44,7 @@ class PersonAdmin(admin.ModelAdmin):
 
 
 @admin.register(WorkRequest)
-class WorkRequestAdmin(admin.ModelAdmin):
+class WorkRequestAdmin(SimpleHistoryAdmin):
     list_display = ('incoming_number', 'unit', 'incoming_date', 'status', 'created_at')
     list_filter = ('status', 'unit', 'incoming_date')
     search_fields = ('incoming_number', 'unit__code', 'unit__name')
@@ -51,7 +52,7 @@ class WorkRequestAdmin(admin.ModelAdmin):
 
 
 @admin.register(WorkRequestItem)
-class WorkRequestItemAdmin(admin.ModelAdmin):
+class WorkRequestItemAdmin(SimpleHistoryAdmin):
     list_display = ('request', 'oid', 'work_type', 'status')
     list_filter = ('work_type', 'status', 'request__unit')
     search_fields = ('oid__cipher', 'request__incoming_number')
@@ -65,7 +66,7 @@ class DocumentTypeAdmin(admin.ModelAdmin):
 
 
 @admin.register(Document)
-class DocumentAdmin(admin.ModelAdmin):
+class DocumentAdmin(SimpleHistoryAdmin):
     list_display = (
         'document_number', 
         'document_type', 
@@ -80,6 +81,7 @@ class DocumentAdmin(admin.ModelAdmin):
     list_filter = ('document_type', 'work_date', 'author', 'oid__unit', 'attestation_registration_sent')
     search_fields = ('document_number', 'oid__cipher', 'dsszzi_registered_number')
     date_hierarchy = 'process_date'
+    history_list_display = ["document_type", 'work_date', 'author', 'oid__unit' ]
 
 
 @admin.register(Trip)
