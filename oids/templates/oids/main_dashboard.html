@@ -5,16 +5,15 @@
 
 {% block content %}
 
-
 <div class="dashboard-columns" style="display: flex; gap: 20px;">
     {# Стовпчик 1: Військові частини (фільтр) #}
     <div class="column" style="flex: 1; border: 1px solid #ccc; padding: 10px;">
         <h3>Військові частини</h3>
-        <form method="get" action="{% url 'oids:main_dashboard' %}" id="unitFilterFormMain">
-            <select name="unit" id="id_unit_filter" class="select2" style="width: 100%;" 
+        <form method="get" action="{% url 'oids:main_dashboard' %}" id="unitFilterFormMain" class="tomselect-field">
+            <select name="unit" id="id_unit_filter" style="width: 100%;" 
                     onchange="this.form.submit();" 
                     data-placeholder="Оберіть ВЧ для фільтрації...">
-                <option value=""></option> {# Для плейсхолдера Select2 #}
+                <option value=""></option> {# Для плейсхолдера #}
                 {% for unit_obj in all_units %}
                     <option value="{{ unit_obj.id }}" {% if unit_obj.id|stringformat:"s" == selected_unit_id %}selected{% endif %}>
                         {{ unit_obj.code }} - {{ unit_obj.name|default:unit_obj.city }} ({{ unit_obj.territorial_management.name|default:"ТУ не вказано" }})
@@ -93,6 +92,22 @@
 </div>
 {% endblock %}
 
-{% block page_specific_js %}
-
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let unitFilterSelect = document.getElementById('id_unit_filter');
+    if (unitFilterSelect) {
+        new TomSelect(unitFilterSelect, {
+            create: false, // Заборонити створення нових опцій
+            sortField: {   // Дозволяє сортування, але не обов'язково для простого вибору
+                field: "text",
+                direction: "asc"
+            },
+            placeholder: unitFilterSelect.getAttribute('data-placeholder') || 'Оберіть в/ч зі списку...' // Використовуємо data-placeholder
+        });
+    } else {
+        console.error("Елемент #id_unit_filter не знайдено для ініціалізації TomSelect.");
+    }
+});
+</script>
 {% endblock %}

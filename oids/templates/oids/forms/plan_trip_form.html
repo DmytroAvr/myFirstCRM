@@ -90,11 +90,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const unitsSelectElement = document.getElementById('id_trip_form_units');
     const oidsSelectElement = document.getElementById('id_trip_form_oids');
     const workRequestsSelectElement = document.getElementById('id_work_requests'); // ID вашого поля заявок
+    const personsSelectElement = document.getElementById('id_persons'); // 
 
     let tomSelectUnits = null;
     let tomSelectOids = null;
     let tomSelectWorkRequests = null;
-
+    let tomSelectPersons = null;
+  
     // URL-и для AJAX (переконайтесь, що вони правильно визначені у base.html або тут)
     const oidsAjaxUrl = window.AJAX_LOAD_OIDS_FOR_MULTIPLE_UNITS_URL || "{% url 'oids:ajax_load_oids_for_multiple_units' %}";
     const workRequestsAjaxUrl = window.AJAX_LOAD_WORK_REQUESTS_FOR_OIDS_URL || "{% url 'oids:ajax_load_work_requests_for_oids' %}";
@@ -148,6 +150,10 @@ document.addEventListener('DOMContentLoaded', function() {
     if (workRequestsSelectElement && workRequestsSelectElement.classList.contains('tomselect-field')) {
         tomSelectWorkRequests = initializeGenericTomSelect(workRequestsSelectElement, 'Спочатку оберіть ОІДи...', true);
         if (tomSelectWorkRequests) tomSelectWorkRequests.disable(); // Деактивуємо, поки не обрані ОІДи
+    }
+    // Ініціалізація TomSelect для співробітників (початково може бути деактивований або показувати всі)
+    if (personsSelectElement && personsSelectElement.classList.contains('tomselect-field')) {
+        tomSelectPersons = initializeGenericTomSelect(personsSelectElement, 'оберіть виконавців...', true);
     }
 
     // --- НОВА ФУНКЦІЯ для фільтрації Заявок ---
