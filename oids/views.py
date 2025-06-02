@@ -7,6 +7,7 @@ from django.urls import reverse_lazy, reverse
 from django.contrib import messages
 from django.db.models import Q, Max, Prefetch, Count 
 from django.db import  transaction 
+from django.utils import timezone
 from .models import (OIDTypeChoices, OIDStatusChoices, SecLevelChoices, WorkRequestStatusChoices, WorkTypeChoices, 
     DocumentReviewResultChoices, AttestationRegistrationStatusChoices, 
 )
@@ -1002,6 +1003,120 @@ def send_attestation_for_registration_view(request):
     }
     return render(request, 'oids/forms/send_attestation_form.html', context)
 
+
+from .forms import TechnicalTaskCreateForm, TechnicalTaskProcessForm # Додаємо нові форми
+from .models import TechnicalTask, DocumentReviewResultChoices, OID, Unit, Person # Додаємо моделі
+
+
+def technical_task_create_view(request):
+    initial_data_for_form = {}
+    # Якщо передано Unit або OID через GET, використовуємо їх для початкового заповнення
+    unit_id_get = request.GET.get('unit_id')
+    oid_id_get = request.GET.get('oid_id')
+
+    if unit_id_get:
+        initial_data_for_form['unit'] = unit_id_get
+    if oid_id_get:
+        initial_data_for_form['oid'] = oid_id_get
+        if not unit_id_get: # Якщо є ОІД, але немає ВЧ, спробуємо її отримати
+            try:
+                oid_instance = OID.objects.get(pk=oid_id_get)
+                initial_data_for_form['unit'] = oid_instance.unit_id
+            except OID.DoesNotExist:
+                pass
+
+
+    if request.method == 'POST':
+        form = TechnicalTaskCreateForm(request.POST)
+        if form.is_valid():
+            task = form.save(commit=False)
+            task.review_result = DocumentReviewResultChoices.READ # Встановлюємо статус "Опрацювати"
+            # task.created_by = request.user # Якщо є автентифікація і поле для автора створення
+            task.save()
+            messages.success(request, f"Технічне завдання №{task.input_number} для ОІД '{task.oid.cipher}' успішно внесено зі статусом 'Опрацювати'.")
+            return redirect('oids:list_technical_tasks') # Або на деталі ТЗ, або на список
+    else:
+        form = TechnicalTaskCreateForm(initial=initial_data_for_form, 
+                                       initial_unit_id=initial_data_for_form.get('unit'),
+                                       initial_oid_id=initial_data_for_form.get('oid'))
+
+    context = {
+        'form': form,
+        'page_title': 'Внесення нового Технічного Завдання'
+    }
+    return render(request, 'oids/forms/technical_task_create_form.html', context)
+
+def technical_task_process_view(request, task_id=None): # Може приймати ID ТЗ з URL
+    # Якщо task_id передано, це форма для конкретного ТЗ.
+    # Якщо ні, то перше поле форми - вибір ТЗ.
+    
+    technical_task_instance = None
+    if task_id:
+        technical_task_instance = get_object_or_404(TechnicalTask, pk=task_id, review_result=DocumentReviewResultChoices.READ)
+    
+    if request.method == 'POST':
+        # Якщо ми працюємо з конкретним ТЗ, передаємо його instance у форму
+        # Якщо ТЗ обирається у формі, то instance не потрібен при POST, отримуємо з cleaned_data
+        
+        form = TechnicalTaskProcessForm(request.POST) # Якщо ТЗ обирається у формі
+        # Якщо ТЗ передано через URL:
+        # form = TechnicalTaskProcessForm(request.POST, instance=technical_task_instance if technical_task_instance else None)
+        # Але оскільки ми оновлюємо конкретні поля, краще отримувати ТЗ з cleaned_data 'technical_task_to_process'
+
+        if form.is_valid():
+            task_to_process = form.cleaned_data['technical_task_to_process']
+            new_status = form.cleaned_data['new_review_result']
+            processed_by_person = form.cleaned_data['processed_by']
+            processing_note_text = form.cleaned_data['processing_note']
+            # outgoing_number = form.cleaned_data.get('outgoing_number')
+            # outgoing_date = form.cleaned_data.get('outgoing_date')
+
+            task_to_process.review_result = new_status
+            task_to_process.reviewed_by = processed_by_person
+            
+            # Додаємо примітку про опрацювання до існуючої або створюємо нову
+            if processing_note_text:
+                if task_to_process.note:
+                    task_to_process.note += f"\n--- Опрацювання ({timezone.now().strftime('%d.%m.%Y %H:%M')}) ---\n{processing_note_text}"
+                else:
+                    task_to_process.note = f"--- Опрацювання ({timezone.now().strftime('%d.%m.%Y %H:%M')}) ---\n{processing_note_text}"
+            
+            # Якщо є поля для вихідного номера/дати, оновлюємо їх
+            # task_to_process.outgoing_document_number = outgoing_number 
+            # task_to_process.outgoing_document_date = outgoing_date
+
+            task_to_process.save() # updated_at оновиться автоматично
+
+            messages.success(request, f"Технічне завдання №{task_to_process.input_number} (ОІД: {task_to_process.oid.cipher}) успішно опрацьовано. Новий статус: {task_to_process.get_review_result_display()}.")
+            return redirect('oids:list_technical_tasks') 
+        else:
+            messages.error(request, "Будь ласка, виправте помилки у формі.")
+            print(f"TechnicalTaskProcessForm errors: {form.errors.as_json()}")
+
+    else: # GET request
+        initial_form_data = {}
+        if technical_task_instance:
+            initial_form_data['technical_task_to_process'] = technical_task_instance
+            # Можна також передати reviewed_by, якщо він є у request.user
+            # if request.user.is_authenticated and hasattr(request.user, 'person_profile'):
+            #     initial_form_data['processed_by'] = request.user.person_profile
+
+        form = TechnicalTaskProcessForm(initial=initial_form_data)
+        # Якщо technical_task_instance визначено, можна обмежити queryset для technical_task_to_process
+        # або просто обрати його, якщо поле не disabled
+        if technical_task_instance:
+            form.fields['technical_task_to_process'].queryset = TechnicalTask.objects.filter(pk=technical_task_instance.pk)
+            form.fields['technical_task_to_process'].empty_label = None # Прибираємо порожню опцію, якщо ТЗ вже обрано
+
+    context = {
+        'form': form,
+        'page_title': f"Опрацювання Технічного Завдання{': ' + str(technical_task_instance) if technical_task_instance else ''}",
+        'technical_task_instance': technical_task_instance # Для відображення деталей ТЗ на сторінці
+    }
+    return render(request, 'oids/forms/technical_task_process_form.html', context)
+
+
+
 # list info 
 def summary_information_hub_view(request):
     """
@@ -1625,8 +1740,9 @@ def technical_task_list_view(request):
     oids_for_filter = OID.objects.select_related('unit').all().order_by('unit__code', 'cipher') 
     review_result_choices_for_filter = DocumentReviewResultChoices.choices #
     # Фільтруємо осіб, які справді щось розглядали, щоб список не був занадто великим
-    persons_for_filter = Person.objects.filter(reviewed_technical_tasks__isnull=False).distinct().order_by('full_name')
-        
+    persons_for_filter = Person.objects.filter(
+        processed_technical_tasks__isnull=False # <--- ЗМІНЕНО ТУТ
+    ).distinct().order_by('full_name')        
     context = {
         'page_title': 'Список Технічних Завдань',
         'object_list': page_obj,
@@ -1635,7 +1751,7 @@ def technical_task_list_view(request):
         'units_for_filter': units_for_filter,
         'oids_for_filter': oids_for_filter,
         'review_result_choices_for_filter': review_result_choices_for_filter,
-        'persons_for_filter': persons_for_filter,
+		'persons_for_filter': persons_for_filter,
         'current_filter_unit_id': current_filter_unit_id,
         'current_filter_oid_id': current_filter_oid_id,
         'current_filter_review_result': filter_review_result,

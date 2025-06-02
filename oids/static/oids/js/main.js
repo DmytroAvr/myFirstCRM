@@ -26,7 +26,8 @@ const SELECTORS = {
     INSERT_UNIT_SPAN: "#insert_unit", // Span для відображення назви військової частини
     UNIT_SELECT: "#id_unit", // Основний select для військової частини (один на сторінці)
     OID_ASIDE_CLOSE_BUTTON: "#oid-aside-close",
-    OID_CREATE_FORM: "#ajaxOidCreateForm", // ID форми створення ОІД. раніше була #oid-create-form
+	OID_CREATE_FORM: "#ajaxOidCreateForm", // ID форми створення ОІД. раніше була #oid-create-form
+	
     OID_SELECT_NAME_SUFFIX: "-oid", // Для полів OID у формсеті (e.g., form-0-oid)
     OID_SELECT_MAIN_NAME: "oid", // Для основного поля OID, якщо воно не в формсеті (e.g., id_oid)
 };
@@ -366,11 +367,11 @@ function closeOidAside() {
  */
 async function handleOidCreateFormSubmit(event) {
     event.preventDefault();
-
+	console.log("MAIN_JS: handleOidCreateFormSubmit CALLED");
     const form = event.target; // Це #oid-create-form або #ajaxOidCreateForm з base.html
     const formData = new FormData(form);
     const oidModalElement = document.getElementById("createOidModal"); // ID модального вікна з base.html
-
+    console.log("MAIN_JS: FormData for OID creation:", Object.fromEntries(formData));
     // Переконайтесь, що unit_id додається до formData, якщо ваш AJAX endpoint 'ajax_create_oid' його очікує.
     // Це вже мало б відбуватися при відкритті модалки (запис у hidden input)
     // або ви можете додати його тут, якщо це потрібно:
@@ -379,15 +380,15 @@ async function handleOidCreateFormSubmit(event) {
     //     formData.append('unit', unitIdForNewOid.value); // Або та назва, яку очікує view
     // }
 
-    try {
-        // Переконайтесь, що URL правильний. Якщо form.action порожній, отримайте URL з window.AJAX_CREATE_OID_URL
-        const actionUrl = form.action || window.AJAX_CREATE_OID_URL;
-        if (!actionUrl) {
-            console.error("URL для створення ОІД не знайдено!");
-            alert("Помилка: URL для створення ОІД не визначено.");
-            return;
-        }
+	// Переконайтесь, що URL правильний. Якщо form.action порожній, отримайте URL з window.AJAX_CREATE_OID_URL
+	const actionUrl = form.action || window.AJAX_CREATE_OID_URL;
+	if (!actionUrl) {
+		console.error("URL для створення ОІД не знайдено!");
+		alert("Помилка: URL для створення ОІД не визначено.");
+		return;
+	}
 
+    try {
         const response = await fetch(actionUrl, {
             method: "POST",
             body: formData,
@@ -397,7 +398,7 @@ async function handleOidCreateFormSubmit(event) {
             },
         });
         const data = await response.json(); // {status: 'success', oid_id: ..., oid_name: ..., unit_id: ...} АБО {status: 'error', errors: ...}
-
+ console.log("MAIN_JS: AJAX response from OID creation:", data);
         if (data.status === "success" && data.oid_id && data.oid_name) {
             // Успіх! Генеруємо подію.
             if (oidModalElement) {
@@ -416,7 +417,8 @@ async function handleOidCreateFormSubmit(event) {
             // const modalInstance = bootstrap.Modal.getInstance(oidModalElement);
             // if (modalInstance) modalInstance.hide();
         } else if (data.status === "error" && data.errors) {
-            // Помилка валідації. Генеруємо подію.
+			// Помилка валідації. Генеруємо подію.
+			console.warn("MAIN_JS: OID creation VALIDATION ERROR. Dispatching 'oid.created.error' event.");
             if (oidModalElement) {
                 const errorEvent = new CustomEvent("oid.created.error", {
                     detail: { errors: data.errors },
@@ -453,6 +455,7 @@ async function handleOidCreateFormSubmit(event) {
 // if (oidCreateFormElement) {
 //    oidCreateFormElement.addEventListener('submit', handleOidCreateFormSubmit);
 // }
+
 // Або, якщо кнопка submit модалки має окремий ID, то вішати 'click' на неї і викликати handleOidCreateFormSubmit
 // з передачею форми. Поточний ваш main.js [cite: 1] мав:
 // const oidCreateForm = aside.querySelector(SELECTORS.OID_CREATE_FORM); -> (це була #oid-create-form)
@@ -460,19 +463,20 @@ async function handleOidCreateFormSubmit(event) {
 //    oidCreateForm.addEventListener("submit", handleOidCreateFormSubmit);
 // }
 // Потрібно оновити SELECTORS.OID_CREATE_FORM на 'ajaxOidCreateForm' або той ID, що є у формі в base.html.
-// !кінець для створення popup "додати ОІД"
-// !кінець логіка для створення popup "додати ОІД"
 
 /**
  * Ініціалізує логіку для бічного вікна створення ОІД.
  */
 function setupOidAsideLogic() {
+	console.log("MAIN_JS: setupOidAsideLogic CALLED");
     const aside = document.querySelector(SELECTORS.OID_ASIDE);
     if (!aside) return;
 
     const closeButton = aside.querySelector(SELECTORS.OID_ASIDE_CLOSE_BUTTON);
     const overlay = document.querySelector(SELECTORS.OVERLAY);
-    const oidCreateForm = aside.querySelector(SELECTORS.OID_CREATE_FORM);
+	const oidCreateForm = aside.querySelector(SELECTORS.OID_CREATE_FORM);
+	// const oidCreateFormElement = document.querySelector(SELECTORS.OID_CREATE_FORM); // Використовуємо SELECTORS
+	console.log("MAIN_JS: Modal OID Form Element found by selector:", SELECTORS.OID_CREATE_FORM, oidCreateForm);
 
     if (closeButton) {
         closeButton.addEventListener("click", closeOidAside);
@@ -481,7 +485,10 @@ function setupOidAsideLogic() {
         overlay.addEventListener("click", closeOidAside); // Закриття по кліку на оверлей
     }
     if (oidCreateForm) {
-        oidCreateForm.addEventListener("submit", handleOidCreateFormSubmit);
+		oidCreateForm.addEventListener("submit", handleOidCreateFormSubmit);
+		console.log("MAIN_JS: Submit event listener ATTACHED to form:", oidCreateForm.id);
+    } else {
+        console.error("MAIN_JS: ERROR: OID Create Form (#ajaxOidCreateForm) NOT FOUND. Cannot attach submit listener.");
     }
 
     // Глобальний слухач для кнопок "Додати ОІД" (делегування подій)
@@ -494,6 +501,8 @@ function setupOidAsideLogic() {
 }
 
 
+// !кінець для створення popup "додати ОІД"
+// !кінець логіка для створення popup "додати ОІД"
 
 
 

@@ -1,4 +1,110 @@
 /* Дуже базовий CSS для прикладу */
+:root {
+
+            /* Colors */
+
+            --color-white: #fff;
+            --color-black: #000;
+            --color-main-blue: #1976D2;
+            --color-light-blue: #1E88E5;
+            --color-hover-bg: rgba(0, 0, 0, 0.03);
+            --color-border: rgba(0, 0, 0, 0.2);
+            --color-active-border: #1E88E5;
+
+            /* Effects */
+            
+            --transition: all 120ms ease-in 80ms;
+            --primary-shadow: rgba(0, 0, 0, 0.05) 0px 6px 24px 0px, rgba(0, 0, 0, 0.08) 0px 0px 0px 1px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: poppins;
+        }
+
+        .main {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .menu {
+            position: relative;
+        }
+
+        .menu__button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25em;
+            width: 15em;
+            height: 2.5em;
+            background-color: var(--color-main-blue);
+            color: var(--color-white);
+            font-size: 1.2em;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: var(--transition);
+            font-weight: 600;
+        }
+
+        .menu:hover .menu__button {
+            background-color: var(--color-light-blue);
+        }
+
+        .menu__button-icon {
+            width: 1.5em;
+            transition: var(--transition);
+        }
+
+        .menu:hover .menu__button-icon {
+            transform: rotate(-180deg);
+        }
+
+        .menu__content {
+            position: absolute;
+            width: 100%;
+            margin-top: 0.3em;
+            border-radius: 2px;
+            box-shadow: var(--primary-shadow);
+            visibility: hidden;
+            opacity: 0;
+            transition: var(--transition);
+			background-color: #ffffffce;
+		}
+
+        .menu:hover .menu__content {
+            visibility: visible;
+            opacity: 1;
+			
+        }
+
+        .menu__link {
+            display: block;
+            padding: 0.25em;
+            margin: 0.25em 0.25em 0;
+            color: var(--color-black);
+            text-align: center;
+            text-decoration: none;
+            border-left: 0.125em solid var(--color-border);
+            border-radius: 1px;
+        }
+
+        .menu__link:last-child {
+            margin-bottom: 0.25em;
+        }
+
+        .menu__link:hover {
+            background-color: var(--color-hover-bg);
+            border-left-color: var(--color-active-border);
+        }
+
+
 body {
 	font-family: Arial, sans-serif;
 	margin: 0;
@@ -17,6 +123,10 @@ body {
 .header {
 	text-align: center;
 	margin-bottom: 20px;
+}
+.nav {
+    justify-content: space-around;
+
 }
 .nav-buttons {
 	display: flex;
@@ -59,9 +169,7 @@ ul {
 ul li {
 	margin-bottom: 8px;
 }
-.nav-buttons li {
-	text-decoration: none;
-}
+
 ul li a {
 	text-decoration: none;
 	color: #333;

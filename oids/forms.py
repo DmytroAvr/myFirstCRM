@@ -3,14 +3,14 @@
 from django import forms
 from django.forms import inlineformset_factory, modelformset_factory
 from .models import (WorkRequestStatusChoices, WorkTypeChoices, OIDTypeChoices, 
-	OIDStatusChoices, AttestationRegistrationStatusChoices, 
+	OIDStatusChoices, AttestationRegistrationStatusChoices, DocumentReviewResultChoices
 )
 from .models import (
     WorkRequest, WorkRequestItem, OID, Unit, Person, Trip, TripResultForUnit, Document, DocumentType,
-    AttestationRegistration, AttestationResponse,  
+    AttestationRegistration, AttestationResponse,  TechnicalTask
 )
 from django_tomselect.forms import TomSelectModelChoiceField, TomSelectConfig
-
+from django.utils import timezone
 
 class WorkRequestForm(forms.ModelForm):
     unit = forms.ModelChoiceField(
@@ -893,6 +893,111 @@ class TripResultSendForm(forms.ModelForm):
                         if last_updated_item:
                             last_updated_item.update_request_status() # Припускаючи, що цей метод існує і працює
                         print(f"DEBUG: Attempted to update overall status for WorkRequest {work_request.id}")
-
-
         return instance
+    
+class TechnicalTaskCreateForm(forms.ModelForm):
+    unit = forms.ModelChoiceField(
+        queryset=Unit.objects.all().order_by('code'),
+        label="1. Військова частина",
+        widget=forms.Select(attrs={'class': 'form-select tomselect-field', 'id': 'id_tt_create_unit'}),
+        empty_label="Оберіть ВЧ..."
+    )
+    # Поле oid буде ModelChoiceField, але його queryset оновлюється динамічно
+    oid = forms.ModelChoiceField(
+        queryset=OID.objects.none(), 
+        label="2. Об'єкт інформаційної діяльності (ОІД)",
+        widget=forms.Select(attrs={'class': 'form-select tomselect-field', 'id': 'id_tt_create_oid'}),
+        empty_label="Спочатку оберіть ВЧ...",
+        required=True
+    )
+
+    class Meta:
+        model = TechnicalTask
+        fields = [
+            # 'unit' не є полем моделі TechnicalTask, він для фільтрації OID
+            'oid', 'input_number', 'input_date', 
+            'read_till_date', 'note'
+            # Поля reviewed_by та review_result будуть встановлені пізніше або матимуть default
+        ]
+        widgets = {
+            'input_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'read_till_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'input_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'note': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        initial_unit_id = kwargs.pop('initial_unit_id', None)
+        initial_oid_id = kwargs.pop('initial_oid_id', None)
+        super().__init__(*args, **kwargs)
+
+        if initial_unit_id:
+            self.fields['unit'].initial = initial_unit_id
+            self.fields['oid'].queryset = OID.objects.filter(unit_id=initial_unit_id).order_by('cipher')
+            if initial_oid_id:
+                self.fields['oid'].initial = initial_oid_id
+        
+        if self.is_bound:
+            unit_id_from_data = self.data.get(self.add_prefix('unit'))
+            if unit_id_from_data and unit_id_from_data.isdigit():
+                self.fields['oid'].queryset = OID.objects.filter(unit_id=int(unit_id_from_data)).order_by('cipher')
+
+# Доступні статуси для форми опрацювання
+PROCESS_STATUS_CHOICES = [
+    (DocumentReviewResultChoices.AWAITING_DOCS, DocumentReviewResultChoices.AWAITING_DOCS.label),
+    (DocumentReviewResultChoices.APPROVED, DocumentReviewResultChoices.APPROVED.label),
+    (DocumentReviewResultChoices.FOR_REVISION, DocumentReviewResultChoices.FOR_REVISION.label),
+]
+
+
+class TechnicalTaskProcessForm(forms.ModelForm):
+    # Поле для вибору ТЗ, яке потрібно опрацювати
+    technical_task_to_process = forms.ModelChoiceField(
+        queryset=TechnicalTask.objects.filter(review_result=DocumentReviewResultChoices.READ).select_related('oid__unit').order_by('-input_date'),
+        label="1. Оберіть Технічне Завдання для опрацювання (статус 'Опрацювати')",
+        widget=forms.Select(attrs={'class': 'form-select tomselect-field', 'id': 'id_tt_process_task_select'}),
+        empty_label="Оберіть ТЗ...",
+        required=True
+    )
+    
+    # Поле для вибору нового статусу
+    new_review_result = forms.ChoiceField(
+        choices=PROCESS_STATUS_CHOICES,
+        label="2. Встановіть новий результат опрацювання",
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        required=True
+    )
+    
+    # Поле "Хто опрацював" (reviewed_by)
+    # reviewed_by вже є в моделі, але ми можемо його тут перевизначити, якщо потрібно
+    # Якщо залишити як є в моделі, то у view при збереженні ми його оновимо.
+    # Для простоти, припустимо, що reviewed_by буде заповнюватися у view.
+    # Або можна додати його сюди:
+    processed_by = forms.ModelChoiceField(
+        queryset=Person.objects.filter(is_active=True).order_by('full_name'),
+        label="3. Хто опрацював",
+        widget=forms.Select(attrs={'class': 'form-select tomselect-field', 'id': 'id_tt_process_processed_by'}),
+        required=True # Або False, якщо може бути автоматично
+    )
+    
+    processing_note = forms.CharField(
+        label="4. Примітка до опрацювання/відправки (опційно)",
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        required=False
+    )
+    # Поля для "вихідного номера та дати" ТЗ, якщо вони потрібні окремо.
+    # Якщо "відправка" ТЗ означає просто зміну його статусу та додавання reviewed_by,
+    # то ці поля можуть бути не потрібні або їх значення можна вносити в 'processing_note'.
+    # outgoing_number = forms.CharField(label="Вихідний номер (якщо є)", required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
+    # outgoing_date = forms.DateField(label="Дата вихідного (якщо є)", required=False, widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}))
+
+
+    class Meta:
+        model = TechnicalTask # Ми оновлюємо існуючий TechnicalTask
+        # Поля, які ми дозволяємо редагувати через цю форму (крім вибору самого ТЗ)
+        fields = [] # Жодних полів моделі напряму не редагуємо тут, все через кастомні поля
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Можна відфільтрувати queryset для technical_task_to_process, якщо потрібно (наприклад, за користувачем)
+        # self.fields['technical_task_to_process'].queryset = ...

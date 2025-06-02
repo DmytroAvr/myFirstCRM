@@ -23,20 +23,77 @@
 <body>
 	<div class="container">
 		<header class="header py-3 mb-4 border-bottom">
+			<nav class="mb-3">
+			<ul class="nav nav-pills">
+				<li class="nav-item">
+					<a href="{% url 'oids:main_dashboard' %}" class="menu__link">ГОЛОВНА</a>					
+				</li>
+				<li class="nav-item">					
+						<div class="menu">
+							<button class="menu__button">
+								<svg class="menu__button-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 24"
+									stroke-width="1.5" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+								</svg>
+								ТЗ
+							</button>
+							<div class="menu__content">
+								<a href="{% url 'oids:technical_task_create' %}" class="nav-link">Дадати ТЗ</a>
+								<a href="{% url 'oids:technical_task_process_select' %}" class="nav-link">Відправити ТЗ (опрацювати)</a>
+							</div>
+						</div>
+				</li>
+				<li>
+					<div class="menu">
+							<button class="menu__button">
+								<svg class="menu__button-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 24"
+									stroke-width="1.5" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+								</svg>
+								Заявки / Планування
+							</button>
+							<div class="menu__content">
+								<a href="{% url 'oids:add_work_request_view_name' %}" class="nav-link">Додати заявку</a>
+								<a href="{% url 'oids:plan_trip_view_name' %}" class="nav-link">Запланувати відрядження</a>
+							</div>
+						</div></li>
+				<li><div class="menu">
+							<button class="menu__button">
+								<svg class="menu__button-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 24"
+									stroke-width="1.5" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+								</svg>
+								опрацювання документів / відправка в частину
+							</button>
+							<div class="menu__content">
+								<a href="{% url 'oids:add_document_processing_view_name' %}" class="nav-link">Додати опрацювання документів</a>
+								<a href="{% url 'oids:send_trip_results_form' %}" class="nav-link">Відправити документи в частину</a> 
+
+							</div>
+						</div>
+					</li>
+				<li><div class="menu">
+							<button class="menu__button">
+								<svg class="menu__button-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 24"
+									stroke-width="1.5" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+								</svg>
+								до ДССЗЗІ
+							</button>
+							<div class="menu__content">
+								<a href="{% url 'oids:send_attestation_for_registration' %}" class="nav-link">Відправка на реєстрацію АА (до ДССЗЗІ) </a>
+								<a href="{% url 'oids:record_attestation_response' %}" class="nav-link">Реєстрація АА (відповідь ДССЗЗІ)</a>
+								<a href="{% url 'oids:update_oid_status' %}" class="nav-link">Змінити статус ОІД</a>
+							</div>
+						</div></li>
+
+			</ul>
+		</nav>
+
 			<h1 class="h3">{% block page_title %}Панель керування ОІД{% endblock %}</h1>
 		</header>
 
-		<nav class="mb-3">
-			<ul class="nav nav-pills">
-				<li class="nav-item"><a href="{% url 'oids:add_work_request_view_name' %}" class="nav-link">Додати заявку</a></li>
-				<li class="nav-item"><a href="{% url 'oids:plan_trip_view_name' %}" class="nav-link">Запланувати відрядження</a></li>
-				<li class="nav-item"><a href="{% url 'oids:add_document_processing_view_name' %}" class="nav-link">Додати опрацювання</a></li>
-				<li class="nav-item"><a href="{% url 'oids:update_oid_status' %}" class="nav-link">Змінити статус ОІД</a></li>
-				<li class="nav-item"><a href="{% url 'oids:send_attestation_for_registration' %}" class="nav-link">Відправка на реєстрацію АА (до ДССЗЗІ) </a></li>
-				<li class="nav-item"><a href="{% url 'oids:record_attestation_response' %}" class="nav-link">Реєстрація АА (відповідь ДССЗЗІ)</a></li>
-				<li class="nav-item"><a href="{% url 'oids:send_trip_results_form' %}" class="nav-link">Відправити документи в частину</a></li>
-			</ul>
-		</nav>
+		
 
 		{% if messages %}
 		<div id="messages" class="messages-container">
@@ -85,9 +142,8 @@
 
 						<div class="mb-3">
 							<label for="id_modal_oid_type" class="form-label">Тип ОІД</label>
-							<select name="oid_type" id="id_modal_oid_type" class="form-select">
-								{# Припускаємо, що view.get_oid_type_choices доступний, або ці опції будуть завантажені інакше #}
-								{% for value, text in view.get_oid_type_choices %}
+							<select name="oid_type" id="id_modal_oid_type" class="form-select" required>
+								{% for value, text in oid_type_choices_global %} 
 								<option value="{{ value }}">{{ text }}</option>
 								{% endfor %}
 							</select>
@@ -95,7 +151,7 @@
 						</div>
 						<div class="mb-3">
 							<label for="id_modal_cipher" class="form-label">Шифр ОІД</label>
-							<input type="text" name="cipher" id="id_modal_cipher" class="form-control">
+							<input type="text" name="cipher" id="id_modal_cipher" class="form-control" required>
 							<div class="invalid-feedback" data-field-errors-bs="cipher"></div>
 						</div>
 						<div class="mb-3">
@@ -105,13 +161,13 @@
 						</div>
 						<div class="mb-3">
 							<label for="id_modal_room" class="form-label">Приміщення №</label>
-							<input type="text" name="room" id="id_modal_room" class="form-control">
+							<input type="text" name="room" id="id_modal_room" class="form-control" required>
 							<div class="invalid-feedback" data-field-errors-bs="room"></div>
 						</div>
 						<div class="mb-3">
 							<label for="id_modal_status" class="form-label">Поточний стан ОІД</label>
-							<select name="status" id="id_modal_status" class="form-select">
-								{% for value, text in view.get_oid_status_choices %}
+							<select name="status" id="id_modal_status" class="form-select" required>
+								{% for value, text in oid_status_choices_global_for_new %} 
 								<option value="{{ value }}">{{ text }}</option>
 								{% endfor %}
 							</select>
@@ -120,7 +176,7 @@
 						<div class="mb-3">
 							<label for="id_modal_sec_level" class="form-label">Гриф ОІД</label>
 							<select name="sec_level" id="id_modal_sec_level" class="form-select">
-								{% for value, text in view.get_sec_level_choices %}
+								{% for value, text in sec_level_choices_global %}
 								<option value="{{ value }}">{{ text }}</option>
 								{% endfor %}
 							</select>
@@ -136,7 +192,7 @@
 				</div>
 				<div class="modal-footer">
 					<button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="createOidModalCloseFooterBtn">Закрити</button>
-					<button type="button" class="btn btn-primary" id="submitOidCreateFormBootstrap">Створити ОІД</button>
+					<button type="submit" form="ajaxOidCreateForm" class="btn btn-primary" id="submitOidCreateFormBootstrap">Створити ОІД</button>
 				</div>
 			</div>
 		</div>
@@ -151,10 +207,145 @@
 
 	{# TODO: Додайте сюди посилання на JS для Tom Select #}
 
-	{# <script src="{% static 'oids/js/filtering_dynamic.js' %}"></script>  #}
 	<script src="{% static 'oids/js/main.js' %}"></script>
 
-	{% block extra_js %}{% endblock %}
+	{% block extra_js %}
+	<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('ajaxOidCreateForm');
+    const submitButton = document.getElementById('submitOidCreateFormBootstrap');
+    const formAlertsContainer = document.getElementById('oidCreateFormAlertsBootstrap');
+
+    if (form && submitButton) {
+        form.addEventListener('submit', function (event) {
+            event.preventDefault(); // Зупиняємо стандартну відправку форми
+
+            let isValid = true;
+            formAlertsContainer.innerHTML = ''; // Очищуємо попередні загальні повідомлення
+
+            // Знаходимо всі поля з атрибутом 'required' всередині форми
+            const requiredFields = form.querySelectorAll('[required]');
+
+            requiredFields.forEach(function (field) {
+                const fieldName = field.name;
+                const errorDiv = form.querySelector(`[data-field-errors-bs="${fieldName}"]`);
+
+                // Скидаємо попередні помилки для поля
+                field.classList.remove('is-invalid');
+                if (errorDiv) {
+                    errorDiv.textContent = '';
+                }
+
+                // Перевіряємо, чи поле заповнене
+                if (field.value.trim() === '') {
+                    isValid = false;
+                    field.classList.add('is-invalid');
+                    if (errorDiv) {
+                        errorDiv.textContent = 'Це поле є обов\'язковим.';
+                    }
+                }
+            });
+
+            if (isValid) {
+                // Якщо всі обов'язкові поля заповнені, відправляємо форму
+                console.log('Форма валідна. Відправка POST-запиту...');
+                // Тут буде ваш код для відправки даних форми через AJAX (наприклад, Fetch API)
+
+                const formData = new FormData(form);
+                const url = form.action;
+
+                // Приклад відправки за допомогою Fetch API
+                fetch(url, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        // 'X-CSRFToken': formData.get('csrfmiddlewaretoken') // Django CSRF
+                        // Якщо використовуєте інший фреймворк, заголовок може відрізнятися
+                        // Для Django {% csrf_token %} вже додає приховане поле,
+                        // FormData його підхопить автоматично.
+                        // Fetch API автоматично встановить 'Content-Type' для FormData.
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        // Якщо сервер повернув помилку (статус не 2xx)
+                        // Можна спробувати отримати JSON з помилками від сервера
+                        return response.json().then(errorData => {
+                            throw { status: response.status, data: errorData };
+                        });
+                    }
+                    return response.json(); // Очікуємо JSON у відповіді
+                })
+                .then(data => {
+                    // Обробка успішної відповіді від сервера
+                    console.log('Успіх:', data);
+                    // Наприклад, показати повідомлення про успіх, оновити дані на сторінці, закрити модальне вікно
+                    formAlertsContainer.innerHTML = `
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            ОІД успішно створено!
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>`;
+                    form.reset(); // Очистити форму
+
+                    // Закрити модальне вікно (якщо потрібно)
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('createOidModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
+                    // Тут можна додати код для оновлення таблиці/списку ОІДів на сторінці, якщо потрібно
+                })
+                .catch(error => {
+                    // Обробка помилок (мережа, або відповідь сервера з помилкою)
+                    console.error('Помилка:', error);
+                    let errorMessage = 'Під час створення ОІД сталася помилка.';
+
+                    if (error.data) {
+                        // Якщо сервер повернув структуровані помилки валідації
+                        // Наприклад, error.data може мати вигляд { field_name: ["Помилка 1", "Помилка 2"], ... }
+                        Object.keys(error.data).forEach(fieldName => {
+                            const fieldErrorDiv = form.querySelector(`[data-field-errors-bs="${fieldName}"]`);
+                            const inputField = form.querySelector(`[name="${fieldName}"]`);
+                            if (inputField) {
+                                inputField.classList.add('is-invalid');
+                            }
+                            if (fieldErrorDiv && Array.isArray(error.data[fieldName])) {
+                                fieldErrorDiv.textContent = error.data[fieldName].join(' ');
+                            }
+                        });
+                        if (error.data.non_field_errors) { // Загальні помилки форми від Django
+                             errorMessage = error.data.non_field_errors.join(' ');
+                        } else if (!Object.keys(error.data).some(k => form.querySelector(`[data-field-errors-bs="${k}"]`))) {
+                            // Якщо помилки є, але не прив'язані до конкретних полів, або поля не знайдені
+                            errorMessage = "Будь ласка, перевірте введені дані. " + (Object.values(error.data).flat().join(' ') || '');
+                        }
+
+                    } else if (error.status) {
+                        errorMessage = `Помилка сервера: ${error.status}.`;
+                    }
+
+                    formAlertsContainer.innerHTML = `
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            ${errorMessage}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>`;
+                });
+
+            } else {
+                // Якщо форма не валідна, показуємо загальне повідомлення (опціонально)
+                console.log('Форма не валідна. Будь ласка, заповніть всі обов\'язкові поля.');
+                formAlertsContainer.innerHTML = `
+                    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                        Будь ласка, заповніть всі обов'язкові поля, позначені червоним.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>`;
+            }
+        });
+    } else {
+        console.error('Форма або кнопка відправки не знайдені!');
+    }
+});
+</script>
+{% endblock %}
 
 </body>
 

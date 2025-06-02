@@ -77,7 +77,8 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                "django_tomselect.context_processors.tomselect",
+                'django_tomselect.context_processors.tomselect',
+				'oids.context_processors.global_choices',
             ],
         },
 		

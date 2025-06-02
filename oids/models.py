@@ -16,7 +16,7 @@ class OIDStatusChoices(models.TextChoices):
     NEW = 'створюється', 'Створюється'
     RECEIVED_TZ = 'отримано ТЗ', 'Отримано ТЗ' # Додано з твого опису "Стан ОІД"
     RECEIVED_REQUEST = 'отримано заявку', 'Отримано Заявку' # Додано з твого опису "Стан ОІД"
-    ACTIVE = 'активний', 'Активний (наступне проведення робіт)'
+    ACTIVE = 'активний', 'Активний (В дії)'
     TERMINATED = 'призупинено', 'Призупинено'
     CANCELED = 'скасований', 'Скасований'
 
@@ -35,7 +35,7 @@ class WorkTypeChoices(models.TextChoices):
     IK = 'ІК', 'ІК'
     
 class DocumentReviewResultChoices(models.TextChoices): 
-    READ = 'працювати', 'Опрацювати'
+    READ = 'опрацювати', 'Опрацювати'
     AWAITING_DOCS = 'очікує в папері', 'Очікує в папері'
     APPROVED = 'погоджено', 'Погоджено'
     FOR_REVISION = 'на доопрацювання', 'На доопрацювання'
@@ -773,42 +773,35 @@ class TripResultForUnit(models.Model):
         verbose_name = "Результати відрядження для частини"
         verbose_name_plural = "Результати відрядження для частин"
 
+# oids/models.py
 class TechnicalTask(models.Model):
-    """
-    Технічне завдання
-    """
-    oid = models.ForeignKey(
-        OID, 
-        on_delete=models.CASCADE, 
-        verbose_name="ОІД", 
-        related_name='technical_tasks' 
-    )
+    # ... (поля як у вас)
+    oid = models.ForeignKey(OID, on_delete=models.CASCADE, verbose_name="ОІД", related_name='technical_tasks')
     input_number = models.CharField(max_length=50, verbose_name="Вхідний номер")
     input_date = models.DateField(verbose_name="Вхідна дата")
     read_till_date = models.DateField(verbose_name="Опрацювати до")
     reviewed_by = models.ForeignKey(
         Person, 
         on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
-        verbose_name="Хто ознайомився",
-        related_name='reviewed_technical_tasks' # Додав related_name
+        null=True, blank=True, 
+        verbose_name="Хто ознайомився/опрацював", # Оновлено для ясності
+        related_name='processed_technical_tasks' # <--- ЗМІНЕНО ТУТ
     )
     review_result = models.CharField(
         max_length=30, 
         choices=DocumentReviewResultChoices.choices, 
-        default=DocumentReviewResultChoices.APPROVED, 
-        verbose_name="Результат розгляду"
+        # default=DocumentReviewResultChoices.APPROVED, # Можна прибрати default, якщо встановлюється у view
+        verbose_name="Результат розгляду / Статус ТЗ" # Змінено verbose_name
     )
     note = models.TextField(blank=True, null=True, verbose_name="Примітка")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
 
     def __str__(self):
-        return f"ТЗ №{self.input_number} для {self.oid.cipher}"
-class Meta:
-        verbose_name = "Опрацьований ТЗ"
-        verbose_name_plural = "Опрацьовані ТЗ"
-        ordering = ['-input_date', '-read_till_date']
-        
+        return f"ТЗ №{self.input_number} для ОІД: {self.oid.cipher} (статус: {self.get_review_result_display()})"
+
+    class Meta:
+        verbose_name = "Технічне Завдання" # Змінено
+        verbose_name_plural = "Технічні Завдання" # Змінено
+        ordering = ['-input_date', '-read_till_date', '-created_at'] # Додав created_at
 # 

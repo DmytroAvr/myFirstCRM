@@ -220,12 +220,22 @@ def create_oid_ajax(request):
         return JsonResponse({'success': False, 'errors': {'unit_id': ['Unit ID не передано']}}, status=400)
 
     if form.is_valid():
-        oid = form.save(commit=False)
+        oid = form.save(commit=False)		
         try:
+            
             unit = Unit.objects.get(id=unit_id)
             oid.unit = unit
             oid.save()
-            return JsonResponse({'success': True, 'oid': {'id': oid.id, 'name': oid.name}})
+            return JsonResponse({
+				'status': 'success',
+				'message': f'ОІД "{oid.cipher}" успішно створено!',
+				'oid_id': oid.id,
+				'oid_cipher': oid.cipher,
+				'oid_name': str(oid), 
+				'unit_id': oid.unit_id 
+			})
+            # 
+			# return JsonResponse({'success': True, 'oid': {'id': oid.id, 'name': oid.name}})
         except Unit.DoesNotExist:
             return JsonResponse({'success': False, 'errors': {'unit': ['Unit не знайдено']}}, status=400)
     else:
@@ -262,16 +272,6 @@ def send_doc_unit(request):
 #     return render(request, 'oids/trip_result_list.html', {'results': results})
 
 # Технічне завдання
-def technical_task_create(request):
-    if request.method == 'POST':
-        form = TechnicalTaskForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect('technical_task_create')  # або інша сторінка
-    else:
-        form = TechnicalTaskForm()
-    return render(request, 'oids/technical_task_form.html', {'form': form})
-
 
 def create_oid(request):
     if request.method == 'POST':

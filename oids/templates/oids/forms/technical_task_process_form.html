@@ -1,0 +1,104 @@
+{% extends "oids/base.html" %}
+{% load static %}
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container form-container">
+    <h2 class="mb-4">{{ page_title }}</h2>
+
+    {% if technical_task_instance %}
+    <div class="card mb-3">
+        <div class="card-header">Деталі обраного Технічного Завдання</div>
+        <div class="card-body">
+            <p><strong>ОІД:</strong> {{ technical_task_instance.oid.cipher }} (ВЧ: {{ technical_task_instance.oid.unit.code }})</p>
+            <p><strong>Вхідний номер:</strong> {{ technical_task_instance.input_number }}</p>
+            <p><strong>Вхідна дата:</strong> {{ technical_task_instance.input_date|date:"d.m.Y" }}</p>
+            <p><strong>Опрацювати до:</strong> {{ technical_task_instance.read_till_date|date:"d.m.Y" }}</p>
+            <p><strong>Поточний статус:</strong> {{ technical_task_instance.get_review_result_display }}</p>
+            <p><strong>Примітка до ТЗ:</strong> {{ technical_task_instance.note|default:"-" }}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger" role="alert">{% for error in form.non_field_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}</div>
+        {% endif %}
+
+        {# Якщо ТЗ не передано через URL, показуємо поле для його вибору #}
+        {% if not technical_task_instance %}
+        <div class="row mb-3">
+            <label for="{{ form.technical_task_to_process.id_for_label }}" class="col-sm-3 col-form-label fw-bold">{{ form.technical_task_to_process.label }}{% if form.technical_task_to_process.field.required %}<span class="text-danger">*</span>{% endif %}:</label>
+            <div class="col-sm-9">{{ form.technical_task_to_process }}{% for error in form.technical_task_to_process.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}</div>
+        </div>
+        {% else %}
+            {# Якщо ТЗ передано, воно буде встановлено у формі у view, але можна передати його ID у прихованому полі #}
+            <input type="hidden" name="{{ form.technical_task_to_process.name }}" value="{{ technical_task_instance.pk }}">
+        {% endif %}
+
+        <div class="row mb-3">
+            <label for="{{ form.new_review_result.id_for_label }}" class="col-sm-3 col-form-label fw-bold">{{ form.new_review_result.label }}{% if form.new_review_result.field.required %}<span class="text-danger">*</span>{% endif %}:</label>
+            <div class="col-sm-9">{{ form.new_review_result }}{% for error in form.new_review_result.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}</div>
+        </div>
+        <div class="row mb-3">
+            <label for="{{ form.processed_by.id_for_label }}" class="col-sm-3 col-form-label fw-bold">{{ form.processed_by.label }}{% if form.processed_by.field.required %}<span class="text-danger">*</span>{% endif %}:</label>
+            <div class="col-sm-9">{{ form.processed_by }}{% for error in form.processed_by.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}</div>
+        </div>
+        <div class="row mb-3">
+            <label for="{{ form.processing_note.id_for_label }}" class="col-sm-3 col-form-label fw-bold">{{ form.processing_note.label }}{% if form.processing_note.field.required %}<span class="text-danger">*</span>{% endif %}:</label>
+            <div class="col-sm-9">{{ form.processing_note }}{% for error in form.processing_note.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}</div>
+        </div>
+        {# Додайте поля outgoing_number та outgoing_date, якщо ви їх додали у форму #}
+
+        <div class="form-actions mt-4">
+            <button type="submit" class="btn btn-primary">Зберегти результат опрацювання</button>
+            <a href="{% url 'oids:list_technical_tasks' %}" class="btn btn-secondary">Скасувати</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    console.log("TechTaskProcessForm JS: DOMContentLoaded.");
+    if (typeof TomSelect === 'undefined') { console.error("TechTaskProcessForm JS: TomSelect not loaded!"); return; }
+
+    const taskSelect = document.getElementById('id_tt_process_task_select');
+    const processedBySelect = document.getElementById('id_tt_process_processed_by');
+
+    function initTomSelect(element, placeholder, initialOpts = []) {
+        if (!element) return null;
+        // Зчитуємо HTML опції, якщо initialOpts порожні
+        let optionsToUse = initialOpts;
+        if (initialOpts.length === 0 && element.options.length > 0) {
+            optionsToUse = [];
+            Array.from(element.options).forEach(opt => { if (opt.value) optionsToUse.push({id:opt.value, text:opt.text, selected:opt.selected});});
+        }
+        const config = { create: false, placeholder: placeholder, options: optionsToUse, allowEmptyOption: true, valueField: 'id', labelField: 'text', searchField: ['text']};
+        const instance = new TomSelect(element, config);
+        console.log(`TechTaskProcessForm JS: TomSelect for #${element.id} initialized. Options in DOM: ${instance.dropdown_content.querySelectorAll('.option').length}`);
+        // Якщо є початкове значення і воно не обране, спробувати обрати
+        if (element.value && instance.getValue() !== element.value && instance.options[element.value]) {
+            instance.setValue(element.value, true);
+        }
+        return instance;
+    }
+
+    if (taskSelect) { // Це поле для вибору ТЗ, якщо воно не передане через URL
+        const tsTask = initTomSelect(taskSelect, 'Оберіть ТЗ...');
+        if (tsTask) {
+            tsTask.on('change', function(value) {
+                if (value) { // Якщо ТЗ обрано, перезавантажуємо сторінку з ID цього ТЗ
+                    window.location.href = `/oids/technical-task/${value}/process/`; // Адаптуйте URL, якщо потрібно
+                }
+            });
+        }
+    }
+    if (processedBySelect) {
+        initTomSelect(processedBySelect, 'Оберіть виконавця...');
+    }
+});
+</script>
+{% endblock %}

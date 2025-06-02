@@ -25,6 +25,9 @@ urlpatterns = [
 	# 
 	# 
 	# 
+	path('technical-task/create/', views.technical_task_create_view, name='technical_task_create'),
+	path('technical-task/process/', views.technical_task_process_view, name='technical_task_process_select'), # Для вибору ТЗ на формі
+	path('technical-task/<int:task_id>/process/', views.technical_task_process_view, name='technical_task_process_specific'), # Для опрацювання конкретного ТЗ
 
     # URLs для форм
     path('trip/plan/', views.plan_trip_view, name='plan_trip_view_name'),

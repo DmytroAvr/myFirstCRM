@@ -1,0 +1,104 @@
+{% extends "oids/base.html" %}
+{% load static %}
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container form-container">
+    <h2 class="mb-4">{{ page_title }}</h2>
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger" role="alert">
+                {% for error in form.non_field_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
+            </div>
+        {% endif %}
+
+        {# Явний рендеринг полів для кращого контролю #}
+        <div class="row mb-3">
+            <label for="{{ form.unit.id_for_label }}" class="col-sm-3 col-form-label fw-bold">{{ form.unit.label }}{% if form.unit.field.required %}<span class="text-danger">*</span>{% endif %}:</label>
+            <div class="col-sm-9">{{ form.unit }}{% for error in form.unit.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}</div>
+        </div>
+        <div class="row mb-3">
+            <label for="{{ form.oid.id_for_label }}" class="col-sm-3 col-form-label fw-bold">{{ form.oid.label }}{% if form.oid.field.required %}<span class="text-danger">*</span>{% endif %}:</label>
+            <div class="col-sm-9">{{ form.oid }}{% for error in form.oid.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}</div>
+        </div>
+        <div class="row mb-3">
+            <label for="{{ form.input_number.id_for_label }}" class="col-sm-3 col-form-label fw-bold">{{ form.input_number.label }}{% if form.input_number.field.required %}<span class="text-danger">*</span>{% endif %}:</label>
+            <div class="col-sm-9">{{ form.input_number }}{% for error in form.input_number.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}</div>
+        </div>
+        <div class="row mb-3">
+            <label for="{{ form.input_date.id_for_label }}" class="col-sm-3 col-form-label fw-bold">{{ form.input_date.label }}{% if form.input_date.field.required %}<span class="text-danger">*</span>{% endif %}:</label>
+            <div class="col-sm-9">{{ form.input_date }}{% for error in form.input_date.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}</div>
+        </div>
+        <div class="row mb-3">
+            <label for="{{ form.read_till_date.id_for_label }}" class="col-sm-3 col-form-label fw-bold">{{ form.read_till_date.label }}{% if form.read_till_date.field.required %}<span class="text-danger">*</span>{% endif %}:</label>
+            <div class="col-sm-9">{{ form.read_till_date }}{% for error in form.read_till_date.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}</div>
+        </div>
+        <div class="row mb-3">
+            <label for="{{ form.note.id_for_label }}" class="col-sm-3 col-form-label fw-bold">{{ form.note.label }}{% if form.note.field.required %}<span class="text-danger">*</span>{% endif %}:</label>
+            <div class="col-sm-9">{{ form.note }}{% for error in form.note.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}</div>
+        </div>
+
+        <div class="form-actions mt-4">
+            <button type="submit" class="btn btn-primary">Зберегти Технічне Завдання</button>
+            <a href="{% url 'oids:list_technical_tasks' %}" class="btn btn-secondary">Скасувати</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    console.log("TechTaskCreateForm JS: DOMContentLoaded.");
+    const unitSelect = document.getElementById('id_tt_create_unit');
+    const oidSelect = document.getElementById('id_tt_create_oid');
+    const oidsForUnitUrl = "{% url 'oids:ajax_load_oids_for_unit' %}"; 
+    let tsUnit, tsOid;
+
+    if (typeof TomSelect === 'undefined') { console.error("TechTaskCreateForm JS: TomSelect not loaded!"); return; }
+
+    function initTomSelect(element, placeholder, isDisabled = false, initialOpts = []) {
+        if (!element) return null;
+        const config = { create: false, placeholder: placeholder, options: initialOpts, disabled: isDisabled, allowEmptyOption: true, valueField: 'id', labelField: 'text', searchField: ['text'] };
+        return new TomSelect(element, config);
+    }
+
+    if (unitSelect) {
+        let htmlUnitOpts = []; Array.from(unitSelect.options).forEach(opt => {if (opt.value) htmlUnitOpts.push({id:opt.value, text:opt.text, selected: opt.selected});});
+        tsUnit = initTomSelect(unitSelect, 'Оберіть ВЧ...', false, htmlUnitOpts);
+        if (tsUnit) {
+            unitSelect.tomselectInstance = tsUnit;
+            tsUnit.on('change', function(unitId) {
+                console.log("TechTaskCreateForm JS: Unit changed to:", unitId);
+                if (!tsOid) return;
+                tsOid.clear(); tsOid.clearOptions(); tsOid.sync();
+                if (unitId && unitId !== "") {
+                    tsOid.enable(); tsOid.placeholder = 'Завантаження ОІДів...';
+                    fetch(`${oidsForUnitUrl}?unit_id=${unitId}`)
+                        .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t); }))
+                        .then(data => {
+                            const options = data.map(oid => ({ id: oid.id.toString(), text: `${oid.cipher} (${oid.full_name || 'Без назви'})` }));
+                            tsOid.addOptions(options);
+                            tsOid.refreshOptions(false);
+                            tsOid.placeholder = options.length ? 'Оберіть ОІД...' : 'Для ВЧ немає ОІДів';
+                            // Якщо є initial OID для цієї ВЧ, обрати його
+                            const initialOidId = "{{ form.initial.oid.id|default:''|escapejs }}";
+                            if (initialOidId && unitId === "{{ form.initial.unit.id|default:''|escapejs }}" && tsOid.options[initialOidId]) {
+                                tsOid.setValue(initialOidId, true);
+                            }
+                        }).catch(e => { if (tsOid) tsOid.placeholder = 'Помилка ОІД';});
+                } else {
+                    tsOid.disable(); tsOid.placeholder = 'Спочатку оберіть ВЧ';
+                }
+            });
+            if (tsUnit.getValue()) tsUnit.trigger('change'); // Початкове завантаження
+        }
+    }
+    if (oidSelect) {
+        tsOid = initTomSelect(oidSelect, 'Спочатку оберіть ВЧ', true);
+        oidSelect.tomselectInstance = tsOid;
+    }
+});
+</script>
+{% endblock %}
