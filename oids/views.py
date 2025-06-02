@@ -589,6 +589,7 @@ def main_dashboard(request):
     }
     return render(request, 'oids/main_dashboard.html', context)
 
+@login_required 
 @transaction.atomic
 def send_trip_results_view(request):
     if request.method == 'POST':
@@ -983,7 +984,7 @@ def update_oid_status_view(request, oid_id_from_url=None):
     return render(request, 'oids/forms/update_oid_status_form.html', context)
 
 
-
+@login_required 
 @transaction.atomic # Використовуємо транзакцію для цілісності даних
 def send_attestation_for_registration_view(request):
     if request.method == 'POST':
@@ -2039,6 +2040,7 @@ def attestation_response_list_view(request):
 
 
 # View для внесення "Відповіді від ДССЗЗІ"
+@login_required 
 @transaction.atomic
 def record_attestation_response_view(request, att_reg_sent_id=None): # Може приймати ID з URL
     attestation_registration_instance = None
