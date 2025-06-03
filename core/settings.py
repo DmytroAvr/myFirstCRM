@@ -40,8 +40,8 @@ INSTALLED_APPS = [
     'multiselectfield', # Якщо ви використовуєте multiselectfield
     'oids', # Ваш додаток
     'django_tomselect',
-	'simple_history'
-    
+	'simple_history',
+    # 'import_export', #pip install django-import-export
     # 'django_select2',
     # 'core',
     # 'requests',
@@ -142,3 +142,6 @@ LOGIN_URL = '/accounts/login/' # Явно вказуємо URL для сторі
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# from import_export.formats.base_formats import CSV, XLSX
+# IMPORT_FORMATS = [CSV, XLSX]

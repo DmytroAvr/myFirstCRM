@@ -138,16 +138,16 @@
                                 <a href="{% url 'oids:oid_detail_view_name' item.oid.id %}">{{ item.oid.cipher }}</a>
                             </td>
                             <td>
-                                <a href="#"> {# TODO: Посилання на деталі заявки, якщо є #}
-                                    №{{ item.request.incoming_number }}
-                                </a> від {{ item.request.incoming_date|date:"d.m.Y" }}
+                                {# TODO: Посилання на деталі заявки, якщо є <a href="#">  </a>#}
+                                    
+                               №{{ item.request.incoming_number }} від {{ item.request.incoming_date|date:"d.m.Y" }}
                             </td>
                             <td>{{ item.get_work_type_display }}</td>
                             <td>{{ item.get_status_display }}</td>
                             <td>
                                 {% if last_trip and last_trip.start_date and last_trip.end_date %}
                                     {{ last_trip.start_date|date:"d.m.Y" }} - {{ last_trip.end_date|date:"d.m.Y" }}
-                                    (<a href="#">ID:{{ last_trip.id }}</a>) {# TODO: Посилання на деталі відрядження #}
+                                     {#  TODO: (<a href="#">ID:{{ last_trip.id }}</a>) Посилання на деталі відрядження #}
                                 {% else %}
                                     <span class="text-muted">-</span>
                                 {% endif %}
