@@ -713,54 +713,22 @@ class Trip(models.Model):
     history = HistoricalRecords()
 
     def __str__(self):
-        unit_names = ", ".join(unit.code for unit in self.units.all())
-        return f"Відрядження {self.start_date}—{self.end_date} до {unit_names or 'немає частин'} ({unit_city or 'немає міста'})"
+        unit_codes = ", ".join(unit.code for unit in self.units.all()[:3]) # Обмежимо кількість для читабельності
+        if self.units.count() > 3:
+            unit_codes += "..."
+        return f"Відрядження {self.start_date.strftime('%d.%m.%Y')}—{self.end_date.strftime('%d.%m.%Y')} до ВЧ: {unit_codes or 'не вказано'}"
+
     def save(self, *args, **kwargs):
-        is_new = self.pk is None
-        old_end_date = None
-        if not is_new:
-            try:
-                old_end_date = Trip.objects.get(pk=self.pk).end_date
-            except Trip.DoesNotExist:
-                pass
-
-        super().save(*args, **kwargs) # Спочатку зберігаємо Trip
-
-        # Встановлюємо/оновлюємо дедлайни, якщо end_date встановлено і (це новий Trip АБО end_date змінилася)
-        if self.end_date and (is_new or self.end_date != old_end_date):
-            print(f"TRIP_SAVE_DEBUG: Trip ID {self.pk}, end_date: {self.end_date}. Calculating deadlines.")
-            
-            # Отримуємо WorkRequestItems, які пов'язані з цим відрядженням
-            # через поле Trip.work_requests та Trip.oids
-            items_to_process = WorkRequestItem.objects.filter(
-                request__in=self.work_requests.all(),
-                oid__in=self.oids.all(), # Переконуємося, що ОІД з елемента заявки також є в списку ОІДів відрядження
-                # Можливо, додати фільтр по статусу WorkRequestItem, наприклад, тільки 'IN_PROGRESS'
-                # status=WorkRequestStatusChoices.IN_PROGRESS
-            ).select_related('oid', 'request__unit')
-
-            print(f"TRIP_SAVE_DEBUG: Found {items_to_process.count()} WRI to update for trip {self.id}")
-
-            for item in items_to_process:
-                days_for_processing = 0
-                if item.work_type == WorkTypeChoices.IK:
-                    days_for_processing = 15
-                elif item.work_type == WorkTypeChoices.ATTESTATION:
-                    days_for_processing = 10
-                
-                if days_for_processing > 0:
-                    # self.end_date - це останній день відрядження.
-                    # Відлік починається з першого робочого дня ПІСЛЯ self.end_date.
-                    # Отже, add_working_days має додати 'days_for_processing' робочих днів до self.end_date.
-                    new_deadline = add_working_days(self.end_date, days_for_processing)
-                    
-                    if item.doc_processing_deadline != new_deadline:
-                        item.doc_processing_deadline = new_deadline
-                        item.save(update_fields=['doc_processing_deadline', 'updated_at'])
-                        print(f"TRIP_SAVE_DEBUG: WRI ID {item.id} (OID: {item.oid.cipher}) deadline -> {item.doc_processing_deadline}")
+        # Тут може бути інша логіка, специфічна для збереження Trip,
+        # але розрахунок дедлайнів для WorkRequestItem тепер обробляється сигналом.
+        print(f"TRIP_MODEL_SAVE: Saving Trip ID {self.pk} with end_date: {self.end_date}")
+        super().save(*args, **kwargs)
+        # НЕМАЄ логіки розрахунку дедлайнів тут
+    
     class Meta:
         verbose_name = "Відрядження"
         verbose_name_plural = "Відрядження"
+        ordering = ['-start_date', '-id']
 
 class OIDStatusChange(models.Model):
     """

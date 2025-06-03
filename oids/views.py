@@ -11,7 +11,7 @@ from django.db import  transaction
 from django.utils import timezone
 import datetime
 from .models import (OIDTypeChoices, OIDStatusChoices, SecLevelChoices, WorkRequestStatusChoices, WorkTypeChoices, 
-    DocumentReviewResultChoices, AttestationRegistrationStatusChoices, 
+    DocumentReviewResultChoices, AttestationRegistrationStatusChoices, add_working_days
 )
 from .models import (Unit, UnitGroup, OID, OIDStatusChange, TerritorialManagement, 
 	Document, DocumentType, WorkRequest, WorkRequestItem, Trip,TripResultForUnit, 
@@ -22,6 +22,81 @@ from .forms import ( TripForm, TripResultSendForm, DocumentProcessingMainForm, D
 	AttestationRegistrationSendForm, AttestationResponseMainForm, AttestationActUpdateFormSet,
     TechnicalTaskFilterForm, WorkRequestItemProcessingFilterForm
 )
+
+# from .utils import add_working_days # Або перемістіть add_working_days сюди
+
+# def add_working_days(start_date, days_to_add): ... (якщо не в utils.py)
+
+@transaction.atomic
+def plan_trip_view(request):
+    if request.method == 'POST':
+        form = TripForm(request.POST)
+        if form.is_valid():
+            trip = form.save(commit=False) 
+            # Тут можна додати будь-яку логіку перед першим збереженням Trip, якщо потрібно
+            trip.save() # Перше збереження для отримання trip.id
+            form.save_m2m() # Зберігаємо ManyToMany зв'язки (units, oids, work_requests)
+
+            # --- Логіка встановлення дедлайнів ПІСЛЯ збереження M2M ---
+            if trip.end_date:
+                print(f"PLAN_TRIP_VIEW: Trip ID {trip.pk} saved with end_date: {trip.end_date}. Calculating deadlines.")
+                
+                linked_work_requests = trip.work_requests.all()
+                linked_oids_direct = trip.oids.all()
+                
+                print(f"PLAN_TRIP_VIEW: Trip linked to WorkRequest IDs: {[wr.id for wr in linked_work_requests]}")
+                print(f"PLAN_TRIP_VIEW: Trip directly linked to OID IDs: {[o.id for o in linked_oids_direct]}")
+
+                if linked_work_requests.exists():
+                    items_to_process = WorkRequestItem.objects.filter(
+                        request__in=linked_work_requests,
+                        oid__in=linked_oids_direct 
+                        # Можна додати: doc_processing_deadline__isnull=True
+                    ).select_related('oid', 'request__unit')
+
+                    print(f"PLAN_TRIP_VIEW: Found {items_to_process.count()} WRI to update for trip {trip.id}")
+                    
+                    start_counting_from_date = trip.end_date
+
+                    for item in items_to_process:
+                        days_for_processing = 0
+                        if item.work_type == WorkTypeChoices.IK: days_for_processing = 15
+                        elif item.work_type == WorkTypeChoices.ATTESTATION: days_for_processing = 10
+                        
+                        if days_for_processing > 0:
+                            new_deadline = add_working_days(start_counting_from_date, days_for_processing)
+                            if item.doc_processing_deadline != new_deadline:
+                                item.doc_processing_deadline = new_deadline
+                                item.save(update_fields=['doc_processing_deadline', 'updated_at'])
+                                print(f"PLAN_TRIP_VIEW: WRI ID {item.id} (OID: {item.oid.cipher}) deadline -> {item.doc_processing_deadline}")
+                else:
+                    print(f"PLAN_TRIP_VIEW: No WorkRequests linked to Trip ID {trip.pk} to calculate item deadlines.")
+            else:
+                print(f"PLAN_TRIP_VIEW: Trip ID {trip.pk} has no end_date. Deadline calculation skipped.")
+            # --- Кінець логіки дедлайнів ---
+
+
+            messages.success(request, f'Відрядження заплановано успішно (ID: {trip.id}).')
+            # Оновлюємо статус пов'язаних заявок на "В роботі" (ця логіка у вас вже була)
+            for work_request in linked_work_requests: # Використовуємо вже отриманий queryset
+                if work_request.status == WorkRequestStatusChoices.PENDING:
+                    work_request.status = WorkRequestStatusChoices.IN_PROGRESS
+                    work_request.save(update_fields=['status', 'updated_at'])
+                    WorkRequestItem.objects.filter(request=work_request, status=WorkRequestStatusChoices.PENDING)\
+                                           .update(status=WorkRequestStatusChoices.IN_PROGRESS)
+
+            return redirect('oids:list_trips') # Або main_dashboard
+        else:
+            messages.error(request, 'Будь ласка, виправте помилки у формі.')
+            print(f"PLAN_TRIP_VIEW: Form errors: {form.errors.as_json()}")
+    else: # GET request
+        form = TripForm()
+    
+    context = {
+        'form': form, 
+        'page_title': 'Запланувати відрядження'
+    }
+    return render(request, 'oids/forms/plan_trip_form.html', context)
 
 def get_last_document_expiration_date(oid_instance, document_name_keyword, work_type_choice=None):
     try:

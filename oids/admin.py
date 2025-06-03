@@ -45,7 +45,7 @@ class PersonAdmin(admin.ModelAdmin):
 
 @admin.register(WorkRequest)
 class WorkRequestAdmin(SimpleHistoryAdmin):
-    list_display = ('incoming_number', 'unit', 'incoming_date', 'status', 'created_at')
+    list_display = ('incoming_number', 'incoming_date', 'unit', 'status', 'created_at')
     list_filter = ('status', 'unit', 'incoming_date')
     search_fields = ('incoming_number', 'unit__code', 'unit__name')
     date_hierarchy = 'incoming_date'
