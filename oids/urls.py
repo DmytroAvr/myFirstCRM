@@ -51,7 +51,8 @@ urlpatterns = [
     path('attestation-response/record/', views.record_attestation_response_view, name='record_attestation_response'), # URL для форми внесення відповіді ДССЗЗІ
     path('attestation-registration/<int:att_reg_sent_id>/record-response/', views.record_attestation_response_view, name='record_attestation_response_for_registration'), # передавати ID відправки в URL для форми відповіді
 
-    
+    path('processing-control/', views.processing_control_view, name='processing_control_dashboard'),
+
 
 
  

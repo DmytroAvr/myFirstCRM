@@ -9,6 +9,7 @@ from django.contrib import messages
 from django.db.models import Q, Max, Prefetch, Count 
 from django.db import  transaction 
 from django.utils import timezone
+import datetime
 from .models import (OIDTypeChoices, OIDStatusChoices, SecLevelChoices, WorkRequestStatusChoices, WorkTypeChoices, 
     DocumentReviewResultChoices, AttestationRegistrationStatusChoices, 
 )
@@ -19,8 +20,17 @@ from .models import (Unit, UnitGroup, OID, OIDStatusChange, TerritorialManagemen
 from .forms import ( TripForm, TripResultSendForm, DocumentProcessingMainForm, DocumentItemFormSet, DocumentForm, 
 	WorkRequestForm, WorkRequestItemFormSet, OIDForm, OIDStatusUpdateForm, 
 	AttestationRegistrationSendForm, AttestationResponseMainForm, AttestationActUpdateFormSet,
+    TechnicalTaskFilterForm, WorkRequestItemProcessingFilterForm
 )
 
+def add_working_days(start_date, days_to_add):
+    current_date_iter = start_date # Дата, з якої починаємо відлік (наступний день після trip.end_date)
+    days_counted = 0
+    while days_counted < days_to_add:
+        current_date_iter += datetime.timedelta(days=1)
+        if current_date_iter.weekday() < 5: # 0-Mon, 1-Tue, 2-Wed, 3-Thu, 4-Fri
+            days_counted += 1
+    return current_date_iter
 
  # Твоя допоміжна функція (залишається без змін, але буде викликатися в AJAX view)
 def get_last_document_expiration_date(oid_instance, document_name_keyword, work_type_choice=None):
@@ -686,6 +696,7 @@ def oid_detail_view(request, oid_id):
 
 # ... (main_dashboard, ajax_load_oids_for_unit_categorized, ajax_load_oids_for_unit, oid_detail_view) ...
 # Переконайся, що функція get_last_document_expiration_date визначена вище
+
 @login_required 
 def plan_trip_view(request):
     if request.method == 'POST':
@@ -707,6 +718,7 @@ def plan_trip_view(request):
         form = TripForm()
     
     return render(request, 'oids/forms/plan_trip_form.html', {'form': form, 'page_title': 'Запланувати відрядження'})
+
 @login_required 
 def add_document_processing_view(request, oid_id=None, work_request_item_id=None):
     initial_data = {}
@@ -725,34 +737,75 @@ def add_document_processing_view(request, oid_id=None, work_request_item_id=None
 
     if request.method == 'POST':
         form = DocumentForm(request.POST, request.FILES, initial_oid=selected_oid) # Передаємо initial_oid для фільтрації
-        if form.is_valid():
-            document = form.save()
-            messages.success(request, f'Документ "{document.document_type.name}" №{document.document_number} успішно додано.')
+        main_form = DocumentProcessingMainForm(request.POST, prefix='main') # prefix, якщо використовуєте
+        formset = DocumentItemFormSet(request.POST, request.FILES, prefix='docs') # prefix, якщо використовуєте
+        if main_form.is_valid() and formset.is_valid():
+            oid_instance = main_form.cleaned_data['oid']
+            work_request_item_instance = main_form.cleaned_data.get('work_request_item') 
+            process_date_from_main = main_form.cleaned_data['process_date']
+            work_date_from_main = main_form.cleaned_data['work_date']
+            author_instance = main_form.cleaned_data.get('author')
+
+            saved_documents = [] # Збираємо збережені документи
+            for item_form in formset:
+                if item_form.is_valid() and item_form.has_changed():
+                    document_instance = item_form.save(commit=False)
+                    document_instance.oid = oid_instance
+                    document_instance.work_request_item = work_request_item_instance
+                    document_instance.process_date = process_date_from_main
+                    document_instance.work_date = work_date_from_main
+                    document_instance.author = author_instance
+                    document_instance.save()
+                    saved_documents.append(document_instance)
             
-            # Оновлення статусу WorkRequestItem, якщо документ пов'язаний з ним
-            if document.work_request_item:
-                # Перевіряємо, чи всі обов'язкові документи для цього WorkRequestItem вже є
-                # Ця логіка може бути складною і залежить від бізнес-правил
-                # Поки що просто змінюємо статус, якщо він був "в роботі"
-                item = document.work_request_item
-                if item.status == WorkRequestStatusChoices.IN_PROGRESS:
-                     # Потрібно визначити, коли саме елемент заявки вважається виконаним
-                     # Наприклад, коли додано певний ключовий документ
-                     # Або коли всі обов'язкові документи для цього типу робіт по ОІД є.
-                     # Тут поки що не змінюємо статус автоматично, це потребує деталізації правил.
-                     pass
+            if saved_documents:
+                messages.success(request, f'{len(saved_documents)} документ(ів) успішно додано.')
 
-            # Оновлення статусу ОІД (спрощена логіка)
-            # Цю логіку краще винести в сигнали або методи моделі OID
-            current_oid = document.oid
-            # Приклад: якщо додано "Акт атестації", змінюємо статус ОІД
-            if document.document_type.name.lower().startswith('акт атестації') and current_oid.status != OIDStatusChoices.ACTIVE:
-                # Потрібно створити запис в OIDStatusChange
-                current_oid.status = OIDStatusChoices.ACTIVE # Або ATTESTED, залежно від воркфлоу
-                current_oid.save()
-                messages.info(request, f'Статус ОІД "{current_oid.cipher}" оновлено на "{current_oid.get_status_display()}".')
+                # --- ОНОВЛЕННЯ WorkRequestItem ПІСЛЯ ЗБЕРЕЖЕННЯ ВСІХ ДОКУМЕНТІВ З ФОРМСЕТУ ---
+                if work_request_item_instance:
+                    # Встановлюємо docs_actually_processed_on на найпізнішу process_date
+                    # з усіх щойно доданих документів, що стосуються цього WRI
+                    # Або просто на process_date_from_main, якщо вона єдина для всього пакету
+                    
+                    # Оновлюємо дату фактичного опрацювання
+                    if work_request_item_instance.docs_actually_processed_on is None or \
+                       process_date_from_main > work_request_item_instance.docs_actually_processed_on:
+                        work_request_item_instance.docs_actually_processed_on = process_date_from_main
+                    
+                    # Перевірка, чи можна встановити статус "виконано" для WorkRequestItem
+                    # Ця логіка має перевірити, чи всі ОБОВ'ЯЗКОВІ документи для
+                    # work_request_item_instance.oid.oid_type та work_request_item_instance.work_type
+                    # тепер присутні в базі даних (включаючи ті, що були додані зараз).
+                    
+                    # Приклад спрощеної логіки (як у моделі):
+                    can_complete_wri = False
+                    for doc in saved_documents: # Перевіряємо тільки щойно збережені
+                        if doc.work_request_item == work_request_item_instance: # Переконуємось, що документ для цього WRI
+                            doc_type_name_lower = doc.document_type.name.lower()
+                            if "акт атестації" in doc_type_name_lower and \
+                               work_request_item_instance.work_type == WorkTypeChoices.ATTESTATION and \
+                               doc.dsszzi_registered_number and doc.dsszzi_registered_date:
+                                can_complete_wri = True
+                                break
+                            elif "висновок ік" in doc_type_name_lower and \
+                                 work_request_item_instance.work_type == WorkTypeChoices.IK:
+                                can_complete_wri = True
+                                break
+                    
+                    if can_complete_wri and work_request_item_instance.status != WorkRequestStatusChoices.COMPLETED:
+                        work_request_item_instance.status = WorkRequestStatusChoices.COMPLETED
+                        messages.info(request, f"Статус елемента заявки для ОІД '{work_request_item_instance.oid.cipher}' оновлено на 'Виконано'.")
+                    
+                    work_request_item_instance.save() # Зберігаємо зміни в WRI (це викличе update_request_status)
 
-            return redirect('oids:oid_detail_view_name', oid_id=document.oid.id)
+                if document.document_type.name.lower().startswith('акт атестації') and current_oid.status != OIDStatusChoices.ACTIVE:
+                    current_oid.status = OIDStatusChoices.ACTIVE # Або ATTESTED, залежно від воркфлоу                 # Потрібно створити запис в OIDStatusChange
+                    current_oid.save()
+                    messages.info(request, f'Статус ОІД "{current_oid.cipher}" оновлено на "{current_oid.get_status_display()}".')
+
+                # return redirect('oids:oid_detail_view_name', oid_id=oid_instance.id)
+                return redirect('oids:oid_detail_view_name', oid_id=document.oid.id)# ... (логіка оновлення статусу ОІД, якщо потрібно) ...
+   
     else:
         form = DocumentForm(initial=initial_data, initial_oid=selected_oid)
 
@@ -761,6 +814,7 @@ def add_document_processing_view(request, oid_id=None, work_request_item_id=None
         'page_title': 'Додати опрацювання документів',
         'selected_oid': selected_oid
     })
+
 @login_required 
 def add_work_request_view(request):
     # Отримуємо екземпляр Unit, якщо ID передано в GET-запиті
@@ -830,6 +884,7 @@ def add_work_request_view(request):
         # **context_modal_choices
     }
     return render(request, 'oids/forms/add_work_request_form.html', context)
+
 @login_required 
 def add_document_processing_view(request, oid_id=None, work_request_item_id=None):
     selected_oid_instance = None
@@ -918,6 +973,7 @@ def add_document_processing_view(request, oid_id=None, work_request_item_id=None
         'selected_oid': selected_oid_instance # Для відображення в заголовку
     }
     return render(request, 'oids/forms/add_document_processing_form.html', context)
+
 @login_required 
 def update_oid_status_view(request, oid_id_from_url=None):
     initial_unit = None
@@ -984,6 +1040,7 @@ def update_oid_status_view(request, oid_id_from_url=None):
     return render(request, 'oids/forms/update_oid_status_form.html', context)
 
 
+
 @login_required 
 @transaction.atomic # Використовуємо транзакцію для цілісності даних
 def send_attestation_for_registration_view(request):
@@ -1008,6 +1065,7 @@ def send_attestation_for_registration_view(request):
 
 from .forms import TechnicalTaskCreateForm, TechnicalTaskProcessForm # Додаємо нові форми
 from .models import TechnicalTask, DocumentReviewResultChoices, OID, Unit, Person # Додаємо моделі
+
 
 @login_required 
 def technical_task_create_view(request):
@@ -1047,6 +1105,7 @@ def technical_task_create_view(request):
         'page_title': 'Внесення нового Технічного Завдання'
     }
     return render(request, 'oids/forms/technical_task_create_form.html', context)
+
 @login_required 
 def technical_task_process_view(request, task_id=None): # Може приймати ID ТЗ з URL
     # Якщо task_id передано, це форма для конкретного ТЗ.
@@ -1119,6 +1178,7 @@ def technical_task_process_view(request, task_id=None): # Може прийма�
 
 
 
+
 @login_required # list info 
 def summary_information_hub_view(request):
     """
@@ -1148,6 +1208,7 @@ def summary_information_hub_view(request):
         'model_views': model_views
     }
     return render(request, 'oids/summary_information_hub.html', context)
+
 @login_required 
 def document_list_view(request):
     documents_list = Document.objects.select_related(
@@ -1169,6 +1230,7 @@ def document_list_view(request):
         'page_obj': page_obj # Для навігації пагінатора
     }
     return render(request, 'oids/lists/document_list.html', context)
+
 @login_required 
 def unit_list_view(request):
     units_list_qs = Unit.objects.select_related(
@@ -1233,6 +1295,7 @@ def unit_list_view(request):
         'is_sorted_desc': sort_order == 'desc',
     }
     return render(request, 'oids/lists/unit_list.html', context)
+
 @login_required 
 def territorial_management_list_view(request):
     tm_list_queryset = TerritorialManagement.objects.all().order_by('name')
@@ -1247,6 +1310,7 @@ def territorial_management_list_view(request):
         'page_obj': page_obj     # Для самого шаблону пагінації
     }
     return render(request, 'oids/lists/territorial_management_list.html', context)
+
 @login_required 
 def unit_group_list_view(request):
     group_list_queryset = UnitGroup.objects.prefetch_related('units').order_by('name') # prefetch_related для units
@@ -1261,6 +1325,7 @@ def unit_group_list_view(request):
         'page_obj': page_obj
     }
     return render(request, 'oids/lists/unit_group_list.html', context)
+
 @login_required 
 def person_list_view(request):
     person_list_queryset = Person.objects.all().order_by('full_name')
@@ -1275,6 +1340,7 @@ def person_list_view(request):
         'page_obj': page_obj
     }
     return render(request, 'oids/lists/person_list.html', context)
+
 @login_required 
 def document_type_list_view(request):
     doc_type_list_queryset = DocumentType.objects.all().order_by('oid_type', 'work_type', 'name')
@@ -1289,6 +1355,7 @@ def document_type_list_view(request):
         'page_obj': page_obj
     }
     return render(request, 'oids/lists/document_type_list.html', context)
+
 @login_required 
 def oid_list_view(request):
     oid_list_queryset = OID.objects.select_related(
@@ -1399,6 +1466,7 @@ def oid_list_view(request):
         'current_sort_order_is_desc': actual_sort_order_is_desc, # Поточний напрямок desc (true/false)
     }
     return render(request, 'oids/lists/oid_list.html', context)
+
 @login_required 
 def work_request_list_view(request):
     work_request_list_queryset = WorkRequest.objects.select_related(
@@ -1501,6 +1569,7 @@ def work_request_list_view(request):
         'current_sort_order_is_desc': actual_sort_order_is_desc,
     }
     return render(request, 'oids/lists/work_request_list.html', context)
+
 @login_required  
 def trip_list_view(request):
     trip_list_queryset = Trip.objects.prefetch_related(
@@ -1614,6 +1683,7 @@ def trip_list_view(request):
         'current_sort_order_is_desc': actual_sort_order_is_desc,
     }
     return render(request, 'oids/lists/trip_list.html', context)
+
 @login_required 
 def technical_task_list_view(request):
     task_list_queryset = TechnicalTask.objects.select_related(
@@ -1768,6 +1838,7 @@ def technical_task_list_view(request):
         'current_sort_order_is_desc': actual_sort_order_is_desc,
     }
     return render(request, 'oids/lists/technical_task_list.html', context)
+
 @login_required 
 def attestation_registration_list_view(request):
     registration_list_queryset = AttestationRegistration.objects.prefetch_related(
@@ -1785,6 +1856,7 @@ def attestation_registration_list_view(request):
         'page_obj': page_obj
     }
     return render(request, 'oids/lists/attestation_registration_list.html', context)
+
 @login_required 
 def attestation_response_list_view(request):
     """
@@ -1817,6 +1889,7 @@ def attestation_response_list_view(request):
         'current_filter_att_reg_id': current_filter_att_reg_id,
     }
     return render(request, 'oids/lists/attestation_response_list.html', context)
+
 @login_required 
 def trip_result_for_unit_list_view(request):
     result_list_queryset = TripResultForUnit.objects.select_related(
@@ -1837,6 +1910,7 @@ def trip_result_for_unit_list_view(request):
         'page_obj': page_obj
     }
     return render(request, 'oids/lists/trip_result_for_unit_list.html', context)
+
 @login_required 
 def oid_status_change_list_view(request):
     status_change_list_queryset = OIDStatusChange.objects.select_related(
@@ -1966,6 +2040,7 @@ def oid_status_change_list_view(request):
         'current_sort_order_is_desc': actual_sort_order_is_desc,
     }
     return render(request, 'oids/lists/oid_status_change_list.html', context)
+
 @login_required 
 def attestation_registration_list_view(request):
     """
@@ -2006,6 +2081,7 @@ def attestation_registration_list_view(request):
         'current_filter_unit_id': current_filter_unit_id,
     }
     return render(request, 'oids/lists/attestation_registration_list.html', context)
+
 @login_required 
 def attestation_response_list_view(request):
     """
@@ -2040,6 +2116,7 @@ def attestation_response_list_view(request):
 
 
 # View для внесення "Відповіді від ДССЗЗІ"
+
 @login_required 
 @transaction.atomic
 def record_attestation_response_view(request, att_reg_sent_id=None): # Може приймати ID з URL
@@ -2164,6 +2241,7 @@ def record_attestation_response_view(request, att_reg_sent_id=None): # Може 
 
 
 # # View для внесення "Відповіді від ДССЗЗІ"
+# 
 # @login_required @transaction.atomic
 # def record_attestation_response_view(request):
 #     # Цей view буде двокроковим або використовуватиме AJAX для завантаження формсету
@@ -2261,3 +2339,79 @@ def record_attestation_response_view(request, att_reg_sent_id=None): # Може 
 #         'selected_att_reg_sent': attestation_registration_instance # Для відображення деталей відправки
 #     }
 #     return render(request, 'oids/forms/record_attestation_response_form.html', context)
+
+# oids/views.py
+# ... (інші імпорти)
+
+def processing_control_view(request):
+    # --- Блок 1: Читання ТЗ ---
+    today_date = datetime.date.today()
+    tt_queryset = TechnicalTask.objects.select_related(
+        'oid__unit', 
+        'reviewed_by'
+    ).order_by('-read_till_date', '-input_date')
+
+    tt_filter_form = TechnicalTaskFilterForm(request.GET or None)
+    if tt_filter_form.is_valid():
+        if tt_filter_form.cleaned_data.get('unit'):
+            tt_queryset = tt_queryset.filter(oid__unit=tt_filter_form.cleaned_data['unit'])
+        if tt_filter_form.cleaned_data.get('oid'):
+            tt_queryset = tt_queryset.filter(oid=tt_filter_form.cleaned_data['oid'])
+        if tt_filter_form.cleaned_data.get('review_result'):
+            tt_queryset = tt_queryset.filter(review_result=tt_filter_form.cleaned_data['review_result'])
+        # TODO: Додати сортування для ТЗ, якщо потрібно
+
+    tt_paginator = Paginator(tt_queryset, 15) # 15 ТЗ на сторінку
+    tt_page_number = request.GET.get('tt_page') # Використовуємо префікс для параметра сторінки
+    tt_page_obj = tt_paginator.get_page(tt_page_number)
+
+    # --- Блок 2: Опрацювання документів з відрядження (на базі WorkRequestItem) ---
+    wri_queryset = WorkRequestItem.objects.filter(
+        # Фільтруємо тільки ті, для яких має бути встановлений дедлайн або які в процесі/очікують
+        # Q(doc_processing_deadline__isnull=False) | Q(status__in=[WorkRequestStatusChoices.IN_PROGRESS, WorkRequestStatusChoices.PENDING])
+        # Або просто показуємо всі, а фільтри роблять свою справу
+    ).select_related(
+        'request__unit', 
+        'oid'
+    ).order_by('doc_processing_deadline', 'request__incoming_date') # Сортуємо за дедлайном
+
+    wri_filter_form = WorkRequestItemProcessingFilterForm(request.GET or None)
+    if wri_filter_form.is_valid():
+        if wri_filter_form.cleaned_data.get('unit'):
+            wri_queryset = wri_queryset.filter(request__unit=wri_filter_form.cleaned_data['unit'])
+        if wri_filter_form.cleaned_data.get('oid'):
+            wri_queryset = wri_queryset.filter(oid=wri_filter_form.cleaned_data['oid'])
+        if wri_filter_form.cleaned_data.get('status'):
+            wri_queryset = wri_queryset.filter(status=wri_filter_form.cleaned_data['status'])
+        if wri_filter_form.cleaned_data.get('deadline_from'):
+            wri_queryset = wri_queryset.filter(doc_processing_deadline__gte=wri_filter_form.cleaned_data['deadline_from'])
+        if wri_filter_form.cleaned_data.get('deadline_to'):
+            wri_queryset = wri_queryset.filter(doc_processing_deadline__lte=wri_filter_form.cleaned_data['deadline_to'])
+        
+        processed_filter = wri_filter_form.cleaned_data.get('processed')
+        if processed_filter == 'yes':
+            wri_queryset = wri_queryset.filter(docs_actually_processed_on__isnull=False)
+        elif processed_filter == 'no':
+            wri_queryset = wri_queryset.filter(docs_actually_processed_on__isnull=True)
+        # TODO: Додати сортування для WRI, якщо потрібно
+
+    wri_paginator = Paginator(wri_queryset, 15) # 15 елементів на сторінку
+    wri_page_number = request.GET.get('wri_page') # Використовуємо префікс
+    wri_page_obj = wri_paginator.get_page(wri_page_number)
+
+    # Отримуємо всі Units та OIDs для заповнення фільтрів у JS, якщо потрібно
+    # (або queryset у формах оновлюється залежно від першого фільтра)
+    all_units = Unit.objects.all().order_by('code')
+    # all_oids = OID.objects.select_related('unit').order_by('unit__code', 'cipher')
+
+    context = {
+        'page_title': 'Контроль опрацювання завдань та документів',
+        'tt_filter_form': tt_filter_form,
+        'technical_tasks': tt_page_obj, # Для першої таблиці
+        'wri_filter_form': wri_filter_form,
+        'work_request_items': wri_page_obj, # Для другої таблиці
+        'all_units': all_units, # Для динамічного заповнення ОІД у фільтрах
+        # 'all_oids': all_oids # Якщо потрібен повний список ОІД для JS
+    }
+    return render(request, 'oids/processing_control_dashboard.html', context)
+

@@ -1,0 +1,250 @@
+{# oids/templates/oids/processing_control_dashboard.html #}
+{% extends "oids/base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-4">{{ page_title }}</h2>
+
+    {# --- Блок 1: Читання Технічних Завдань --- #}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4 class="mb-0">Контроль опрацювання Технічних Завдань (ТЗ)</h4>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="mb-3 p-3 border bg-light rounded" id="ttFilterForm">
+                <input type="hidden" name="wri_page" value="{{ work_request_items.number|default:1 }}"> {# Зберігаємо сторінку іншої таблиці #}
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-3">{{ tt_filter_form.unit.label_tag }} {{ tt_filter_form.unit }}</div>
+                    <div class="col-md-3">{{ tt_filter_form.oid.label_tag }} {{ tt_filter_form.oid }}</div>
+                    <div class="col-md-3">{{ tt_filter_form.review_result.label_tag }} {{ tt_filter_form.review_result }}</div>
+                    <div class="col-md-1 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary btn-sm w-100">Фільтр ТЗ</button>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <a href="{% url 'oids:processing_control_dashboard' %}" class="btn btn-outline-secondary btn-sm w-100">Скинути всі фільтри</a>
+                    </div>
+                </div>
+            </form>
+
+            {% if technical_tasks.object_list %}
+            <div class="table-responsive">
+                <table class="table table-sm table-striped table-bordered table-hover">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>ВЧ / ОІД</th>
+                            <th>Вхідний № ТЗ</th>
+                            <th>Вхідна дата ТЗ</th>
+                            <th>Термін опрацювання</th>
+                            <th>Статус ТЗ</th>
+                            <th>Хто/Коли опрацював</th>
+                            <th>Примітки</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in technical_tasks %}
+                        <tr>
+                            <td>
+                                <small>{{ task.oid.unit.code }}</small><br>
+                                <a href="{% url 'oids:oid_detail_view_name' task.oid.id %}#task-{{task.id}}">{{ task.oid.cipher }}</a>
+                            </td>
+                            <td>{{ task.input_number }}</td>
+                            <td>{{ task.input_date|date:"d.m.Y" }}</td>
+                            <td {% if task.read_till_date < today_date and task.review_result == 'READ' %}class="table-danger"{% endif %}> {# today_date потрібно передати з view #}
+                                {{ task.read_till_date|date:"d.m.Y" }}
+                            </td>
+                            <td>{{ task.get_review_result_display }}</td>
+                            <td>
+                                {{ task.reviewed_by.full_name|default:"-" }}
+                                {% if task.updated_at != task.created_at and task.review_result != 'READ' %}
+                                    <br><small class="text-muted">({{ task.updated_at|date:"d.m.Y H:i" }})</small>
+                                {% endif %}
+                            </td>
+                            <td>{{ task.note|truncatechars:50|default:"-" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% include "oids/includes/pagination.html" with page_obj=technical_tasks param_prefix="tt_" current_filters=request.GET.urlencode %}
+            {% else %}
+            <p>Технічні завдання, що відповідають фільтрам, відсутні.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {# --- Блок 2: Опрацювання документів з відрядження --- #}
+    <div class="card">
+        <div class="card-header">
+            <h4 class="mb-0">Контроль опрацювання документів Заявок (після відряджень)</h4>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="mb-3 p-3 border bg-light rounded" id="wriFilterForm">
+                <input type="hidden" name="tt_page" value="{{ technical_tasks.number|default:1 }}"> {# Зберігаємо сторінку іншої таблиці #}
+                 <div class="row g-2 align-items-start">
+                    <div class="col-md-3">{{ wri_filter_form.unit.label_tag }} {{ wri_filter_form.unit }}</div>
+                    <div class="col-md-3">{{ wri_filter_form.oid.label_tag }} {{ wri_filter_form.oid }}</div>
+                    <div class="col-md-3">{{ wri_filter_form.status.label_tag }} {{ wri_filter_form.status }}</div>
+                    <div class="col-md-3">{{ wri_filter_form.processed.label_tag }} {{ wri_filter_form.processed }}</div>
+                </div>
+                <div class="row g-2 mt-1 align-items-end">
+                    <div class="col-md-3">{{ wri_filter_form.deadline_from.label_tag }} {{ wri_filter_form.deadline_from }}</div>
+                    <div class="col-md-3">{{ wri_filter_form.deadline_to.label_tag }} {{ wri_filter_form.deadline_to }}</div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary btn-sm w-100">Фільтр Заявок</button>
+                    </div>
+                     <div class="col-md-3 d-flex align-items-end">
+                        {# Посилання на скидання тільки для цієї секції, якщо потрібно #}
+                    </div>
+                </div>
+            </form>
+
+            {% if work_request_items.object_list %}
+            <div class="table-responsive">
+                <table class="table table-sm table-striped table-bordered table-hover">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>ВЧ / ОІД</th>
+                            <th>Заявка (№, дата)</th>
+                            <th>Тип робіт</th>
+                            <th>Статус опрац. ОІД</th>
+                            <th>Термін опрац. документів</th>
+                            <th>Дата факт. опрац.</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in work_request_items %}
+                        <tr>
+                            <td>
+                                <small>{{ item.request.unit.code }}</small><br>
+                                <a href="{% url 'oids:oid_detail_view_name' item.oid.id %}">{{ item.oid.cipher }}</a>
+                            </td>
+                            <td>№{{ item.request.incoming_number }} від {{ item.request.incoming_date|date:"d.m.Y" }}</td>
+                            <td>{{ item.get_work_type_display }}</td>
+                            <td>{{ item.get_status_display }}</td>
+                            <td {% if item.doc_processing_deadline and item.doc_processing_deadline < today_date and not item.docs_actually_processed_on %}class="table-danger"{% endif %}>
+								{{ item.doc_processing_deadline|date:"d.m.Y"|default:"Не встановлено" }}
+							</td>
+							<td>{{ item.docs_actually_processed_on|date:"d.m.Y"|default:"-" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% include "oids/includes/pagination.html" with page_obj=work_request_items param_prefix="wri_" current_filters=request.GET.urlencode %}
+            {% else %}
+            <p>Елементи заявок, що відповідають фільтрам, відсутні.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("ProcessingControl JS: DOMContentLoaded.");
+    if (typeof TomSelect === 'undefined') { console.error("ProcessingControl JS: TomSelect not loaded!"); return; }
+
+    // Ініціалізація TomSelect для фільтрів
+    const ttUnitFilter = document.getElementById('{{ tt_filter_form.unit.id_for_label }}');
+    const ttOidFilter = document.getElementById('{{ tt_filter_form.oid.id_for_label }}');
+    const wriUnitFilter = document.getElementById('{{ wri_filter_form.unit.id_for_label }}');
+    const wriOidFilter = document.getElementById('{{ wri_filter_form.oid.id_for_label }}');
+    
+    let tsTtUnit, tsTtOid, tsWriUnit, tsWriOid;
+
+    function initFilterTomSelect(element, placeholder, initialOpts = []) {
+        if (!element) return null;
+        let htmlOpts = [];
+        Array.from(element.options).forEach(opt => {if(opt.value) htmlOpts.push({id: opt.value, text: opt.text, selected: opt.selected});});
+        
+        const config = {
+            create: false, placeholder: placeholder, allowEmptyOption: true,
+            options: htmlOpts.length ? htmlOpts : initialOpts, // Пріоритет HTML опціям
+            valueField: 'id', labelField: 'text', searchField: ['text']
+        };
+        const instance = new TomSelect(element, config);
+        // Якщо опції не підхопилися, а були в HTML
+        if (instance.dropdown_content.querySelectorAll('.option').length === 0 && htmlOpts.length > 0) {
+            instance.addOptions(htmlOpts); instance.refreshOptions(false);
+            htmlOpts.forEach(opt => { if(opt.selected) instance.addItem(opt.id, true);});
+        }
+        return instance;
+    }
+
+    if (ttUnitFilter) tsTtUnit = initFilterTomSelect(ttUnitFilter, 'Всі ВЧ');
+    if (ttOidFilter) tsTtOid = initFilterTomSelect(ttOidFilter, 'Всі ОІДи (оберіть ВЧ)');
+    if (wriUnitFilter) tsWriUnit = initFilterTomSelect(wriUnitFilter, 'Всі ВЧ');
+    if (wriOidFilter) tsWriOid = initFilterTomSelect(wriOidFilter, 'Всі ОІДи (оберіть ВЧ)');
+    
+    const oidsForUnitUrl = "{% url 'oids:ajax_load_oids_for_unit' %}";
+
+    function setupOidFilterCascade(unitSelectInstance, oidTomSelectInstance) {
+        if (!unitSelectInstance || !oidTomSelectInstance) return;
+        
+        unitSelectInstance.on('change', function(unitId){
+            console.log("ProcessingControl JS: Unit filter changed to:", unitId, "for OID select:", oidTomSelectInstance.input.id);
+            oidTomSelectInstance.clear();
+            oidTomSelectInstance.clearOptions();
+            oidTomSelectInstance.sync();
+            if (unitId && unitId !== "") {
+                oidTomSelectInstance.enable();
+                oidTomSelectInstance.placeholder = 'Завантаження ОІДів...';
+                fetch(`${oidsForUnitUrl}?unit_id=${unitId}`)
+                    .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t);}))
+                    .then(data => {
+                        const options = data.map(oid => ({id: oid.id.toString(), text: `${oid.cipher} (${oid.full_name || ''})`}));
+                        oidTomSelectInstance.addOptions(options);
+                        oidTomSelectInstance.refreshOptions(false);
+                        oidTomSelectInstance.placeholder = options.length ? 'Всі ОІДи для ВЧ' : 'Немає ОІДів';
+                    })
+                    .catch(e => { console.error("Error loading OIDs for filter:", e); oidTomSelectInstance.placeholder = 'Помилка ОІД'; });
+            } else {
+                oidTomSelectInstance.disable();
+                oidTomSelectInstance.placeholder = 'Всі ОІДи (оберіть ВЧ)';
+                 // Якщо ВЧ скинуто, завантажуємо всі ОІДи або залишаємо порожнім
+                 // Для простоти, залишимо порожнім, користувач має обрати ВЧ для фільтрації ОІД
+            }
+        });
+        // Початкове завантаження, якщо ВЧ вже обрана
+        if (unitSelectInstance.getValue()) unitSelectInstance.trigger('change');
+    }
+
+    if (tsTtUnit && tsTtOid) setupOidFilterCascade(tsTtUnit, tsTtOid);
+    if (tsWriUnit && tsWriOid) setupOidFilterCascade(tsWriUnit, tsWriOid);
+
+    // Збереження параметрів GET при відправці форм фільтрів
+    // Це допоможе зберегти стан іншого фільтра, коли один з них відправляється
+    document.getElementById('ttFilterForm')?.addEventListener('submit', function(e){
+        const wriPage = document.querySelector('input[name="wri_page"]');
+        if (wriPage && wriPage.value !== '1') { // Якщо сторінка не перша
+            // Додаємо параметр wri_page до поточних GET параметрів форми ttFilterForm
+            // Це можна зробити, додаючи прихований input до ttFilterForm перед submit,
+            // або маніпулюючи action URL. Простіше - дозволити Django обробляти це,
+            // але для чистоти можна було б додати.
+        }
+    });
+     document.getElementById('wriFilterForm')?.addEventListener('submit', function(e){
+        const ttPage = document.querySelector('input[name="tt_page"]');
+        if (ttPage && ttPage.value !== '1') {
+            // ...
+        }
+    });
+
+
+});
+</script>
+{% endblock %}
+
+<!-- 
+Що потрібно буде доопрацювати:
+
+Пагінація для двох таблиць: Переконайтеся, що ваш pagination.html може коректно працювати з параметрами param_prefix та current_filters, щоб посилання пагінації для однієї таблиці не скидали фільтри/сторінку іншої. Можливо, доведеться генерувати URL для пагінації більш явно в JS або модифікувати логіку pagination.html.
+Сортування: Аналогічно до попередніх сторінок, можна додати сортування для стовпців обох таблиць.
+AJAX для фільтрів (опціонально): Замість перезавантаження всієї сторінки при застосуванні фільтрів, можна оновити тільки відповідну таблицю через AJAX.
+Виділення протермінованих завдань: Передайте today_date = datetime.date.today() у контекст з view, щоб працювало підсвічування.
+Це основа для вашої сторінки контролю. Почніть з цього, протестуйте фільтрацію та пагінацію. 
+-->

@@ -128,7 +128,7 @@ class OID(models.Model):
         related_name='oids' # Дозволить отримати всі ОІД для частини: `unit_instance.oids.all()`
     )
     oid_type = models.CharField(max_length=10, choices=OIDTypeChoices.choices, verbose_name="Тип ОІД")
-    cipher = models.CharField(max_length=100, verbose_name="Шифр ОІД", unique=True) # Додав шифр, як вказано в описі
+    cipher = models.CharField(max_length=100, verbose_name="Шифр ОІД", unique=False) # Додав шифр, як вказано в описі
     sec_level = models.CharField(max_length=15, choices=SecLevelChoices.choices, verbose_name="Гриф")
     full_name = models.CharField(max_length=255, verbose_name="Повна назва ОІД", blank=True, null=True) # Змінив name на full_name
     room = models.CharField(max_length=255, verbose_name="Приміщення №")
@@ -142,7 +142,6 @@ class OID(models.Model):
     # OneToOneField для created_by_document може бути проблематичним, якщо один документ може "створити" кілька ОІД.
     # Краще використовувати ForeignKey, і вже на рівні логіки (service/views) забезпечувати, що це перший документ.
     # Я видалив created_by_document і latest_document, оскільки їх можна отримати через related_name
-    # до моделі Document (наприклад, oid_instance.documents.order_by('process_date').first()).
     # Це зменшує дублювання даних і забезпечує узгодженість.
 
     def __str__(self):
@@ -230,6 +229,16 @@ class WorkRequestItem(models.Model):
         default=WorkRequestStatusChoices.PENDING, 
         verbose_name="Статус опрацювання ОІД в заявці"
     )
+    doc_processing_deadline = models.DateField(
+        verbose_name="Термін опрацювання документів до",
+        null=True,
+        blank=True
+    )
+    docs_actually_processed_on = models.DateField(
+        verbose_name="Документи фактично опрацьовано (дата)",
+        null=True,
+        blank=True
+    )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
     history = HistoricalRecords()
@@ -237,7 +246,8 @@ class WorkRequestItem(models.Model):
         unique_together = ('request', 'oid', 'work_type') # Один ОІД не може мати двічі одну і ту ж роботу в одній заявці
         verbose_name = "Елемент заявки"
         verbose_name_plural = "Елементи заявки"
-        ordering = ['request', 'oid'] # Додано сортування
+        # ordering = ['request', 'oid'] # Додано сортування
+        ordering = ['request', 'request__incoming_date' ] # Додав сортування за замовчуванням
 
     def __str__(self):
         # return f"{self.oid.cipher} - {self.get_work_type_display()} ({self.get_status_display()})"
@@ -405,8 +415,7 @@ class WorkRequestItem(models.Model):
         else:
             print(f"[DEBUG] WorkRequest ID {work_request.id} status '{work_request.get_status_display()}' remains unchanged.")
         print(f"--- [DEBUG] WRI.update_request_status() FINISHED for WRI ID: {self.id} ---")
-# Потрібно також імпортувати OID, WorkRequest, Person, AttestationRegistration вище в файлі models.py
-# from .models import OID, WorkRequest, Person, AttestationRegistration (приклад, залежить від структури)
+#
 
 class DocumentType(models.Model):
     """
@@ -728,7 +737,6 @@ class OIDStatusChange(models.Model):
 
 # --- Додаткові сутності, які були в оригінальному файлі, але не були інтегровані в бізнес-логіку ---
 
-     
 class TripResultForUnit(models.Model):
     """
     Результати відрядження, що відправляються до військових частин.
@@ -772,14 +780,15 @@ class TripResultForUnit(models.Model):
     # related_request - можна отримати через trip.work_requests.all() або через documents.work_request_item.request
     # Тому, якщо це не критично для прямого доступу, можна прибрати для уникнення дублювання.
     # related_request = models.ForeignKey('WorkRequest', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Пов’язана заявка")
-
+    
     def __str__(self):
         return f"Відправка результатів від {self.process_date}"
-
+    
     class Meta:
         verbose_name = "Результати відрядження для частини"
         verbose_name_plural = "Результати відрядження для частин"
-
+        ordering = ['-process_date', '-id']
+        
 # oids/models.py
 class TechnicalTask(models.Model):
     # ... (поля як у вас)

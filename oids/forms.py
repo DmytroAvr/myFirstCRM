@@ -751,6 +751,7 @@ class TripResultSendForm(forms.ModelForm):
             # 'units', # поле 'units' в TripResultForUnit буде заповнено з 'units_in_trip'
             # 'oids',  # поле 'oids' в TripResultForUnit буде заповнено з 'oids_in_trip_units'
             # 'documents', # поле 'documents' в TripResultForUnit буде заповнено з 'documents_to_send'
+			'process_date',
 			'outgoing_letter_number', 
             'outgoing_letter_date', 
             'note',             
@@ -1001,3 +1002,99 @@ class TechnicalTaskProcessForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         # Можна відфільтрувати queryset для technical_task_to_process, якщо потрібно (наприклад, за користувачем)
         # self.fields['technical_task_to_process'].queryset = ...
+        
+class TechnicalTaskFilterForm(forms.Form):
+    unit = forms.ModelChoiceField(
+        queryset=Unit.objects.all().order_by('code'),
+        required=False,
+        label="Військова частина",
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm tomselect-field'}),
+        empty_label="Всі ВЧ"
+    )
+    oid = forms.ModelChoiceField( # Буде заповнюватися динамічно
+        queryset=OID.objects.none(), 
+        required=False,
+        label="ОІД",
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm tomselect-field'}),
+        empty_label="Всі ОІДи"
+    )
+    review_result = forms.ChoiceField(
+        choices=[('', 'Всі статуси')] + DocumentReviewResultChoices.choices,
+        required=False,
+        label="Статус ТЗ",
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
+    )
+    # Можна додати фільтри по датах (input_date, read_till_date)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Динамічне заповнення OID на основі unit, якщо unit обрано (для POST або initial)
+        if 'unit' in self.data and self.data.get('unit'):
+            try:
+                unit_id = int(self.data.get('unit'))
+                self.fields['oid'].queryset = OID.objects.filter(unit_id=unit_id).order_by('cipher')
+            except (ValueError, TypeError):
+                pass
+        elif self.initial.get('unit'):
+            try:
+                unit_id = int(self.initial.get('unit'))
+                self.fields['oid'].queryset = OID.objects.filter(unit_id=unit_id).order_by('cipher')
+            except (ValueError, TypeError):
+                 pass
+
+
+class WorkRequestItemProcessingFilterForm(forms.Form):
+    unit = forms.ModelChoiceField(
+        queryset=Unit.objects.all().order_by('code'),
+        required=False,
+        label="Військова частина",
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm tomselect-field'}),
+        empty_label="Всі ВЧ"
+    )
+    oid = forms.ModelChoiceField( # Буде заповнюватися динамічно
+        queryset=OID.objects.none(),
+        required=False,
+        label="ОІД",
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm tomselect-field'}),
+        empty_label="Всі ОІДи"
+    )
+    status = forms.ChoiceField( # Статус WorkRequestItem
+        choices=[('', 'Всі статуси')] + WorkRequestStatusChoices.choices,
+        required=False,
+        label="Статус опрацювання елемента заявки",
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
+    )
+    # Можна додати фільтри по датах (doc_processing_deadline, docs_actually_processed_on)
+    deadline_from = forms.DateField(
+        required=False, 
+        widget=forms.DateInput(attrs={'type':'date', 'class':'form-control form-control-sm'}),
+        label="Дедлайн з"
+    )
+    deadline_to = forms.DateField(
+        required=False, 
+        widget=forms.DateInput(attrs={'type':'date', 'class':'form-control form-control-sm'}),
+        label="Дедлайн по"
+    )
+    
+    processed = forms.ChoiceField(
+        choices=[('', 'Всі'), ('yes', 'Опрацьовано'), ('no', 'Не опрацьовано')],
+        required=False,
+        label="Стан опрацювання",
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
+    )
+
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'unit' in self.data and self.data.get('unit'):
+            try:
+                unit_id = int(self.data.get('unit'))
+                self.fields['oid'].queryset = OID.objects.filter(unit_id=unit_id).order_by('cipher')
+            except (ValueError, TypeError):
+                pass
+        elif self.initial.get('unit'):
+            try:
+                unit_id = int(self.initial.get('unit'))
+                self.fields['oid'].queryset = OID.objects.filter(unit_id=unit_id).order_by('cipher')
+            except (ValueError, TypeError):
+                 pass
