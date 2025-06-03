@@ -87,9 +87,11 @@
         </div>
     </div>
 
-    {# --- Блок 2: Опрацювання документів з відрядження --- #}
+     {# --- Блок 2: Опрацювання документів з відрядження --- #}
     <div class="card">
-        <div class="card-header"><h4 class="mb-0">Контроль опрацювання документів Заявок</h4></div>
+        <div class="card-header">
+            <h4 class="mb-0">Контроль опрацювання документів Заявок (після відряджень)</h4>
+        </div>
         <div class="card-body">
             <form method="GET" class="mb-3 p-3 border bg-light rounded" id="wriFilterForm">
                 {% for key, value in request.GET.items %}
@@ -117,27 +119,45 @@
                 <table class="table table-sm table-striped table-bordered table-hover">
                     <thead class="thead-light">
                         <tr>
-                            <th><a href="{{ base_url }}?{{ request.GET.urlencode }}&wri_sort_by=unit&wri_sort_order={% if current_wri_sort_by == 'unit' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">ВЧ / ОІД</a></th>
-                            <th><a href="{{ base_url }}?{{ request.GET.urlencode }}&wri_sort_by=req_num&wri_sort_order={% if current_wri_sort_by == 'req_num' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Заявка (№, дата)</a></th>
-                            <th><a href="{{ base_url }}?{{ request.GET.urlencode }}&wri_sort_by=work_type&wri_sort_order={% if current_wri_sort_by == 'work_type' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Тип робіт</a></th>
-                            <th><a href="{{ base_url }}?{{ request.GET.urlencode }}&wri_sort_by=status&wri_sort_order={% if current_wri_sort_by == 'status' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Статус опрац. ОІД</a></th>
-                            <th><a href="{{ base_url }}?{{ request.GET.urlencode }}&wri_sort_by=deadline&wri_sort_order={% if current_wri_sort_by == 'deadline' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Термін опрац. док.</a></th>
-                            <th><a href="{{ base_url }}?{{ request.GET.urlencode }}&wri_sort_by=proc_date&wri_sort_order={% if current_wri_sort_by == 'proc_date' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Дата факт. опрац.</a></th>
+                            <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=unit&wri_sort_order={% if current_wri_sort_by == 'unit' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">ВЧ / ОІД</a></th>
+                            <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=req_num&wri_sort_order={% if current_wri_sort_by == 'req_num' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Заявка (№, дата)</a></th>
+                            <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=work_type&wri_sort_order={% if current_wri_sort_by == 'work_type' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Тип робіт</a></th>
+                            <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=status&wri_sort_order={% if current_wri_sort_by == 'status' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Статус опрац. ОІД</a></th>
+                            <th>Термін відрядження</th>
+                            <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=deadline&wri_sort_order={% if current_wri_sort_by == 'deadline' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Термін опрац. док.</a></th>
+                            <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=proc_date&wri_sort_order={% if current_wri_sort_by == 'proc_date' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Дата факт. опрац.</a></th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for item in work_request_items %}
+                        {% for item in work_request_items %} {# work_request_items - це page_obj з WRI #}
+                        {# Визначаємо останнє завершене відрядження для заявки цього елемента #}
+                        {% with last_trip=item.request.trips.all.0 %} {# .0 - перший елемент, бо ми сортували по -end_date #}
                         <tr {% if item.doc_processing_deadline and item.doc_processing_deadline < today_date and not item.docs_actually_processed_on %}class="table-danger"{% elif item.docs_actually_processed_on %}class="table-success"{% endif %}>
                             <td>
-                                <small>{{ item.request.unit.code }}</small><br>
+                                <small>{{ item.request.unit.code }} / {{ item.oid.unit.code }}</small><br> {# Додав ВЧ ОІДа для ясності #}
                                 <a href="{% url 'oids:oid_detail_view_name' item.oid.id %}">{{ item.oid.cipher }}</a>
                             </td>
-                            <td>№{{ item.request.incoming_number }} від {{ item.request.incoming_date|date:"d.m.Y" }}</td>
+                            <td>
+                                <a href="#"> {# TODO: Посилання на деталі заявки, якщо є #}
+                                    №{{ item.request.incoming_number }}
+                                </a> від {{ item.request.incoming_date|date:"d.m.Y" }}
+                            </td>
                             <td>{{ item.get_work_type_display }}</td>
                             <td>{{ item.get_status_display }}</td>
-                            <td>{{ item.doc_processing_deadline|date:"d.m.Y"|default:"Не встановлено" }}</td>
+                            <td>
+                                {% if last_trip and last_trip.start_date and last_trip.end_date %}
+                                    {{ last_trip.start_date|date:"d.m.Y" }} - {{ last_trip.end_date|date:"d.m.Y" }}
+                                    (<a href="#">ID:{{ last_trip.id }}</a>) {# TODO: Посилання на деталі відрядження #}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {{ item.doc_processing_deadline|date:"d.m.Y"|default:"Не встановлено" }}
+                            </td>
                             <td>{{ item.docs_actually_processed_on|date:"d.m.Y"|default:"-" }}</td>
                         </tr>
+                        {% endwith %}
                         {% endfor %}
                     </tbody>
                 </table>
@@ -190,7 +210,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     let tsTtUnit = ttUnitFilterElement ? initFilterTomSelect(ttUnitFilterElement, 'Всі ВЧ') : null;
     let tsTtOid = ttOidFilterElement ? initFilterTomSelect(ttOidFilterElement, 'Всі ОІДи (оберіть ВЧ)', true) : null; // true - disabled
-
+	// let tsTtOid = ttOidFilterElement ? initFilterTomSelect(ttOidFilterElement, 'Всі ОІДи (оберіть ВЧ)', !ttUnitFilterElement?.value) : null; 
     if (tsTtUnit && tsTtOid) {
         tsTtUnit.on('change', function(unitId){
             console.log("TT Filter: Unit changed to:", unitId);
@@ -216,16 +236,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const wriOidFilterElement = document.getElementById('id_wri-oid');
 
     let tsWriUnit = wriUnitFilterElement ? initFilterTomSelect(wriUnitFilterElement, 'Всі ВЧ') : null;
-    let tsWriOid = wriOidFilterElement ? initFilterTomSelect(wriOidFilterElement, 'Всі ОІДи (оберіть ВЧ)', true) : null; // true - disabled
+
+	// let tsWriOid = wriOidFilterElement ? initFilterTomSelect(wriOidFilterElement, 'Всі ОІДи (оберіть ВЧ)', true) : null; // true - disabled
+    let tsWriOid = wriOidFilterElement ? initFilterTomSelect(wriOidFilterElement, 'Всі ОІДи (оберіть ВЧ)', !wriUnitFilterElement?.value) : null;
 
     if (tsWriUnit && tsWriOid) {
-        tsWriUnit.on('change', function(unitId){
-            console.log("WRI Filter: Unit changed to:", unitId);
+		tsWriUnit.on('change', function(unitId){
+			console.log("WRI Filter: Unit changed to:", unitId);
             tsWriOid.clear(); tsWriOid.clearOptions(); tsWriOid.sync();
             if (unitId && unitId !== "") {
-                tsWriOid.enable(); tsWriOid.placeholder = 'Завантаження ОІДів...';
+				tsWriOid.enable(); tsWriOid.placeholder = 'Завантаження ОІДів...';
                 fetch(`${oidsForUnitUrl}?unit_id=${unitId}`)
-                    .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t);}))
+				.then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t);}))
                     .then(data => {
                         const options = data.map(oid => ({id: oid.id.toString(), text: `${oid.cipher} (${oid.full_name || ''})`}));
                         tsWriOid.addOptions(options); tsWriOid.refreshOptions(false);
@@ -237,6 +259,29 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         if (tsWriUnit.getValue()) tsWriUnit.trigger('change');
     }
+	
+	function setupOidFilterCascade(unitSelectInstance, oidTomSelectInstance) {
+		if (!unitSelectInstance || !oidTomSelectInstance) return;
+        
+        unitSelectInstance.on('change', function(unitId){
+            oidTomSelectInstance.clear(); oidTomSelectInstance.clearOptions(); oidTomSelectInstance.sync();
+            if (unitId && unitId !== "") {
+                oidTomSelectInstance.enable(); oidTomSelectInstance.placeholder = 'Завантаження ОІДів...';
+                fetch(`${oidsForUnitUrl}?unit_id=${unitId}`)
+                    .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t);}))
+                    .then(data => {
+                        const options = data.map(oid => ({id: oid.id.toString(), text: `${oid.cipher} (${oid.full_name || ''})`}));
+                        oidTomSelectInstance.addOptions(options); oidTomSelectInstance.refreshOptions(false);
+                        oidTomSelectInstance.placeholder = options.length ? 'Всі ОІДи для ВЧ' : 'Немає ОІДів';
+                    }).catch(e => { oidTomSelectInstance.placeholder = 'Помилка ОІД'; });
+            } else {
+                oidTomSelectInstance.disable(); oidTomSelectInstance.placeholder = 'Всі ОІДи (оберіть ВЧ)';
+            }
+        });
+        if (unitSelectInstance.getValue()) unitSelectInstance.trigger('change');
+    }
+	if (tsTtUnit && tsTtOid) setupOidFilterCascade(tsTtUnit, tsTtOid);
+    if (tsWriUnit && tsWriOid) setupOidFilterCascade(tsWriUnit, tsWriOid);
 });
 </script>
 {% endblock %}
