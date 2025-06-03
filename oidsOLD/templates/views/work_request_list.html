@@ -87,7 +87,7 @@
     <tr>
       <td class="border px-2 py-1">{{ request.incoming_number }}</td>
       <td class="border px-2 py-1">{{ request.incoming_date }}</td>
-      <td class="border px-2 py-1">{{ request.unit.name }}</td>
+      <td class="border px-2 py-1">{{ request.unit.code }}</td>
       <td class="border px-2 py-1">
         <ul class="mb-0 ps-3" style="list-style: none;">
           {% for item in request.items.all %}

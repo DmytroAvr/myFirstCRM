@@ -26,14 +26,15 @@
 
 <h2>Основна інформація про ОІД</h2>
 <ul class="oid-info">
+    <li class="oid-info__list-item"><strong>Територіальне управління:</strong>  <span class="oid-info__item-underline"> {{ oid.unit.territorial_management.name|default:"Не вказано" }}</span></li>
+    <li class="oid-info__list-item"><strong>Місто:</strong>  <span class="oid-info__item-underline">  {{ oid.unit.city|default:"-" }}</a></span></li>
+    <li class="oid-info__list-item"><strong>Військова частина:</strong>  <span class="oid-info__item-underline"> <a href="{% url 'oids:main_dashboard' %}?unit={{ oid.unit.id }}">{{ oid.unit.code }} - ({{ oid.unit.name|default:oid.unit.city }})</a></span></li>
     <li class="oid-info__list-item"><strong>Шифр:</strong> <span class="oid-info__item-underline">{{ oid.cipher }}</span></li>
+    <li class="oid-info__list-item"><strong>Гриф ОІД:</strong>  <span class="oid-info__item-underline"> {{ oid.get_sec_level_display }}</span></li>
     <li class="oid-info__list-item"><strong>Повна назва:</strong>  <span class="oid-info__item-underline"> {{ oid.full_name|default:"Не вказано" }}</span></li>
     <li class="oid-info__list-item"><strong>Тип ОІД:</strong>  <span class="oid-info__item-underline"> {{ oid.get_oid_type_display }}</span></li>
-    <li class="oid-info__list-item"><strong>Військова частина:</strong>  <span class="oid-info__item-underline"> <a href="{% url 'oids:main_dashboard' %}?unit={{ oid.unit.id }}">{{ oid.unit.code }} - {{ oid.unit.name|default:oid.unit.city }}</a></span></li>
-    <li class="oid-info__list-item"><strong>Територіальне управління:</strong>  <span class="oid-info__item-underline"> {{ oid.unit.territorial_management.name|default:"Не вказано" }}</span></li>
     <li class="oid-info__list-item"><strong>Приміщення:</strong>  <span class="oid-info__item-underline"> {{ oid.room }}</span></li>
-    <li class="oid-info__list-item"><strong>Поточний стан:</strong>  <span class="oid-info__item-underline"> {{ oid.get_status_display }} <a href="{% url 'oids:update_specific_oid_status' oid_id_from_url=oid.id %}"> ---> Змінити статус ОІД</a> </span></li> 
-    <li class="oid-info__list-item"><strong>Гриф ОІД:</strong>  <span class="oid-info__item-underline"> {{ oid.get_sec_level_display }}</span></li>
+    <li class="oid-info__list-item"><strong>Поточний стан:</strong>  <span class="oid-info__item-underline"> {{ oid.get_status_display }} >>> <a href="{% url 'oids:update_specific_oid_status' oid_id_from_url=oid.id %}">Змінити статус ОІД</a> </span></li> 
     <li class="oid-info__list-item"><strong>Примітки:</strong>  <span class="oid-info__item-underline"> {{ oid.note|default:"-" }}</span></li>
     {% if last_attestation_expiration %}
         <li><strong>Атестація дійсна до:</strong> {{ last_attestation_expiration|date:"d.m.Y" }}</li>

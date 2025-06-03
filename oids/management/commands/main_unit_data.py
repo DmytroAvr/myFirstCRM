@@ -223,7 +223,7 @@ class Command(BaseCommand):
                     }
                 )
                 if created:
-                    self.stdout.write(self.style.SUCCESS(f'Successfully created Unit: {unit.code} - {unit.name}'))
+                    self.stdout.write(self.style.SUCCESS(f'Successfully created Unit: {unit.code} {unit.city}- {unit.name}'))
                     created_units_count +=1
                 else:
                     # Оновлення, якщо потрібно (наприклад, якщо змінилися дані)

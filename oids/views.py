@@ -23,16 +23,6 @@ from .forms import ( TripForm, TripResultSendForm, DocumentProcessingMainForm, D
     TechnicalTaskFilterForm, WorkRequestItemProcessingFilterForm
 )
 
-def add_working_days(start_date, days_to_add):
-    current_date_iter = start_date # Дата, з якої починаємо відлік (наступний день після trip.end_date)
-    days_counted = 0
-    while days_counted < days_to_add:
-        current_date_iter += datetime.timedelta(days=1)
-        if current_date_iter.weekday() < 5: # 0-Mon, 1-Tue, 2-Wed, 3-Thu, 4-Fri
-            days_counted += 1
-    return current_date_iter
-
- # Твоя допоміжна функція (залишається без змін, але буде викликатися в AJAX view)
 def get_last_document_expiration_date(oid_instance, document_name_keyword, work_type_choice=None):
     try:
         doc_type_filters = Q(name__icontains=document_name_keyword)
@@ -149,7 +139,7 @@ def ajax_load_oids_for_multiple_units(request):
                     'cipher': oid.cipher, 
                     'full_name': oid.full_name or "",
                     'unit_code': oid.unit.code, # Додаємо код ВЧ для кращого відображення
-                    'unit_name': oid.unit.name or oid.unit.city # Також назву/місто ВЧ
+                    'unit_city': oid.unit.city  # Також місто ВЧ
                 })
         except ValueError:
             return JsonResponse({'error': 'Невірні ID військових частин'}, status=400)
@@ -279,7 +269,7 @@ def ajax_load_work_requests_for_oids(request):
             for wr in relevant_requests:
                 work_requests_data.append({
                     'id': wr.id,
-                    'text': f"заявка вх.№{wr.incoming_number} від {wr.incoming_date.strftime('%d.%m.%Y')} (ВЧ: {wr.unit.code}) - {wr.get_status_display()}"
+                    'text': f"заявка вх.№ {wr.incoming_number} від {wr.incoming_date.strftime('%d.%m.%Y')} (ВЧ: {wr.unit.code}) - {wr.get_status_display()}"
                 })
         except Exception as e:
             # Обробка можливих помилок, наприклад, якщо OID.DoesNotExist (малоймовірно при filter id__in)
@@ -2344,14 +2334,29 @@ def record_attestation_response_view(request, att_reg_sent_id=None): # Може 
 # ... (інші імпорти)
 
 def processing_control_view(request):
-    # --- Блок 1: Читання ТЗ ---
-    today_date = datetime.date.today()
-    tt_queryset = TechnicalTask.objects.select_related(
-        'oid__unit', 
-        'reviewed_by'
-    ).order_by('-read_till_date', '-input_date')
+    today_date = datetime.date.today() # Для підсвічування протермінованих
 
-    tt_filter_form = TechnicalTaskFilterForm(request.GET or None)
+    # --- Блок 1: Читання ТЗ ---
+    tt_queryset = TechnicalTask.objects.select_related('oid__unit', 'reviewed_by')
+    
+    # Сортування для ТЗ
+    tt_sort_by = request.GET.get('tt_sort_by', '-read_till_date') # За замовчуванням
+    tt_sort_order = request.GET.get('tt_sort_order', 'asc') # asc чи desc для tt_sort_by без '-'
+    
+    tt_valid_sorts = {
+        'unit': 'oid__unit__code', 'oid': 'oid__cipher', 'input_num': 'input_number',
+        'input_date': 'input_date', 'deadline': 'read_till_date', 'status': 'review_result',
+        'executor': 'reviewed_by__full_name', 'exec_date': 'updated_at'
+    }
+    tt_order_by_field = tt_valid_sorts.get(tt_sort_by.lstrip('-'), '-read_till_date')
+    if tt_sort_by.startswith('-'):
+        tt_order_by_field = f"-{tt_order_by_field.lstrip('-')}"
+    elif tt_sort_order == 'desc':
+        tt_order_by_field = f"-{tt_order_by_field}"
+    
+    tt_queryset = tt_queryset.order_by(tt_order_by_field)
+    
+    tt_filter_form = TechnicalTaskFilterForm(request.GET or None, prefix="tt") # Додав префікс
     if tt_filter_form.is_valid():
         if tt_filter_form.cleaned_data.get('unit'):
             tt_queryset = tt_queryset.filter(oid__unit=tt_filter_form.cleaned_data['unit'])
@@ -2359,24 +2364,40 @@ def processing_control_view(request):
             tt_queryset = tt_queryset.filter(oid=tt_filter_form.cleaned_data['oid'])
         if tt_filter_form.cleaned_data.get('review_result'):
             tt_queryset = tt_queryset.filter(review_result=tt_filter_form.cleaned_data['review_result'])
-        # TODO: Додати сортування для ТЗ, якщо потрібно
 
-    tt_paginator = Paginator(tt_queryset, 15) # 15 ТЗ на сторінку
-    tt_page_number = request.GET.get('tt_page') # Використовуємо префікс для параметра сторінки
+    tt_paginator = Paginator(tt_queryset, 15) 
+    tt_page_number = request.GET.get('tt_page')
     tt_page_obj = tt_paginator.get_page(tt_page_number)
 
-    # --- Блок 2: Опрацювання документів з відрядження (на базі WorkRequestItem) ---
+    # --- Блок 2: Опрацювання документів з відрядження (WorkRequestItem) ---
     wri_queryset = WorkRequestItem.objects.filter(
-        # Фільтруємо тільки ті, для яких має бути встановлений дедлайн або які в процесі/очікують
-        # Q(doc_processing_deadline__isnull=False) | Q(status__in=[WorkRequestStatusChoices.IN_PROGRESS, WorkRequestStatusChoices.PENDING])
-        # Або просто показуємо всі, а фільтри роблять свою справу
-    ).select_related(
-        'request__unit', 
-        'oid'
-    ).order_by('doc_processing_deadline', 'request__incoming_date') # Сортуємо за дедлайном
+        request__trips__isnull=False # Тільки ті, що пов'язані з відрядженнями
+    ).select_related('request__unit', 'oid').distinct()
 
-    wri_filter_form = WorkRequestItemProcessingFilterForm(request.GET or None)
+    # Сортування для WRI
+    wri_sort_by = request.GET.get('wri_sort_by', 'doc_processing_deadline') # За замовчуванням
+    wri_sort_order = request.GET.get('wri_sort_order', 'asc')
+
+    wri_valid_sorts = {
+        'unit': 'request__unit__code', 'oid': 'oid__cipher', 'req_num': 'request__incoming_number',
+        'req_date': 'request__incoming_date', 'work_type': 'work_type', 'status': 'status',
+        'deadline': 'doc_processing_deadline', 'proc_date': 'docs_actually_processed_on'
+    }
+    wri_order_by_field = wri_valid_sorts.get(wri_sort_by.lstrip('-'), 'doc_processing_deadline')
+    if wri_sort_by.startswith('-'):
+         wri_order_by_field = f"-{wri_order_by_field.lstrip('-')}"
+    elif wri_sort_order == 'desc':
+        wri_order_by_field = f"-{wri_order_by_field}"
+
+    if wri_order_by_field: # Може бути None, якщо сортування не вказано або некоректне
+        wri_queryset = wri_queryset.order_by(wri_order_by_field)
+    else: # Сортування за замовчуванням, якщо нічого не передано або невалідний параметр
+        wri_queryset = wri_queryset.order_by('doc_processing_deadline', 'request__incoming_date')
+
+
+    wri_filter_form = WorkRequestItemProcessingFilterForm(request.GET or None, prefix="wri") # Додав префікс
     if wri_filter_form.is_valid():
+        # ... (ваша логіка фільтрації для wri_queryset, як була) ...
         if wri_filter_form.cleaned_data.get('unit'):
             wri_queryset = wri_queryset.filter(request__unit=wri_filter_form.cleaned_data['unit'])
         if wri_filter_form.cleaned_data.get('oid'):
@@ -2387,31 +2408,29 @@ def processing_control_view(request):
             wri_queryset = wri_queryset.filter(doc_processing_deadline__gte=wri_filter_form.cleaned_data['deadline_from'])
         if wri_filter_form.cleaned_data.get('deadline_to'):
             wri_queryset = wri_queryset.filter(doc_processing_deadline__lte=wri_filter_form.cleaned_data['deadline_to'])
-        
         processed_filter = wri_filter_form.cleaned_data.get('processed')
-        if processed_filter == 'yes':
-            wri_queryset = wri_queryset.filter(docs_actually_processed_on__isnull=False)
-        elif processed_filter == 'no':
-            wri_queryset = wri_queryset.filter(docs_actually_processed_on__isnull=True)
-        # TODO: Додати сортування для WRI, якщо потрібно
+        if processed_filter == 'yes': wri_queryset = wri_queryset.filter(docs_actually_processed_on__isnull=False)
+        elif processed_filter == 'no': wri_queryset = wri_queryset.filter(docs_actually_processed_on__isnull=True)
 
-    wri_paginator = Paginator(wri_queryset, 15) # 15 елементів на сторінку
-    wri_page_number = request.GET.get('wri_page') # Використовуємо префікс
+    wri_paginator = Paginator(wri_queryset, 15) 
+    wri_page_number = request.GET.get('wri_page') 
     wri_page_obj = wri_paginator.get_page(wri_page_number)
 
-    # Отримуємо всі Units та OIDs для заповнення фільтрів у JS, якщо потрібно
-    # (або queryset у формах оновлюється залежно від першого фільтра)
     all_units = Unit.objects.all().order_by('code')
-    # all_oids = OID.objects.select_related('unit').order_by('unit__code', 'cipher')
 
     context = {
-        'page_title': 'Контроль опрацювання завдань та документів',
+        'page_title': 'Контроль опрацювання',
         'tt_filter_form': tt_filter_form,
-        'technical_tasks': tt_page_obj, # Для першої таблиці
+        'technical_tasks': tt_page_obj,
         'wri_filter_form': wri_filter_form,
-        'work_request_items': wri_page_obj, # Для другої таблиці
-        'all_units': all_units, # Для динамічного заповнення ОІД у фільтрах
-        # 'all_oids': all_oids # Якщо потрібен повний список ОІД для JS
+        'work_request_items': wri_page_obj,
+        'all_units': all_units, 
+        'today_date': today_date, # Передаємо сьогоднішню дату
+        # Для сортування (передаємо поточні параметри)
+        'current_tt_sort_by': tt_sort_by,
+        'current_tt_sort_order': tt_sort_order,
+        'current_wri_sort_by': wri_sort_by,
+        'current_wri_sort_order': wri_sort_order,
     }
     return render(request, 'oids/processing_control_dashboard.html', context)
 

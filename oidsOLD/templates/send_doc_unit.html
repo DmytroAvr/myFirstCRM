@@ -16,7 +16,7 @@
     <legend>Військові частини</legend>
     <select id="id_units" name="units" class="select2" multiple>
       {% for unit in form.fields.units.queryset %}
-        <option value="{{ unit.id }}">{{ unit.name }}</option>
+        <option value="{{ unit.id }}">{{ unit.code }} - {{ unit.city }}</option>
       {% endfor %}
     </select>
   </fieldset>

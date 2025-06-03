@@ -1,11 +1,40 @@
 from django.db import models
 from multiselectfield import MultiSelectField
 from django.utils import timezone
+import datetime
 from django.db.models import Q
 from simple_history.models import HistoricalRecords
 # --- CONSTANTS / CHOICES ---
 # Краще зберігати вибори в окремих файлах або в самих моделях, якщо вони специфічні для моделі.
 # Для загальних виборів, які використовуються в кількох моделях, можна тримати їх тут.
+
+
+def add_working_days(start_date, days_to_add):
+    """
+    Додає вказану кількість робочих днів до початкової дати.
+    start_date - це дата, ПІСЛЯ якої починається відлік.
+    days_to_add - кількість робочих днів, які потрібно додати.
+    Функція повертає N-й робочий день після start_date.
+    """
+    if not isinstance(start_date, datetime.date):
+        raise ValueError("start_date має бути об'єктом datetime.date")
+    if not isinstance(days_to_add, int) or days_to_add <= 0: # days_to_add має бути > 0
+        # Якщо days_to_add = 0, то це має бути перший робочий день після start_date,
+        # що потребує іншої логіки або days_to_add=1 для "наступного робочого дня".
+        # Для нашого випадку "10-й робочий день ПІСЛЯ end_date" -> days_to_add буде 10.
+        raise ValueError("days_to_add має бути позитивним цілим числом")
+
+    current_day_iterator = start_date
+    work_days_counted = 0
+    while work_days_counted < days_to_add:
+        current_day_iterator += datetime.timedelta(days=1)
+        if current_day_iterator.weekday() < 5: # 0-Mon, 4-Fri
+            work_days_counted += 1
+    return current_day_iterator
+
+
+ # Твоя допоміжна функція (залишається без змін, але буде викликатися в AJAX view)
+
 
 class SecLevelChoices(models.TextChoices):
     S = 'Таємно', 'Таємно' 
@@ -196,7 +225,7 @@ class WorkRequest(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
     history = HistoricalRecords()
     def __str__(self):
-        return f"в/ч {self.unit.code} Заявка вх.№{self.incoming_number} від {self.incoming_date} ({self.get_status_display()})"
+        return f"в/ч {self.unit.code} Заявка вх.№ {self.incoming_number} від {self.incoming_date} ({self.get_status_display()})"
 
     class Meta:
         verbose_name = "Заявка на проведення робіт"
@@ -684,9 +713,51 @@ class Trip(models.Model):
     history = HistoricalRecords()
 
     def __str__(self):
-        unit_names = ", ".join(unit.name for unit in self.units.all())
-        return f"Відрядження {self.start_date}—{self.end_date} до {unit_names or 'немає частин'}"
+        unit_names = ", ".join(unit.code for unit in self.units.all())
+        return f"Відрядження {self.start_date}—{self.end_date} до {unit_names or 'немає частин'} ({unit_city or 'немає міста'})"
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        old_end_date = None
+        if not is_new:
+            try:
+                old_end_date = Trip.objects.get(pk=self.pk).end_date
+            except Trip.DoesNotExist:
+                pass
 
+        super().save(*args, **kwargs) # Спочатку зберігаємо Trip
+
+        # Встановлюємо/оновлюємо дедлайни, якщо end_date встановлено і (це новий Trip АБО end_date змінилася)
+        if self.end_date and (is_new or self.end_date != old_end_date):
+            print(f"TRIP_SAVE_DEBUG: Trip ID {self.pk}, end_date: {self.end_date}. Calculating deadlines.")
+            
+            # Отримуємо WorkRequestItems, які пов'язані з цим відрядженням
+            # через поле Trip.work_requests та Trip.oids
+            items_to_process = WorkRequestItem.objects.filter(
+                request__in=self.work_requests.all(),
+                oid__in=self.oids.all(), # Переконуємося, що ОІД з елемента заявки також є в списку ОІДів відрядження
+                # Можливо, додати фільтр по статусу WorkRequestItem, наприклад, тільки 'IN_PROGRESS'
+                # status=WorkRequestStatusChoices.IN_PROGRESS
+            ).select_related('oid', 'request__unit')
+
+            print(f"TRIP_SAVE_DEBUG: Found {items_to_process.count()} WRI to update for trip {self.id}")
+
+            for item in items_to_process:
+                days_for_processing = 0
+                if item.work_type == WorkTypeChoices.IK:
+                    days_for_processing = 15
+                elif item.work_type == WorkTypeChoices.ATTESTATION:
+                    days_for_processing = 10
+                
+                if days_for_processing > 0:
+                    # self.end_date - це останній день відрядження.
+                    # Відлік починається з першого робочого дня ПІСЛЯ self.end_date.
+                    # Отже, add_working_days має додати 'days_for_processing' робочих днів до self.end_date.
+                    new_deadline = add_working_days(self.end_date, days_for_processing)
+                    
+                    if item.doc_processing_deadline != new_deadline:
+                        item.doc_processing_deadline = new_deadline
+                        item.save(update_fields=['doc_processing_deadline', 'updated_at'])
+                        print(f"TRIP_SAVE_DEBUG: WRI ID {item.id} (OID: {item.oid.cipher}) deadline -> {item.doc_processing_deadline}")
     class Meta:
         verbose_name = "Відрядження"
         verbose_name_plural = "Відрядження"

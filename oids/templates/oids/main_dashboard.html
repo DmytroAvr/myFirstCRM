@@ -30,7 +30,7 @@
             Об'єкти інформаційної діяльності 
             <span>
                 {% if selected_unit_object %}
-                    (для ВЧ: {{ selected_unit_object.code }} - {{ selected_unit_object.name|default:selected_unit_object.city }})
+                    (для ВЧ: {{ selected_unit_object.code }} - {{ selected_unit_object.name|default:"-" }}) ({{selected_unit_object.city}})
                 {% elif selected_unit_id %}
                     (для обраної ВЧ) {# Якщо selected_unit_object чомусь None, але ID є #}
                 {% else %}

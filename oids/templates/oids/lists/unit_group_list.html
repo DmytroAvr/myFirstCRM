@@ -23,8 +23,8 @@
                         <td>{{ group.name }}</td>
                         <td>{{ group.note|default:"-" }}</td>
                         <td>
-                            {% for unit in group.units.all %} {# Потребує related_name='units' в моделі Unit для unit_groups #}
-                                {{ unit.code }} - {{ unit.name|default:unit.city }}{% if not forloop.last %}; {% endif %}
+                            {% for unit in group.units.all %} 
+                                {{ unit.code }} {{ unit.city }} {{ unit.city}} {% if not forloop.last %}; {% endif %}
                             {% empty %}
                                 Немає частин
                             {% endfor %}

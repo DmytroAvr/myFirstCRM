@@ -100,7 +100,7 @@
                         {% if trip_item.units.all %}
                         <ul class="list-unstyled mb-0">
                             {% for unit in trip_item.units.all %}
-                            <li>{{ unit.code }} {% if unit.name %}({{ unit.name }}){% elif unit.city %}({{ unit.city }}){% endif %}</li>
+                            <li>{{ unit.code }} {% if unit.city %}({{ unit.city }}){% elif unit.name %}({{ unit.name }}){% endif %}</li>
                             {% endfor %}
                         </ul>
                         {% else %}-{% endif %}

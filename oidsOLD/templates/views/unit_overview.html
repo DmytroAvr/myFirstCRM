@@ -125,7 +125,7 @@
   <select name="unit" id="unit" onchange="this.form.submit()">
     <option value="">Усі частини</option>
     {% for unit in units %}
-      <option value="{{ unit.id }}" {% if unit.id|stringformat:"s" == selected_unit_id %}selected{% endif %}>{{ unit.name }}</option>
+      <option value="{{ unit.id }}" {% if unit.id|stringformat:"s" == selected_unit_id %}selected{% endif %}>{{ unit.code }}</option>
     {% endfor %}
   </select>
 </form>
