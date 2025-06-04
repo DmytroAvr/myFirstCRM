@@ -133,11 +133,11 @@ class AttestationResponseAdmin(admin.ModelAdmin):
 
 @admin.register(TripResultForUnit)
 class TripResultForUnitAdmin(admin.ModelAdmin):
-    list_display = ('process_date', 'trip_info')
+    list_display = ('outgoing_letter_date', 'trip_info')
     filter_horizontal = ('units', 'oids', 'documents')
-    list_filter = ('process_date', 'units')
+    list_filter = ('outgoing_letter_date', 'units')
     search_fields = ('trip__purpose', 'units__code', 'documents__document_number')
-    date_hierarchy = 'process_date'
+    date_hierarchy = 'outgoing_letter_date'
 
     def trip_info(self, obj):
         return str(obj.trip) if obj.trip else "N/A"

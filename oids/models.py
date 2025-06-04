@@ -811,7 +811,6 @@ class TripResultForUnit(models.Model):
     outgoing_letter_date = models.DateField(
         verbose_name="Вих. дата супровідного листа"
     )
-    process_date = models.DateField(verbose_name="Дата відправки до частини")
     note = models.TextField(blank=True, null=True, verbose_name="Примітка")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
@@ -821,12 +820,12 @@ class TripResultForUnit(models.Model):
     # related_request = models.ForeignKey('WorkRequest', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Пов’язана заявка")
     
     def __str__(self):
-        return f"Відправка результатів від {self.process_date}"
+        return f"Відправка результатів від {self.outgoing_letter_date}"
     
     class Meta:
         verbose_name = "Результати відрядження для частини"
         verbose_name_plural = "Результати відрядження для частин"
-        ordering = ['-process_date', '-id']
+        ordering = ['-outgoing_letter_date', '-id']
         
 # oids/models.py
 class TechnicalTask(models.Model):

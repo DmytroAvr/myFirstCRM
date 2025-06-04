@@ -15,8 +15,7 @@
                     <th>Пов'язане відрядження</th>
                     <th>Військові частини призначення</th>
                     <th>ОІДи</th>
-                    <th>Документи (кількість)</th>
-                    <th>Файл (супровідний)</th>
+                    <!-- <th>Документи (кількість)</th>                     -->
                     <th>Примітки</th>
                     {# <th>Дії</th> #}
                 </tr>
@@ -24,7 +23,7 @@
             <tbody>
                 {% for result in object_list %}
                     <tr>
-                        <td>{{ result.process_date|date:"d.m.Y" }}</td>
+                        <td>вих.№ {{ result.outgoing_letter_number }} від {{ result.outgoing_letter_date|date:"d.m.Y" }}</td>
                         <td>
                             {% if result.trip %}
                                 Відрядження: {{ result.trip.start_date|date:"d.m.Y" }} - {{ result.trip.end_date|date:"d.m.Y" }}
@@ -50,14 +49,8 @@
                             {% endfor %}
                             </ul>
                         </td>
-                        <td>{{ result.documents.count }}</td>
-                        <td>
-                            {% if result.attachment %}
-                                <a href="{{ result.attachment.url }}" target="_blank">Переглянути</a>
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
+                        <!-- <td>{{ result.documents.count }}</td> -->
+                       
                         <td>{{ result.note|truncatewords:10|default:"-" }}</td>
                         {# <td><a href="#" class="btn btn-sm btn-info">Деталі</a></td> #}
                     </tr>

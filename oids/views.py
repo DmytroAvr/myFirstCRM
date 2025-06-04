@@ -473,7 +473,10 @@ def ajax_load_units_for_trip(request):
             trip = Trip.objects.get(pk=trip_id)
             # Беремо ВЧ, що були задіяні у відрядженні
             for unit in trip.units.all().order_by('code'):
-                units_data.append({'id': unit.id, 'text': f"{unit.code} - {unit.name or unit.city}"})
+                units_data.append({
+                    'id': unit.id, 
+                    'text': f"{unit.code} - {unit.city or unit.name}"
+                    })
         except Trip.DoesNotExist:
             pass # Повернемо порожній список
         except Exception as e:
@@ -497,7 +500,7 @@ def ajax_load_oids_for_trip_units(request):
             for oid in oids_queryset:
                 oids_data.append({
                     'id': oid.id, 
-                    'text': f"{oid.cipher} (ВЧ: {oid.unit.code}) - {oid.full_name or oid.unit.city}",
+                    'text': f"ВЧ: {oid.unit.code} ОІД: {oid.cipher} - {oid.full_name or oid.unit.city}",
                     'oid_type': oid.oid_type # Передаємо тип ОІД для подальшої фільтрації документів
                 })
         except Trip.DoesNotExist:
@@ -547,9 +550,12 @@ def ajax_load_documents_for_trip_oids(request):
 
             # Визначаємо DocumentType для "Акт атестації" та "Висновок ІК"
             # Краще мати константи або slug для цих типів
-            attestation_act_type = DocumentType.objects.filter(name__icontains="Акт атестації").first()
-            ik_conclusion_type = DocumentType.objects.filter(name__icontains="Висновок ІК").first()
+            attestation_act_type = DocumentType.objects.filter(duration_months="60").first()
+            ik_conclusion_type = DocumentType.objects.filter(duration_months="20").first()
+            
             # Інші типи документів, які входять до пакетів (за потреби)
+            # attestation_act_type = DocumentType.objects.filter(name__icontains="Акт атестації").first()
+            # ik_conclusion_type = DocumentType.objects.filter(name__icontains="Висновок ІК").first()
             # program_method_type = DocumentType.objects.filter(name__icontains="Програма і методика").first()
             # plan_search_type = DocumentType.objects.filter(name__icontains="План пошуку ЗП").first()
             # act_search_type = DocumentType.objects.filter(name__icontains="Акт пошуку ЗП").first()
@@ -588,7 +594,7 @@ def ajax_load_documents_for_trip_oids(request):
                 if add_document:
                     documents_data.append({
                         'id': doc.id,
-                        'text': f"{doc.document_type.name} №{doc.document_number} від {doc.work_date.strftime('%d.%m.%Y')} (ОІД: {doc.oid.cipher})"
+                        'text': f"в/ч {doc.oid.unit.code} ОІД: {doc.oid.cipher} | Документ: {doc.document_type.name} підг.№ {doc.document_number} від {doc.work_date.strftime('%d.%m.%Y')}"
                     })
         except Trip.DoesNotExist:
             pass
@@ -668,7 +674,7 @@ def main_dashboard(request):
 @transaction.atomic
 def send_trip_results_view(request):
     if request.method == 'POST':
-        form = TripResultSendForm(request.POST, request.FILES)
+        form = TripResultSendForm(request.POST)
         if form.is_valid():
             # Метод save() форми тепер обробляє збереження M2M та оновлення статусів
             trip_result = form.save() 
@@ -1963,7 +1969,7 @@ def trip_result_for_unit_list_view(request):
         'units', # ВЧ, куди відправлено
         Prefetch('oids', queryset=OID.objects.select_related('unit')), # ОІДи, що стосуються результату
         Prefetch('documents', queryset=Document.objects.select_related('document_type')) # Документи, що відправлені
-    ).order_by('-process_date') # Сортуємо за датою відправки до частини
+    ).order_by('-outgoing_letter_date') # Сортуємо за датою відправки до частини
 
     paginator = Paginator(result_list_queryset, 25)
     page_number = request.GET.get('page')

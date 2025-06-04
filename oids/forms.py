@@ -706,7 +706,6 @@ class OIDStatusUpdateForm(forms.Form):
         # Тут можна додати іншу логіку валідації, якщо потрібно
         return cleaned_data
     
-
 class TripResultSendForm(forms.ModelForm):
     trip = forms.ModelChoiceField(
         queryset=Trip.objects.order_by('-start_date'), # Можна додати фільтр, наприклад, тільки завершені відрядження
@@ -750,7 +749,7 @@ class TripResultSendForm(forms.ModelForm):
             # 'units', # поле 'units' в TripResultForUnit буде заповнено з 'units_in_trip'
             # 'oids',  # поле 'oids' в TripResultForUnit буде заповнено з 'oids_in_trip_units'
             # 'documents', # поле 'documents' в TripResultForUnit буде заповнено з 'documents_to_send'
-			'process_date',
+			
 			'outgoing_letter_number', 
             'outgoing_letter_date', 
             'note',             
@@ -758,13 +757,11 @@ class TripResultSendForm(forms.ModelForm):
         widgets = {
             'outgoing_letter_number': forms.TextInput(attrs={'class': 'form-control'}),
             'outgoing_letter_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-
-            'process_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'note': forms.Textarea(attrs={'rows': 2, 'class': 'form-control'}),
         }
         labels = {
             'outgoing_letter_number': "Вихідний номер супровідного листа",
-            'outgoing_letter_date': "Дата вихідного супровідного листа",
+            'outgoing_letter_date': "Дата вихідного супровідного листа",            
             'note': "Примітки до відправки результатів",
         }
 
