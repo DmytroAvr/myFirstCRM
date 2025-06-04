@@ -153,7 +153,11 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {{ item.doc_processing_deadline|date:"d.m.Y"|default:"Не встановлено" }}
+                                {% if item.deadline_trigger_trip %}
+									{{ item.deadline_trigger_trip.start_date|date:"d.m.Y" }} - {{ item.deadline_trigger_trip.end_date|date:"d.m.Y" }}
+								{% else %}
+									<span class="text-muted">-</span>
+								{% endif %}
                             </td>
                             <td>{{ item.docs_actually_processed_on|date:"d.m.Y"|default:"-" }}</td>
                         </tr>

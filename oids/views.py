@@ -64,11 +64,12 @@ def plan_trip_view(request):
                         elif item.work_type == WorkTypeChoices.ATTESTATION: days_for_processing = 10
                         
                         if days_for_processing > 0:
-                            new_deadline = add_working_days(start_counting_from_date, days_for_processing)
-                            if item.doc_processing_deadline != new_deadline:
-                                item.doc_processing_deadline = new_deadline
-                                item.save(update_fields=['doc_processing_deadline', 'updated_at'])
-                                print(f"PLAN_TRIP_VIEW: WRI ID {item.id} (OID: {item.oid.cipher}) deadline -> {item.doc_processing_deadline}")
+                           new_deadline = add_working_days(start_counting_from_date, days_for_processing)
+                           if item.doc_processing_deadline != new_deadline or item.deadline_trigger_trip != trip: # Додано перевірку trip
+                               item.doc_processing_deadline = new_deadline
+                               item.deadline_trigger_trip = trip # <--- Встановлюємо зв'язок
+                               item.save(update_fields=['doc_processing_deadline', 'deadline_trigger_trip', 'updated_at'])
+                               print(f"PLAN_TRIP_VIEW: WRI ID {item.id} (OID: {item.oid.cipher}) deadline -> {item.doc_processing_deadline}")
                 else:
                     print(f"PLAN_TRIP_VIEW: No WorkRequests linked to Trip ID {trip.pk} to calculate item deadlines.")
             else:
@@ -2339,6 +2340,7 @@ def processing_control_view(request):
     ).select_related(
         'request__unit', 
         'oid__unit' # Додаємо unit для ОІДа, щоб мати доступ до коду ВЧ ОІДа
+        'deadline_trigger_trip' # <--- Додаємо select_related
     ).prefetch_related(
         Prefetch('request__trips', queryset=Trip.objects.order_by('-end_date')) # Отримуємо всі відрядження для заявки, сортуємо
     ).distinct()
@@ -2376,6 +2378,11 @@ def processing_control_view(request):
     wri_page_obj = wri_paginator.get_page(wri_page_number)
 
     all_units = Unit.objects.all().order_by('code')
+    processed_filter = wri_filter_form.cleaned_data.get('processed')
+    if processed_filter == 'yes':
+        wri_queryset = wri_queryset.filter(docs_actually_processed_on__isnull=False)
+    elif processed_filter == 'no':
+        wri_queryset = wri_queryset.filter(docs_actually_processed_on__isnull=True)
 
     context = {
         'page_title': 'Контроль опрацювання',

@@ -1049,62 +1049,22 @@ class WorkRequestItemProcessingFilterForm(forms.Form):
     deadline_from = forms.DateField(required=False, widget=forms.DateInput(attrs={'type':'date', 'class':'form-control form-control-sm'}), label="Дедлайн з")
     deadline_to = forms.DateField(required=False, widget=forms.DateInput(attrs={'type':'date', 'class':'form-control form-control-sm'}), label="Дедлайн по")
     processed = forms.ChoiceField(
-        choices=[('', 'Всі'), ('yes', 'Опрацьовано'), ('no', 'Не опрацьовано')],
-        required=False, label="Стан факт. опрацювання",
-        widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
-    )
-    def __init__(self, *args, **kwargs): # Логіка для оновлення queryset OID
-        super().__init__(*args, **kwargs)
-        unit_field_name = self.add_prefix('unit') if self.prefix else 'unit'
-        unit_id = None
-        if self.is_bound and unit_field_name in self.data and self.data.get(unit_field_name):
-            try: unit_id = int(self.data.get(unit_field_name))
-            except (ValueError, TypeError): pass
-        elif self.initial.get('unit'):
-            try: unit_id = int(self.initial.get('unit'))
-            except (ValueError, TypeError): pass
-        if unit_id: self.fields['oid'].queryset = OID.objects.filter(unit_id=unit_id).order_by('cipher')
-
-    unit = forms.ModelChoiceField(
-        queryset=Unit.objects.all().order_by('code'),
-        required=False,
-        label="Військова частина",
-        widget=forms.Select(attrs={'class': 'form-select form-select-sm tomselect-field'}),
-        empty_label="Всі ВЧ"
-    )
-    oid = forms.ModelChoiceField( # Буде заповнюватися динамічно
-        queryset=OID.objects.none(),
-        required=False,
-        label="ОІД",
-        widget=forms.Select(attrs={'class': 'form-select form-select-sm tomselect-field'}),
-        empty_label="Всі ОІДи"
-    )
-    status = forms.ChoiceField( # Статус WorkRequestItem
-        choices=[('', 'Всі статуси')] + WorkRequestStatusChoices.choices,
-        required=False,
-        label="Статус опрацювання елемента заявки",
-        widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
-    )
-    # Можна додати фільтри по датах (doc_processing_deadline, docs_actually_processed_on)
-    deadline_from = forms.DateField(
-        required=False, 
-        widget=forms.DateInput(attrs={'type':'date', 'class':'form-control form-control-sm'}),
-        label="Дедлайн з"
-    )
-    deadline_to = forms.DateField(
-        required=False, 
-        widget=forms.DateInput(attrs={'type':'date', 'class':'form-control form-control-sm'}),
-        label="Дедлайн по"
-    )
-    
-    processed = forms.ChoiceField(
-        choices=[('', 'Всі'), ('yes', 'Опрацьовано'), ('no', 'Не опрацьовано')],
-        required=False,
-        label="Стан опрацювання",
-        widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
-    )
-
-
+		choices=[('', 'Всі'), ('yes', 'Опрацьовано'), ('no', 'Не опрацьовано')],
+		required=False,
+		label="Стан факт. опрацювання",
+		widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
+	)
+    # def __init__(self, *args, **kwargs): # Логіка для оновлення queryset OID
+    #     super().__init__(*args, **kwargs)
+    #     unit_field_name = self.add_prefix('unit') if self.prefix else 'unit'
+    #     unit_id = None
+    #     if self.is_bound and unit_field_name in self.data and self.data.get(unit_field_name):
+    #         try: unit_id = int(self.data.get(unit_field_name))
+    #         except (ValueError, TypeError): pass
+    #     elif self.initial.get('unit'):
+    #         try: unit_id = int(self.initial.get('unit'))
+    #         except (ValueError, TypeError): pass
+    #     if unit_id: self.fields['oid'].queryset = OID.objects.filter(unit_id=unit_id).order_by('cipher')
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if 'unit' in self.data and self.data.get('unit'):
@@ -1119,3 +1079,46 @@ class WorkRequestItemProcessingFilterForm(forms.Form):
                 self.fields['oid'].queryset = OID.objects.filter(unit_id=unit_id).order_by('cipher')
             except (ValueError, TypeError):
                  pass
+
+    # unit = forms.ModelChoiceField(
+    #     queryset=Unit.objects.all().order_by('code'),
+    #     required=False,
+    #     label="Військова частина",
+    #     widget=forms.Select(attrs={'class': 'form-select form-select-sm tomselect-field'}),
+    #     empty_label="Всі ВЧ"
+    # )
+    # oid = forms.ModelChoiceField( # Буде заповнюватися динамічно
+    #     queryset=OID.objects.none(),
+    #     required=False,
+    #     label="ОІД",
+    #     widget=forms.Select(attrs={'class': 'form-select form-select-sm tomselect-field'}),
+    #     empty_label="Всі ОІДи"
+    # )
+    # status = forms.ChoiceField( # Статус WorkRequestItem
+    #     choices=[('', 'Всі статуси')] + WorkRequestStatusChoices.choices,
+    #     required=False,
+    #     label="Статус опрацювання елемента заявки",
+    #     widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
+    # )
+    # # Можна додати фільтри по датах (doc_processing_deadline, docs_actually_processed_on)
+    # deadline_from = forms.DateField(
+    #     required=False, 
+    #     widget=forms.DateInput(attrs={'type':'date', 'class':'form-control form-control-sm'}),
+    #     label="Дедлайн з"
+    # )
+    # deadline_to = forms.DateField(
+    #     required=False, 
+    #     widget=forms.DateInput(attrs={'type':'date', 'class':'form-control form-control-sm'}),
+    #     label="Дедлайн по"
+    # )
+    
+    # processed = forms.ChoiceField(
+    #     choices=[('', 'Всі'), ('yes', 'Опрацьовано'), ('no', 'Не опрацьовано')],
+    #     required=False,
+    #     label="Стан опрацювання",
+    #     widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
+    # )
+
+
+            
+
