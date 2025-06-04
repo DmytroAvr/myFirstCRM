@@ -55,7 +55,8 @@ python manage.py createsuperuser
 python manage.py main_unit_data  (створити в/ч з каталогу C:\myFirstCRM\oids\management\commands\main_unit_data.py)
 
 
- # Видалити старі міграції:
+
+# Видалити старі міграції:
 del oids/migrations/0*.py
 # (крім __init__.py, його не чіпай!)
 
