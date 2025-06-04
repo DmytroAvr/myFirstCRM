@@ -1,6 +1,6 @@
 # :\myFirstCRM\oids\urls.py
 from django.urls import path
-from . import views
+from ..originalWorkingFiles import views
 
 
 app_name = 'oids' # Важливо для {% url 'oids:view_name' %}

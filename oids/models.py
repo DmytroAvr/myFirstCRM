@@ -270,6 +270,12 @@ class WorkRequestItem(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
+    deadline_trigger_trip = models.ForeignKey(
+        'Trip', 
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        verbose_name="Відрядження, що встановило дедлайн опрацювання"
+    )
     history = HistoricalRecords()
     class Meta:
         unique_together = ('request', 'oid', 'work_type') # Один ОІД не може мати двічі одну і ту ж роботу в одній заявці
@@ -675,61 +681,6 @@ class Document(models.Model):
         verbose_name_plural = "Опрацьовані документи"
         ordering = ['-process_date', '-work_date']
         
-class Trip(models.Model):
-    """
-    Відрядження
-    Атрибути: Дата відрядження з / по, Призначення (до яких військових частин),
-              Які ОІД військових частин, Особи у відрядження, Мета відрядження
-    """
-    units = models.ManyToManyField(
-        Unit, 
-        verbose_name="Військові частини призначення",
-        related_name='trips' # Дозволить знайти всі відрядження для частини
-    )
-    oids = models.ManyToManyField(
-        OID, 
-        verbose_name="Об’єкти інформаційної діяльності, задіяні у відрядженні",
-        related_name='trips' # Дозволить знайти всі відрядження, що стосуються цього ОІД
-    )
-    # Зв'язок з WorkRequest через WorkRequestItem вже є.
-    # Якщо відрядження планується на основі заявок, то work_requests можна отримати через items
-    # або зробити ManyToManyField для прямого зв'язку, але це може призвести до дублювання інформації.
-    # Якщо work_requests - це "мета" відрядження, то краще залишити як є.
-    work_requests = models.ManyToManyField(
-        WorkRequest, 
-        verbose_name="Пов'язані заявки на проведення робіт",
-        related_name='trips' # Дозволить знайти всі відрядження, пов'язані з заявкою
-    ) 
-    start_date = models.DateField(verbose_name="Дата початку відрядження")
-    end_date = models.DateField(verbose_name="Дата завершення відрядження")
-    persons = models.ManyToManyField(
-        Person, 
-        verbose_name="Особи у відрядженні",
-        related_name='trips' # Дозволить знайти всі відрядження, в яких брала участь особа
-    )
-    purpose = models.TextField(blank=True, null=True, verbose_name="Мета відрядження")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
-    history = HistoricalRecords()
-
-    def __str__(self):
-        unit_codes = ", ".join(unit.code for unit in self.units.all()[:3]) # Обмежимо кількість для читабельності
-        if self.units.count() > 3:
-            unit_codes += "..."
-        return f"Відрядження {self.start_date.strftime('%d.%m.%Y')}—{self.end_date.strftime('%d.%m.%Y')} до ВЧ: {unit_codes or 'не вказано'}"
-
-    def save(self, *args, **kwargs):
-        # Тут може бути інша логіка, специфічна для збереження Trip,
-        # але розрахунок дедлайнів для WorkRequestItem тепер обробляється сигналом.
-        print(f"TRIP_MODEL_SAVE: Saving Trip ID {self.pk} with end_date: {self.end_date}")
-        super().save(*args, **kwargs)
-        # НЕМАЄ логіки розрахунку дедлайнів тут
-    
-    class Meta:
-        verbose_name = "Відрядження"
-        verbose_name_plural = "Відрядження"
-        ordering = ['-start_date', '-id']
-
 class OIDStatusChange(models.Model):
     """
     Історія змін статусу ОІД.

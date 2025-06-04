@@ -3,10 +3,8 @@ from django.db.models.signals import m2m_changed
 from django.dispatch import receiver
 from .models import Trip, WorkRequestItem, WorkTypeChoices, OID, add_working_days # Переконайтесь, що всі моделі імпортовані
 # from .utils import add_working_days # Ваша функція для розрахунку робочих днів
-import datetime # Для datetime.timedelta
+import datetime
 
-# Переконайтесь, що функція add_working_days визначена коректно
-# (як ми обговорювали, щоб вона додавала N робочих днів ПІСЛЯ start_date)
 
 @receiver(m2m_changed, sender=Trip.work_requests.through)
 @receiver(m2m_changed, sender=Trip.oids.through) # Слухаємо зміни на обох M2M полях
