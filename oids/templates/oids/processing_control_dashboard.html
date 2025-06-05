@@ -123,7 +123,7 @@
                             <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=req_num&wri_sort_order={% if current_wri_sort_by == 'req_num' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Заявка (№, дата)</a></th>
                             <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=work_type&wri_sort_order={% if current_wri_sort_by == 'work_type' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Тип робіт</a></th>
                             <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=status&wri_sort_order={% if current_wri_sort_by == 'status' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Статус опрац. ОІД</a></th>
-                            <th><a href="?{{ request.GET.urlencode }}&amp;wri_sort_by=trip_dates&amp;wri_sort_order={% if current_wri_sort_by == 'trip_dates' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Термін відрядження</a></th>
+                            <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=trip_dates&wri_sort_order={% if current_wri_sort_by == 'trip_dates' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Термін відрядження</a></th>
                             <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=deadline&wri_sort_order={% if current_wri_sort_by == 'deadline' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Термін опрац. док.</a></th>
                             <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=proc_date&wri_sort_order={% if current_wri_sort_by == 'proc_date' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Дата факт. опрац.</a></th>
                         </tr>
