@@ -333,7 +333,8 @@ class WorkRequestItem(models.Model):
         'Trip', 
         on_delete=models.SET_NULL,
         null=True, blank=True,
-        verbose_name="Відрядження, що встановило дедлайн опрацювання"
+        verbose_name="Відрядження, що встановило дедлайн опрацювання",
+        related_name="triggered_work_items" 
     )
     docs_actually_processed_on = models.DateField(
         verbose_name="Документи фактично опрацьовано (дата)", # <--- ОСЬ ЦЕ ПОЛЕ

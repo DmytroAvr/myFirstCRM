@@ -2316,9 +2316,9 @@ def record_attestation_response_view(request, att_reg_sent_id=None): # Може 
 def processing_control_view(request):
     today_date = datetime.date.today()
 
-    # --- Блок 1: Читання ТЗ (залишаємо без змін, як було) ---
+    # --- Блок 1: Читання ТЗ ---
     tt_queryset = TechnicalTask.objects.select_related('oid__unit', 'reviewed_by')
-    # ... (логіка фільтрації та сортування для ТЗ з вашого файлу views.py) ...
+    
     tt_filter_form = TechnicalTaskFilterForm(request.GET or None, prefix="tt")
     if tt_filter_form.is_valid():
         if tt_filter_form.cleaned_data.get('unit'):
@@ -2328,75 +2328,127 @@ def processing_control_view(request):
         if tt_filter_form.cleaned_data.get('review_result'):
             tt_queryset = tt_queryset.filter(review_result=tt_filter_form.cleaned_data['review_result'])
     
-    tt_queryset = tt_queryset.order_by('-read_till_date', '-input_date') # Приклад сортування
-    tt_paginator = Paginator(tt_queryset, 15)
-    tt_page_number = request.GET.get('tt_page')
-    tt_page_obj = tt_paginator.get_page(tt_page_number)
+    # Сортування для ТЗ (як у вашому файлі)
+    tt_sort_by = request.GET.get('tt_sort_by', '-read_till_date')
+    tt_sort_order = request.GET.get('tt_sort_order', 'asc')
+    tt_valid_sorts = {
+        'unit': 'oid__unit__code', 'oid': 'oid__cipher', 'input_num': 'input_number',
+        'input_date': 'input_date', 'deadline': 'read_till_date', 'status': 'review_result',
+        'executor': 'reviewed_by__full_name', 'exec_date': 'updated_at'
+    }
+    tt_order_by_field_key = tt_sort_by.lstrip('-') # Для отримання чистого імені поля
+    tt_order_by_field = tt_valid_sorts.get(tt_order_by_field_key, '-read_till_date')
 
+    if tt_sort_by.startswith('-'): # Якщо префікс вже є
+        if tt_sort_order == 'asc': # і ми хочемо змінити на asc
+            tt_order_by_field = tt_order_by_field_key
+        # else залишаємо desc (вже з мінусом)
+    elif tt_sort_order == 'desc': # Якщо префікса не було, але хочемо desc
+        tt_order_by_field = f"-{tt_order_by_field}"
+    # інакше залишається asc
+
+    tt_queryset = tt_queryset.order_by(tt_order_by_field, 'input_number')
+
+    tt_paginator = Paginator(tt_queryset, 15) 
+    tt_page_number = request.GET.get('tt_page') 
+    tt_page_obj = tt_paginator.get_page(tt_page_number)
 
     # --- Блок 2: Опрацювання документів з відрядження (WorkRequestItem) ---
     wri_queryset = WorkRequestItem.objects.filter(
-        request__trips__isnull=False # Тільки ті, що пов'язані з відрядженнями
+        request__trips__isnull=False 
     ).select_related(
         'request__unit', 
-        'oid__unit' # Додаємо unit для ОІДа, щоб мати доступ до коду ВЧ ОІДа
-        'deadline_trigger_trip' # <--- Додаємо select_related
-    ).prefetch_related(
-        Prefetch('request__trips', queryset=Trip.objects.order_by('-end_date')) # Отримуємо всі відрядження для заявки, сортуємо
+        'oid__unit',
+        'deadline_trigger_trip' # <--- Додаємо для сортування та відображення
+    ).prefetch_related( # Залишаємо для відображення всіх відряджень, якщо потрібно
+        Prefetch('request__trips', queryset=Trip.objects.order_by('-end_date'))
     ).distinct()
 
     wri_filter_form = WorkRequestItemProcessingFilterForm(request.GET or None, prefix="wri")
-    if wri_filter_form.is_valid():
-        # ... (ваша логіка фільтрації для wri_queryset, як була) ...
+    if wri_filter_form.is_valid(): # <--- ПОЧАТОК БЛОКУ is_valid()
         if wri_filter_form.cleaned_data.get('unit'):
-            wri_queryset = wri_queryset.filter(request__unit=wri_filter_form.cleaned_data['unit'])
+            wri_queryset = wri_queryset.filter(
+                Q(request__unit=wri_filter_form.cleaned_data['unit']) | 
+                Q(oid__unit=wri_filter_form.cleaned_data['unit']) # Додано фільтр по ВЧ самого ОІДа теж
+            ).distinct()
         if wri_filter_form.cleaned_data.get('oid'):
             wri_queryset = wri_queryset.filter(oid=wri_filter_form.cleaned_data['oid'])
-        # ... (інші фільтри) ...
+        if wri_filter_form.cleaned_data.get('status'):
+            wri_queryset = wri_queryset.filter(status=wri_filter_form.cleaned_data['status'])
+        if wri_filter_form.cleaned_data.get('deadline_from'):
+            wri_queryset = wri_queryset.filter(doc_processing_deadline__gte=wri_filter_form.cleaned_data['deadline_from'])
+        if wri_filter_form.cleaned_data.get('deadline_to'):
+            wri_queryset = wri_queryset.filter(doc_processing_deadline__lte=wri_filter_form.cleaned_data['deadline_to'])
+        
+        # Переносимо цю логіку ВСЕРЕДИНУ if wri_filter_form.is_valid():
+        processed_filter = wri_filter_form.cleaned_data.get('processed')
+        if processed_filter == 'yes':
+            wri_queryset = wri_queryset.filter(docs_actually_processed_on__isnull=False)
+        elif processed_filter == 'no':
+            wri_queryset = wri_queryset.filter(docs_actually_processed_on__isnull=True)
+    # <--- КІНЕЦЬ БЛОКУ is_valid()
 
-    # Сортування для WRI (як у вашому файлі views.py)
     wri_sort_by = request.GET.get('wri_sort_by', 'doc_processing_deadline') 
     wri_sort_order = request.GET.get('wri_sort_order', 'asc')
+    
     wri_valid_sorts = {
-        'unit': 'request__unit__code', 'oid': 'oid__cipher', 'req_num': 'request__incoming_number',
-        'req_date': 'request__incoming_date', 'work_type': 'work_type', 'status': 'status',
-        'deadline': 'doc_processing_deadline', 'proc_date': 'docs_actually_processed_on'
+        'unit': 'request__unit__code', 
+        'oid': 'oid__cipher', 
+        'req_num': 'request__incoming_number', 
+        'req_date': 'request__incoming_date', 
+        'work_type': 'work_type', 
+        'status': 'status',
+        'trip_dates': 'relevant_trip_end_date', # <--- Використовуємо ім'я анотованого поля
+        'deadline': 'doc_processing_deadline', 
+        'proc_date': 'docs_actually_processed_on'
     }
-    wri_order_by_field = wri_valid_sorts.get(wri_sort_by.lstrip('-'), 'doc_processing_deadline')
-    if wri_order_by_field: # Перевірка, чи поле існує
-        if wri_sort_by.startswith('-'):
-             wri_order_by_field = f"-{wri_order_by_field.lstrip('-')}"
-        elif wri_sort_order == 'desc':
-            wri_order_by_field = f"-{wri_order_by_field}"
-        wri_queryset = wri_queryset.order_by(wri_order_by_field, 'request__incoming_date') # Додано вторинне сортування
-    else:
-        wri_queryset = wri_queryset.order_by('doc_processing_deadline', 'request__incoming_date')
-
+    wri_order_by_field_key = wri_sort_by.lstrip('-')
+    # Отримуємо фактичне ім'я поля для сортування з wri_valid_sorts
+    # Якщо ключ 'trip_dates', то order_by_field_for_db буде 'relevant_trip_end_date'
+    order_by_field_for_db = wri_valid_sorts.get(wri_order_by_field_key, 'doc_processing_deadline')
+    
+    current_wri_sort_order_for_template = wri_sort_order # Для передачі в шаблон
+    
+    # Визначаємо напрямок сортування
+    if wri_sort_by.startswith('-'):
+        if wri_sort_order == 'asc': # Користувач клікнув для зміни на asc
+            final_wri_order_by_field = order_by_field_for_db # Прибираємо мінус
+            current_wri_sort_order_for_template = 'asc'
+        else: # Залишаємо desc (напрямок вже є у wri_sort_by)
+            final_wri_order_by_field = f"-{order_by_field_for_db}" # Додаємо мінус, якщо його не було
+            current_wri_sort_order_for_template = 'desc'
+    else: # Якщо wri_sort_by не починається з '-'
+        if wri_sort_order == 'desc':
+            final_wri_order_by_field = f"-{order_by_field_for_db}"
+            current_wri_sort_order_for_template = 'desc'
+        else: # asc
+            final_wri_order_by_field = order_by_field_for_db
+            current_wri_sort_order_for_template = 'asc'
+            
+    if final_wri_order_by_field:
+        print(f"DEBUG WRI Sorting by: {final_wri_order_by_field}")
+        wri_queryset = wri_queryset.order_by(final_wri_order_by_field, 'request__incoming_date', 'oid__cipher')
+    else: # За замовчуванням
+        wri_queryset = wri_queryset.order_by('doc_processing_deadline', 'request__incoming_date', 'oid__cipher')
+        current_wri_sort_order_for_template = 'asc' 
 
     wri_paginator = Paginator(wri_queryset, 15) 
     wri_page_number = request.GET.get('wri_page') 
     wri_page_obj = wri_paginator.get_page(wri_page_number)
 
     all_units = Unit.objects.all().order_by('code')
-    processed_filter = wri_filter_form.cleaned_data.get('processed')
-    if processed_filter == 'yes':
-        wri_queryset = wri_queryset.filter(docs_actually_processed_on__isnull=False)
-    elif processed_filter == 'no':
-        wri_queryset = wri_queryset.filter(docs_actually_processed_on__isnull=True)
 
     context = {
         'page_title': 'Контроль опрацювання',
         'tt_filter_form': tt_filter_form,
         'technical_tasks': tt_page_obj,
         'wri_filter_form': wri_filter_form,
-        'work_request_items': wri_page_obj, # Передаємо page_obj сюди
+        'work_request_items': wri_page_obj, 
         'all_units': all_units, 
         'today_date': today_date,
-        'current_tt_sort_by': request.GET.get('tt_sort_by', '-read_till_date'), # Для збереження стану сортування
-        'current_tt_sort_order': request.GET.get('tt_sort_order', 'asc'),
-        'current_wri_sort_by': request.GET.get('wri_sort_by', 'doc_processing_deadline'),
-        'current_wri_sort_order': request.GET.get('wri_sort_order', 'asc'),
+        'current_tt_sort_by': tt_sort_by.lstrip('-'),
+        'current_tt_sort_order': 'desc' if tt_sort_by.startswith('-') else tt_sort_order,
+        'current_wri_sort_by': wri_sort_by.lstrip('-'), # Чисте ім'я поля для порівняння в шаблоні
+        'current_wri_sort_order': current_wri_sort_order_for_template, # Напрямок для наступного кліку
     }
-    return render(request, 'oids/processing_control_dashboard.html', context) # Використовуємо ваш шлях до шаблону
-
-
+    return render(request, 'oids/processing_control_dashboard.html', context)
