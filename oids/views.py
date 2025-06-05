@@ -2390,7 +2390,7 @@ def processing_control_view(request):
 
     wri_sort_by = request.GET.get('wri_sort_by', 'doc_processing_deadline') 
     wri_sort_order = request.GET.get('wri_sort_order', 'asc')
-    
+	
     wri_valid_sorts = {
         'unit': 'request__unit__code', 
         'oid': 'oid__cipher', 
@@ -2398,7 +2398,8 @@ def processing_control_view(request):
         'req_date': 'request__incoming_date', 
         'work_type': 'work_type', 
         'status': 'status',
-        'trip_dates': 'relevant_trip_end_date', # <--- Використовуємо ім'я анотованого поля
+        # 'trip_dates': 'relevant_trip_end_date', # <--- Використовуємо ім'я анотованого поля
+        'trip_dates': 'deadline_trigger_trip', #замінив на щоб не ломалось
         'deadline': 'doc_processing_deadline', 
         'proc_date': 'docs_actually_processed_on'
     }
