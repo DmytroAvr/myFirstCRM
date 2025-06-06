@@ -54,6 +54,7 @@ python manage.py createsuperuser
 
 python manage.py main_unit_data  (створити в/ч з каталогу C:\myFirstCRM\oids\management\commands\main_unit_data.py)
 
+python manage.py oids/management/commands/populate_all_models.py
 
 
 # Видалити старі міграції:

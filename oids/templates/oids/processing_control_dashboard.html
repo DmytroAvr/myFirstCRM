@@ -124,7 +124,7 @@
                             <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=work_type&wri_sort_order={% if current_wri_sort_by == 'work_type' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Тип робіт</a></th>
                             <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=status&wri_sort_order={% if current_wri_sort_by == 'status' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Статус опрац. ОІД</a></th>
                             <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=trip_dates&wri_sort_order={% if current_wri_sort_by == 'trip_dates' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Термін відрядження</a></th>
-                            <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=deadline&wri_sort_order={% if current_wri_sort_by == 'deadline' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Термін опрац. док.</a></th>
+                            <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=deadline&wri_sort_order={% if current_wri_sort_by == 'deadline' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}" style="text-wrap: wrap;">Кінцевий термін  опрац.</a></th>
                             <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=proc_date&wri_sort_order={% if current_wri_sort_by == 'proc_date' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Дата факт. опрац.</a></th>
                         </tr>
                     </thead>
@@ -145,23 +145,18 @@
                             <td>{{ item.get_work_type_display }}</td>
                             <td>{{ item.get_status_display }}</td>
                            <td>
-    {% if item.deadline_trigger_trip %} {# Якщо є зв'язок з конкретним відрядженням #}
-        {{ item.deadline_trigger_trip.start_date|date:"d.m.Y" }} - {{ item.deadline_trigger_trip.end_date|date:"d.m.Y" }}
-    {% elif item.request.trips.all.0 %} {# Інакше - останнє відрядження заявки #}
-        {% with last_trip=item.request.trips.all.0 %}
-            {{ last_trip.start_date|date:"d.m.Y" }} - {{ last_trip.end_date|date:"d.m.Y" }}
-        {% endwith %}
-    {% else %}
-        <span class="text-muted">-</span>
-    {% endif %}
-</td>
-                            <td>
-                                {% if item.deadline_trigger_trip %}
+								{% if item.deadline_trigger_trip %} {# Якщо є зв'язок з конкретним відрядженням #}
 									{{ item.deadline_trigger_trip.start_date|date:"d.m.Y" }} - {{ item.deadline_trigger_trip.end_date|date:"d.m.Y" }}
+								{% elif item.request.trips.all.0 %} {# Інакше - останнє відрядження заявки #}
+									{% with last_trip=item.request.trips.all.0 %}
+										{{ last_trip.start_date|date:"d.m.Y" }} - {{ last_trip.end_date|date:"d.m.Y" }}
+									{% endwith %}
 								{% else %}
 									<span class="text-muted">-</span>
 								{% endif %}
-                            </td>
+							</td>
+                           
+                            <td>{{ item.doc_processing_deadline|date:"d.m.Y"|default:"-" }}</td>
                             <td>{{ item.docs_actually_processed_on|date:"d.m.Y"|default:"-" }}</td>
                         </tr>
                         {% endwith %}

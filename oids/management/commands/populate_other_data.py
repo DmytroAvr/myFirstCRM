@@ -4,7 +4,7 @@ import datetime
 from django.utils import timezone
 
 # Налаштування Django оточення
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'myProject.settings') # ЗАМІНІТЬ 'myProject' на назву вашого проекту
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'oids.settings') # ЗАМІНІТЬ 'myProject' на назву вашого проекту
 django.setup()
 
 from oids.models import (

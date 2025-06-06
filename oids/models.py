@@ -359,83 +359,153 @@ class WorkRequestItem(models.Model):
         ґрунтуючись на наявних та "виконаних" документах.
         Викликається після збереження пов'язаного документа.
         """
+        print(f"[WRI_STATUS_CHECKER] Checking completion for WRI ID {self.id} (OID: {self.oid.cipher})")
+
         if self.status in [WorkRequestStatusChoices.COMPLETED, WorkRequestStatusChoices.CANCELED]:
+            print(f"[WRI_STATUS_CHECKER] WRI ID {self.id} is already COMPLETED or CANCELED. No update needed.")
             return # Немає потреби в оновленні
 
         key_document_fulfilled = False
         wri_oid_type = self.oid.oid_type
-        if self.work_type == WorkTypeChoices.IK:
-            target_duration = 20 # Умова для ІК: наявність документа з duration_months=20 для цього work_request_item
-            # (припускаємо, що це "Висновок ІК")
-            try:
-                # Шукаємо тип документа "Висновок ІК" (або аналог з duration_months=20)
-                # Важливо, щоб цей DocumentType був налаштований для work_type='ІК' або 'СПІЛЬНИЙ'
-                # та мав oid_type, що відповідає self.oid.oid_type або 'СПІЛЬНИЙ'
-                key_doc_type_qs = DocumentType.objects.filter(
-                    (Q(work_type=WorkTypeChoices.IK) | Q(work_type='СПІЛЬНИЙ')),
-                    (Q(oid_type=wri_oid_type) | Q(oid_type='СПІЛЬНИЙ')),
-                    duration_months=target_duration
-                )
-                if key_doc_type_qs.exists():
-                    for dt_candidate in key_doc_type_qs:
-                        print(f"[DEBUG] Checking IK with DocumentType candidate: '{dt_candidate.name}' (ID: {dt_candidate.id})")
-                        if Document.objects.filter(
-                            work_request_item=self,
-                            oid=self.oid,
-                            document_type=dt_candidate
-                        ).exists():
-                            key_document_fulfilled = True
-                            print(f"[DEBUG] >>> Key document for IK FOUND (DocType ID: {dt_candidate.id}) for WRI ID: {self.id}")
-                            break # Знайшли, виходимо
-                    if not key_document_fulfilled:
-                         print(f"[DEBUG] No Document found linked to WRI {self.id} for any suitable IK DocumentTypes.")
-                else:
-                    print(f"[DEBUG] No DocumentType configured for IK (duration={target_duration}, OID Type='{wri_oid_type}' or СПІЛЬНИЙ, Work Type='IK' or СПІЛЬНИЙ).")
-            except Exception as e:
-                print(f"[DEBUG] ERROR during IK DocumentType/Document search: {e}")
+        
+		
+		# 1. Визначаємо, які типи документів є обов'язковими (is_required=True)
+        #    для типу ОІД та типу робіт цього WorkRequestItem.
+        required_doc_types = DocumentType.objects.filter(
+            Q(oid_type=self.oid.oid_type) | Q(oid_type='СПІЛЬНИЙ'),
+            Q(work_type=self.work_type) | Q(work_type='СПІЛЬНИЙ'),
+            is_required=True
+        )
+        if not required_doc_types.exists():
+            print(f"[WRI_STATUS_CHECKER] No required document types found for OID type '{self.oid.oid_type}' and Work type '{self.work_type}'. Cannot determine completion.")
+            # Можливо, в цьому випадку елемент можна вважати виконаним, якщо для нього немає обов'язкових документів.
+            # Це залежить від вашої бізнес-логіки. Припустимо, що якщо немає is_required, то нічого не робимо.
+            return
+        
+		# 2. Отримуємо всі документи, вже створені для цього WorkRequestItem.
+        existing_docs_for_item = Document.objects.filter(work_request_item=self)
+        existing_doc_type_ids = set(existing_docs_for_item.values_list('document_type_id', flat=True))
+        
+        print(f"[WRI_STATUS_CHECKER] Required DocType IDs: {[dt.id for dt in required_doc_types]}")
+        print(f"[WRI_STATUS_CHECKER] Existing DocType IDs for this WRI: {existing_doc_type_ids}")
+        
+		 # 3. Перевіряємо, чи всі обов'язкові типи документів присутні серед існуючих.
+        all_required_docs_are_present = True
+        for req_doc_type in required_doc_types:
+            if req_doc_type.id not in existing_doc_type_ids:
+                all_required_docs_are_present = False
+                print(f"[WRI_STATUS_CHECKER] MISSING required document: '{req_doc_type.name}' (ID: {req_doc_type.id})")
+                break # Знайшли перший відсутній, можна виходити з циклу
+        
+        # Додаткова перевірка для Атестації: Акт має бути зареєстрований
+        if all_required_docs_are_present and self.work_type == WorkTypeChoices.ATTESTATION:
+            # Знайдемо тип "Акт атестації" серед обов'язкових
+            # Знову ж, краще мати надійний ідентифікатор, але поки що використовуємо ваш підхід
+            attestation_act_doc_type = required_doc_types.filter(duration_months=60).first()
+            if attestation_act_doc_type:
+                # Перевіряємо, чи існуючий документ цього типу має реєстраційні дані
+                is_att_act_registered = existing_docs_for_item.filter(
+                    document_type=attestation_act_doc_type,
+                    dsszzi_registered_number__isnull=False,
+                    dsszzi_registered_number__ne=''
+                ).exists()
+                if not is_att_act_registered:
+                    all_required_docs_are_present = False # Вважаємо, що умова не виконана, бо акт не зареєстрований
+                    print(f"[WRI_STATUS_CHECKER] Attestation Act for WRI ID {self.id} exists but is NOT YET REGISTERED.")
+
+        # 4. Якщо всі умови виконані, оновлюємо статус
+        if all_required_docs_are_present:
+            print(f"[WRI_STATUS_CHECKER] All conditions met for WRI ID {self.id}. Updating status to COMPLETED.")
+            self.status = WorkRequestStatusChoices.COMPLETED
+            # Дату docs_actually_processed_on ми вже встановили у Document.save()
+            # Переконаємось, що вона точно встановлена.
+            if not self.docs_actually_processed_on:
+                self.docs_actually_processed_on = timezone.now().date()
+            
+            self.save(update_fields=['status', 'docs_actually_processed_on', 'updated_at']) # Це викличе update_request_status() для WorkRequest
+        else:
+            print(f"[WRI_STATUS_CHECKER] Conditions NOT met for WRI ID {self.id}. Status remains {self.status}.")
 
 
-        elif self.work_type == WorkTypeChoices.ATTESTATION:
-            target_duration = 60
-            # Умова для Атестації: наявність документа з duration_months=60 (Акт атестації),
-            # який зареєстрований в ДССЗЗІ.
-            try:
-                # Шукаємо тип документа "Акт атестації" (або аналог з duration_months=60)
-                key_doc_type_qs = DocumentType.objects.filter(
-                    (Q(work_type=WorkTypeChoices.ATTESTATION) | Q(work_type='СПІЛЬНИЙ')),
-                    (Q(oid_type=wri_oid_type) | Q(oid_type='СПІЛЬНИЙ')),
-                    duration_months=target_duration
-                )
-                print(f"[DEBUG] Found {key_doc_type_qs.count()} potential DocumentType(s) for ATTESTATION.")
-                if key_doc_type_qs.exists():
-                    for dt_candidate in key_doc_type_qs:
-                        print(f"[DEBUG] Checking ATTESTATION with DocumentType candidate: '{dt_candidate.name}' (ID: {dt_candidate.id})")
-                        # Знаходимо всі документи цього типу, пов'язані з WRI
-                        linked_documents = Document.objects.filter(
-                            work_request_item=self,
-                            oid=self.oid,
-                            document_type=dt_candidate
-                        )
-                        if not linked_documents.exists():
-                            print(f"[DEBUG] No Document of type '{dt_candidate.name}' found for WRI ID {self.id}.")
-                            continue # Переходимо до наступного кандидата DocumentType
 
-                        for doc_instance in linked_documents:
-                            print(f"[DEBUG] Checking Document ID {doc_instance.id}: DSSZZI Num='{doc_instance.dsszzi_registered_number}', Date={doc_instance.dsszzi_registered_date}")
-                            if doc_instance.dsszzi_registered_number and \
-                               doc_instance.dsszzi_registered_number.strip() != '' and \
-                               doc_instance.dsszzi_registered_date:
-                                key_document_fulfilled = True
-                                print(f"[DEBUG] >>> Key document for ATTESTATION FOUND AND REGISTERED (DocType ID: {dt_candidate.id}, Doc ID: {doc_instance.id}) for WRI ID: {self.id}")
-                                break # Знайшли зареєстрований, виходимо з циклу документів
-                        if key_document_fulfilled:
-                            break # Виходимо з циклу DocumentType кандидатів
-                    if not key_document_fulfilled:
-                         print(f"[DEBUG] No REGISTERED Document found linked to WRI {self.id} for any suitable ATTESTATION DocumentTypes.")
-                else:
-                    print(f"[DEBUG] No DocumentType configured for ATTESTATION (duration={target_duration}, OID Type='{wri_oid_type}' or СПІЛЬНИЙ, Work Type='ATTESTATION' or СПІЛЬНИЙ).")
-            except Exception as e:
-                print(f"[DEBUG] ERROR during ATTESTATION DocumentType/Document search: {e}")
+
+
+
+
+
+
+        # if self.work_type == WorkTypeChoices.IK:
+        #     target_duration = 20 # Умова для ІК: наявність документа з duration_months=20 для цього work_request_item
+        #     # (припускаємо, що це "Висновок ІК")
+        #     try:
+        #         # Шукаємо тип документа "Висновок ІК" (або аналог з duration_months=20)
+        #         # Важливо, щоб цей DocumentType був налаштований для work_type='ІК' або 'СПІЛЬНИЙ'
+        #         # та мав oid_type, що відповідає self.oid.oid_type або 'СПІЛЬНИЙ'
+        #         key_doc_type_qs = DocumentType.objects.filter(
+        #             (Q(work_type=WorkTypeChoices.IK) | Q(work_type='СПІЛЬНИЙ')),
+        #             (Q(oid_type=wri_oid_type) | Q(oid_type='СПІЛЬНИЙ')),
+        #             duration_months=target_duration
+        #         )
+        #         if key_doc_type_qs.exists():
+        #             for dt_candidate in key_doc_type_qs:
+        #                 print(f"[DEBUG] Checking IK with DocumentType candidate: '{dt_candidate.name}' (ID: {dt_candidate.id})")
+        #                 if Document.objects.filter(
+        #                     work_request_item=self,
+        #                     oid=self.oid,
+        #                     document_type=dt_candidate
+        #                 ).exists():
+        #                     key_document_fulfilled = True
+        #                     print(f"[DEBUG] >>> Key document for IK FOUND (DocType ID: {dt_candidate.id}) for WRI ID: {self.id}")
+        #                     break # Знайшли, виходимо
+        #             if not key_document_fulfilled:
+        #                  print(f"[DEBUG] No Document found linked to WRI {self.id} for any suitable IK DocumentTypes.")
+        #         else:
+        #             print(f"[DEBUG] No DocumentType configured for IK (duration={target_duration}, OID Type='{wri_oid_type}' or СПІЛЬНИЙ, Work Type='IK' or СПІЛЬНИЙ).")
+        #     except Exception as e:
+        #         print(f"[DEBUG] ERROR during IK DocumentType/Document search: {e}")
+
+
+        # elif self.work_type == WorkTypeChoices.ATTESTATION:
+        #     target_duration = 60
+        #     # Умова для Атестації: наявність документа з duration_months=60 (Акт атестації),
+        #     # який зареєстрований в ДССЗЗІ.
+        #     try:
+        #         # Шукаємо тип документа "Акт атестації" (або аналог з duration_months=60)
+        #         key_doc_type_qs = DocumentType.objects.filter(
+        #             (Q(work_type=WorkTypeChoices.ATTESTATION) | Q(work_type='СПІЛЬНИЙ')),
+        #             (Q(oid_type=wri_oid_type) | Q(oid_type='СПІЛЬНИЙ')),
+        #             duration_months=target_duration
+        #         )
+        #         print(f"[DEBUG] Found {key_doc_type_qs.count()} potential DocumentType(s) for ATTESTATION.")
+        #         if key_doc_type_qs.exists():
+        #             for dt_candidate in key_doc_type_qs:
+        #                 print(f"[DEBUG] Checking ATTESTATION with DocumentType candidate: '{dt_candidate.name}' (ID: {dt_candidate.id})")
+        #                 # Знаходимо всі документи цього типу, пов'язані з WRI
+        #                 linked_documents = Document.objects.filter(
+        #                     work_request_item=self,
+        #                     oid=self.oid,
+        #                     document_type=dt_candidate
+        #                 )
+        #                 if not linked_documents.exists():
+        #                     print(f"[DEBUG] No Document of type '{dt_candidate.name}' found for WRI ID {self.id}.")
+        #                     continue # Переходимо до наступного кандидата DocumentType
+
+        #                 for doc_instance in linked_documents:
+        #                     print(f"[DEBUG] Checking Document ID {doc_instance.id}: DSSZZI Num='{doc_instance.dsszzi_registered_number}', Date={doc_instance.dsszzi_registered_date}")
+        #                     if doc_instance.dsszzi_registered_number and \
+        #                        doc_instance.dsszzi_registered_number.strip() != '' and \
+        #                        doc_instance.dsszzi_registered_date:
+        #                         key_document_fulfilled = True
+        #                         print(f"[DEBUG] >>> Key document for ATTESTATION FOUND AND REGISTERED (DocType ID: {dt_candidate.id}, Doc ID: {doc_instance.id}) for WRI ID: {self.id}")
+        #                         break # Знайшли зареєстрований, виходимо з циклу документів
+        #                 if key_document_fulfilled:
+        #                     break # Виходимо з циклу DocumentType кандидатів
+        #             if not key_document_fulfilled:
+        #                  print(f"[DEBUG] No REGISTERED Document found linked to WRI {self.id} for any suitable ATTESTATION DocumentTypes.")
+        #         else:
+        #             print(f"[DEBUG] No DocumentType configured for ATTESTATION (duration={target_duration}, OID Type='{wri_oid_type}' or СПІЛЬНИЙ, Work Type='ATTESTATION' or СПІЛЬНИЙ).")
+        #     except Exception as e:
+        #         print(f"[DEBUG] ERROR during ATTESTATION DocumentType/Document search: {e}")
 
         if key_document_fulfilled:
             if self.status != WorkRequestStatusChoices.COMPLETED:
@@ -454,6 +524,9 @@ class WorkRequestItem(models.Model):
         """
         # current_status = self.status # Можна зберегти для порівняння, якщо потрібно
         super().save(*args, **kwargs)
+              
+        # if hasattr(self, 'request') and self.request is not None:
+           
         # Викликаємо update_request_status тільки якщо це не створення,
         # або якщо статус змінився (щоб уникнути зайвих викликів при масовому створенні).
         # Однак, простіше викликати завжди, а update_request_status зробить перевірку.
@@ -732,11 +805,20 @@ class Document(models.Model):
                 self.expiration_date = None # Очищаємо, якщо умови не виконані
         super().save(*args, **kwargs)
         if self.work_request_item:
+            wri = self.work_request_item
+            
             # Переконуємося, що work_request_item ще не COMPLETED або CANCELED,
             # і що тип роботи work_request_item відповідає типу роботи документа (або документ "СПІЛЬНИЙ")
             if self.work_request_item.status not in [WorkRequestStatusChoices.COMPLETED, WorkRequestStatusChoices.CANCELED] and \
                (self.work_request_item.work_type == self.document_type.work_type or self.document_type.work_type == 'СПІЛЬНИЙ'):
                 self.work_request_item.check_and_update_status_based_on_documents()
+            if wri.docs_actually_processed_on is None or self.process_date > wri.docs_actually_processed_on:
+                wri.docs_actually_processed_on = self.process_date
+                wri.save(update_fields=['docs_actually_processed_on', 'updated_at'])
+                print(f"DOCUMENT_SAVE: Set docs_actually_processed_on for WRI ID {wri.id} to {self.process_date}")
+            # Тепер викликаємо перевірку, чи можна завершити WorkRequestItem
+            # Ця функція має бути методом моделі WorkRequestItem
+            wri.check_and_update_status_based_on_documents()
 
     def __str__(self):
         return f"{self.document_type.name} / {self.document_number} (ОІД: {self.oid.cipher})"
