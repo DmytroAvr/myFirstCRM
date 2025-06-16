@@ -18,7 +18,7 @@ from .models import (Unit, UnitGroup, OID, OIDStatusChange, TerritorialManagemen
     Person, TechnicalTask, AttestationRegistration, AttestationResponse, 
 )
 from .forms import ( TripForm, TripResultSendForm, DocumentProcessingMainForm, DocumentItemFormSet, DocumentForm, 
-	WorkRequestForm, WorkRequestItemFormSet, OIDStatusUpdateForm, TechnicalTaskCreateForm, TechnicalTaskProcessForm,
+	WorkRequestForm, WorkRequestItemFormSet,OIDCreateForm, OIDStatusUpdateForm, TechnicalTaskCreateForm, TechnicalTaskProcessForm,
 	AttestationRegistrationSendForm, AttestationResponseMainForm, AttestationActUpdateFormSet,
     TechnicalTaskFilterForm, WorkRequestItemProcessingFilterForm
 )
@@ -729,6 +729,27 @@ def oid_detail_view(request, oid_id):
 
 # ... (main_dashboard, ajax_load_oids_for_unit_categorized, ajax_load_oids_for_unit, oid_detail_view) ...
 # Переконайся, що функція get_last_document_expiration_date визначена вище
+
+
+@login_required
+def oid_create_view(request):
+    if request.method == 'POST':
+        form = OIDCreateForm(request.POST)
+        if form.is_valid():
+            oid_instance = form.save()
+            messages.success(request, f'ОІД "{oid_instance.cipher}" успішно створено.')
+            return redirect('oids:oid_detail_view_name', oid_id=oid_instance.id) # Перенаправляємо на деталі нового ОІД
+        else:
+            messages.error(request, 'Будь ласка, виправте помилки у формі.')
+    else: # GET request
+        form = OIDCreateForm()
+    
+    context = {
+        'form': form,
+        'page_title': 'Створення нового Об\'єкта Інформаційної Діяльності'
+    }
+    return render(request, 'oids/forms/oid_create_form.html', context)
+
 
 @login_required 
 def plan_trip_view(request):

@@ -1,7 +1,7 @@
 # C:\myFirstCRM\oids\forms.py
 
 from django import forms
-from django.forms import inlineformset_factory, modelformset_factory
+from django.forms import inlineformset_factory, modelformset_factory, formset_factory
 from .models import (WorkRequestStatusChoices, WorkTypeChoices, OIDTypeChoices, 
 	OIDStatusChoices, AttestationRegistrationStatusChoices, DocumentReviewResultChoices
 )
@@ -11,6 +11,7 @@ from .models import (
 )
 from django_tomselect.forms import TomSelectModelChoiceField, TomSelectConfig
 from django.utils import timezone
+
 
 class WorkRequestForm(forms.ModelForm):
     unit = forms.ModelChoiceField(
@@ -262,13 +263,6 @@ class DocumentForm(forms.ModelForm):
             self.save_m2m() # Якщо є ManyToMany поля
         return instance
     
-# new form for documents
-# new form for documents
-# oids/forms.py
-from django import forms
-from django.forms import formset_factory # Або modelformset_factory
-from .models import Document, OID, Unit, WorkRequestItem, DocumentType, Person
-
 # Форма для одного документа (буде використовуватися у формсеті)
 class DocumentItemForm(forms.ModelForm):
     document_type = forms.ModelChoiceField(
@@ -1085,6 +1079,54 @@ class WorkRequestItemProcessingFilterForm(forms.Form):
     #     widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
     # )
 
+class OIDCreateForm(forms.ModelForm):
+    # Додаємо поле `unit` для вибору ВЧ, оскільки воно є ForeignKey у моделі OID
+    unit = forms.ModelChoiceField(
+        queryset=Unit.objects.all().order_by('code'),
+        label="Військова частина",
+        widget=forms.Select(attrs={'class': 'form-select tomselect-field'}), # Клас для TomSelect
+        empty_label="Оберіть ВЧ..."
+    )
 
+    class Meta:
+        model = OID
+        # Включаємо всі поля, які користувач має заповнити
+        fields = [
+            'unit', 'oid_type', 'cipher', 'full_name', 'room', 
+            'sec_level', 'status', 
+            # Додаємо специфічні для ПЕМІН поля
+            'pemin_sub_type', 'serial_number', 'inventory_number',
+            'note'
+        ]
+        widgets = {
+            'oid_type': forms.Select(attrs={'class': 'form-select'}),
+            'cipher': forms.TextInput(attrs={'class': 'form-control'}),
+            'full_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'room': forms.TextInput(attrs={'class': 'form-control'}),
+            'sec_level': forms.Select(attrs={'class': 'form-select'}),
+            'status': forms.Select(attrs={'class': 'form-select'}),
+            'pemin_sub_type': forms.Select(attrs={'class': 'form-select'}), # Для підтипу теж select
+            'serial_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'inventory_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'note': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        oid_type = cleaned_data.get('oid_type')
+        
+        # Якщо тип ОІД - ПЕМІН, то підтип стає обов'язковим
+        if oid_type == OIDTypeChoices.PEMIN:
+            pemin_sub_type = cleaned_data.get('pemin_sub_type')
+            if not pemin_sub_type:
+                self.add_error('pemin_sub_type', 'Це поле є обов\'язковим для типу ОІД "ПЕМІН".')
+        
+        # Якщо тип не ПЕМІН, очищаємо специфічні поля, щоб вони не збереглися в БД випадково
+        else:
+            cleaned_data['pemin_sub_type'] = None
+            cleaned_data['serial_number'] = ''
+            cleaned_data['inventory_number'] = ''
+            
+        return cleaned_data
             
 

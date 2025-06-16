@@ -4,6 +4,7 @@ from django.utils import timezone
 import datetime
 from django.db.models import Q
 from simple_history.models import HistoricalRecords
+	
 # --- CONSTANTS / CHOICES ---
 # Краще зберігати вибори в окремих файлах або в самих моделях, якщо вони специфічні для моделі.
 # Для загальних виборів, які використовуються в кількох моделях, можна тримати їх тут.
@@ -75,7 +76,11 @@ class AttestationRegistrationStatusChoices(models.TextChoices):
     # PARTIALLY_RECEIVED = 'partially_received', 'Відповідь отримано частково' # Можна додати, якщо потрібно
     CANCELED = 'canceled', 'Скасовано (відправку)'
     
-
+class PeminSubTypeChoices(models.TextChoices):
+    VARM = 'ВАРМ', 'ВАРМ'
+    AS1Static = 'АС1Стаціонар', 'АС1 Стаціонар'
+    AS1Portable = 'АС1Getac', 'АС1 Getac'
+    
 # --- Models ---
 
 class TerritorialManagement(models.Model):
@@ -165,6 +170,25 @@ class OID(models.Model):
     note = models.TextField(verbose_name="Примітка", blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
+    pemin_sub_type = models.CharField(
+        max_length=20, 
+        choices=PeminSubTypeChoices.choices, 
+        verbose_name="Тип ЕОТ",
+        blank=True, # Дозволяє бути порожнім у формах
+        null=True   # Дозволяє бути NULL в базі даних (для МОВНА ОІД)
+    )
+    serial_number = models.CharField(
+        max_length=20, 
+        verbose_name="Серійний номер", 
+        blank=True, 
+        null=True
+    )
+    inventory_number = models.CharField(
+        max_length=20, 
+        verbose_name="Інвентарний номер", 
+        blank=True, 
+        null=True
+    )
     history = HistoricalRecords()
 
 	# Прив'язка до першого та останнього документа для відстеження

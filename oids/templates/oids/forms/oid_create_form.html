@@ -1,0 +1,145 @@
+
+
+{# oids/templates/oids/forms/oid_create_form.html #}
+{% extends "oids/base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container form-container">
+    <h2 class="mb-4">{{ page_title }}</h2>
+    
+    <form method="post" novalidate>
+        {% csrf_token %}
+        
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger" role="alert">
+                {% for error in form.non_field_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
+            </div>
+        {% endif %}
+
+        <fieldset class="mb-3 p-3 border rounded">
+            <legend class="w-auto px-2 h6">Загальна інформація</legend>
+            
+            {# Рендеримо поля, спільні для всіх типів ОІД #}
+            {% for field in form %}
+                {% if field.name not in "pemin_sub_type,serial_number,inventory_number" %}
+                <div class="row mb-3 align-items-center">
+                    <label for="{{ field.id_for_label }}" class="col-sm-3 col-form-label text-sm-end fw-bold">
+                        {{ field.label }}{% if field.field.required %}<span class="text-danger">*</span>{% endif %}:
+                    </label>
+                    <div class="col-sm-9">
+                        {{ field }}
+                        {% if field.help_text %}<small class="form-text text-muted d-block">{{ field.help_text }}</small>{% endif %}
+                        {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </fieldset>
+
+        {# Блок для полів, специфічних для ПЕМІН. Початково прихований. #}
+        <fieldset id="pemin-details-section" class="mb-3 p-3 border rounded" style="display: none;">
+            <legend class="w-auto px-2 h6">Додаткові деталі для ОІД типу "ПЕМІН"</legend>
+            
+            <div class="row mb-3 align-items-center">
+                <label for="{{ form.pemin_sub_type.id_for_label }}" class="col-sm-3 col-form-label text-sm-end fw-bold">
+                    {{ form.pemin_sub_type.label }}{% if form.pemin_sub_type.field.required %}<span class="text-danger">*</span>{% endif %}:
+                </label>
+                <div class="col-sm-9">
+                    {{ form.pemin_sub_type }}
+                    {% for error in form.pemin_sub_type.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+
+            <div class="row mb-3 align-items-center">
+                <label for="{{ form.serial_number.id_for_label }}" class="col-sm-3 col-form-label text-sm-end fw-bold">
+                    {{ form.serial_number.label }}{% if form.serial_number.field.required %}<span class="text-danger">*</span>{% endif %}:
+                </label>
+                <div class="col-sm-9">
+                    {{ form.serial_number }}
+                    {% for error in form.serial_number.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+
+            <div class="row mb-3 align-items-center">
+                <label for="{{ form.inventory_number.id_for_label }}" class="col-sm-3 col-form-label text-sm-end fw-bold">
+                    {{ form.inventory_number.label }}{% if form.inventory_number.field.required %}<span class="text-danger">*</span>{% endif %}:
+                </label>
+                <div class="col-sm-9">
+                    {{ form.inventory_number }}
+                    {% for error in form.inventory_number.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+        </fieldset>
+        
+        <div class="form-actions mt-4">
+            <button type="submit" class="btn btn-primary">Створити ОІД</button>
+            <a href="{% url 'oids:main_dashboard' %}" class="btn btn-secondary">Скасувати</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    console.log("OID Create Form JS: Initializing...");
+
+    // Ініціалізація TomSelect для полів select
+    if (typeof TomSelect !== 'undefined') {
+        document.querySelectorAll('.tomselect-field').forEach(function(selectElement) {
+            new TomSelect(selectElement, {
+                create: false,
+                placeholder: selectElement.querySelector('option[value=""]')?.textContent || 'Оберіть...',
+                allowEmptyOption: true,
+            });
+        });
+        console.log("OID Create Form JS: TomSelects initialized.");
+    }
+    
+    // Логіка для динамічного відображення полів ПЕМІН
+    const oidTypeSelect = document.getElementById('{{ form.oid_type.id_for_label }}');
+    const peminDetailsSection = document.getElementById('pemin-details-section');
+    const peminSubTypeSelect = document.getElementById('{{ form.pemin_sub_type.id_for_label }}');
+
+    function togglePeminFields() {
+        if (!oidTypeSelect || !peminDetailsSection) return;
+
+        // "ПЕМІН" - це значення з OIDTypeChoices.PEMIN.value
+        if (oidTypeSelect.value === 'ПЕМІН') {
+            console.log("OID Type is 'ПЕМІН'. Showing Pemin fields.");
+            peminDetailsSection.style.display = 'block';
+            if (peminSubTypeSelect) {
+                peminSubTypeSelect.required = true; // Робимо підтип обов'язковим через JS
+            }
+        } else {
+            console.log("OID Type is NOT 'ПЕМІН'. Hiding Pemin fields.");
+            peminDetailsSection.style.display = 'none';
+             if (peminSubTypeSelect) {
+                peminSubTypeSelect.required = false; // Робимо необов'язковим
+                // Опціонально: очищаємо значення прихованих полів
+                peminDetailsSection.querySelectorAll('input, select').forEach(input => {
+                    // Якщо у select є TomSelect, очищаємо через його API
+                    if (input.tomselectInstance) {
+                        input.tomselectInstance.clear();
+                    } else {
+                        input.value = '';
+                    }
+                });
+            }
+        }
+    }
+
+    if (oidTypeSelect && peminDetailsSection) {
+        // Запускаємо функцію при завантаженні сторінки для встановлення початкового стану
+        togglePeminFields();
+        // Додаємо слухача на зміну поля "Тип ОІД"
+        oidTypeSelect.addEventListener('change', togglePeminFields);
+    } else {
+        console.warn("OID Create Form JS: oidTypeSelect or peminDetailsSection not found.");
+    }
+});
+</script>
+{% endblock %}

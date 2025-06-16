@@ -40,7 +40,8 @@ urlpatterns = [
 	path('oid/update-status/', views.update_oid_status_view, name='update_oid_status'),
 	path('oid/<int:oid_id_from_url>/update-status/', views.update_oid_status_view, name='update_specific_oid_status'),
 
-
+	path('oid/create/', views.oid_create_view, name='oid_create'), # Новий URL для форми
+	
     
     
     path('attestation-registration/send/', views.send_attestation_for_registration_view, name='send_attestation_for_registration'), # URL для форми створення нової відправки на реєстрацію
