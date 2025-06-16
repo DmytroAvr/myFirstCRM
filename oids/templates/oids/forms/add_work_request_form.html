@@ -165,8 +165,6 @@ const WorkRequestItemFormsetManager = (function() {
     let minFormsCount;
     let canDeleteForms;
     let currentSelectedUnitId = null;
-    let oidCreateModalInstance = null;
-    let targetOidSelectForModal = null;
 
     const OID_SELECT_CLASS = 'tomselect-oid-item';
 
@@ -431,37 +429,6 @@ const WorkRequestItemFormsetManager = (function() {
          // Це складніший сценарій, поки що зосередимось на базовій логіці.
     }
     
-    function handleShowCreateOidModalForRow(event) {
-        // ... (код функції, як був, але перевірте targetOidSelectForModal) ...
-        const button = event.target.closest('.add-oid-modal-per-row');
-        const itemFormElement = button.closest('.work-request-item-form');
-        const oidSelectInRow = itemFormElement.querySelector(`select.${OID_SELECT_CLASS}`);
-        targetOidSelectForModal = oidSelectInRow ? oidSelectInRow.tomselectInstance : null; // МАЄ БУТИ ЕКЗЕМПЛЯР TOMSELECT
-        
-        console.log("Formset JS: Opening OID creation modal for a specific row. Target TomSelect INSTANCE:", targetOidSelectForModal ? "Found" : "NOT Found", "Target select element ID was:", oidSelectInRow ? oidSelectInRow.id : "N/A");
-
-        const selectedUnitValue = unitSelectElement.value;
-        if (!selectedUnitValue) {
-            alert('Будь ласка, спочатку оберіть Військову частину в основній формі.');
-            return;
-        }
-        
-        const oidCreateModalElem = document.getElementById('createOidModal');
-        if (!oidCreateModalElem) return;
-        const modalInstanceToUse = bootstrap.Modal.getInstance(oidCreateModalElem) || new bootstrap.Modal(oidCreateModalElem);
-        
-        const oidCreateFormElem = document.getElementById('ajaxOidCreateForm');
-        if (oidCreateFormElem) oidCreateFormElem.reset();
-        document.getElementById('oidCreateFormAlertsBootstrap').innerHTML = '';
-        document.getElementById('modalSelectedUnitName').textContent = unitSelectElement.options[unitSelectElement.selectedIndex]?.text || 'не обрано';
-        document.getElementById('id_modal_hidden_unit_id').value = selectedUnitValue;
-        
-        if (oidCreateFormElem){
-            oidCreateFormElem.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
-            oidCreateFormElem.querySelectorAll('.invalid-feedback[data-field-errors-bs]').forEach(el => el.textContent = '');
-        }
-        modalInstanceToUse.show();
-    }
 
     function init() {
         // ... (код init, як був, але переконайтесь, що minFormsCount та canDeleteForms встановлюються правильно) ...
@@ -522,34 +489,7 @@ const WorkRequestItemFormsetManager = (function() {
         }
         updateDeleteButtonsVisibility();
 
-        // Слухачі на події модального вікна
-        const oidCreateModalElem = document.getElementById('createOidModal');
-        if (oidCreateModalElem) {
-            oidCreateModalElem.addEventListener('oid.created.success', function (event) {
-                const newOidData = event.detail;
-                console.log("Formset JS: Global 'oid.created.success' received by formset manager. Target:", targetOidSelectForModal, "Data:", newOidData);
-                if (targetOidSelectForModal && newOidData && newOidData.oid_id && newOidData.oid_name && newOidData.unit_id) {
-                    if (newOidData.unit_id.toString() === currentSelectedUnitId) {
-                        targetOidSelectForModal.addOption({ 
-                            id: newOidData.oid_id.toString(),
-                            text: newOidData.oid_name 
-                        });
-                        targetOidSelectForModal.addItem(newOidData.oid_id.toString());
-                        console.log("Formset JS: New OID added to target TomSelect (from modal event).");
-                    } else {
-                         console.warn("Formset JS: Created OID's unit via modal does not match current main form unit.");
-                    }
-                    const modalToHide = bootstrap.Modal.getInstance(oidCreateModalElem);
-                    if (modalToHide) modalToHide.hide();
-                    targetOidSelectForModal = null; 
-                } else {
-                     console.warn("Formset JS: 'oid.created.success' received by formset, but target/data incomplete. Target:", targetOidSelectForModal, "Data:", newOidData);
-                }
-            });
-             oidCreateModalElem.addEventListener('oid.created.error', function(event) {
-                console.error("Formset JS: Global 'oid.created.error' event from modal:", event.detail.errors);
-             });
-        }
+       
     } // Кінець init
 
     return {

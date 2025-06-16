@@ -68,6 +68,3 @@ unique=True	Поле повинно бути унікальним (актуал�
 
 Передати URL через data- атрибут на HTML-елементі:
 HTML
-
-<select name="unit" id="id_unit_filter" class="select2" data-ajax-url-categorized="{% url 'oids:ajax_load_oids_categorized' %}" style="width: 100%;">
-І в JS зчитувати: url: $(this).data('ajax-url-categorized') або config.url = $sourceElement.data('ajax-url-categorized');.

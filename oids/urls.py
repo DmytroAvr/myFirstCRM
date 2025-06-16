@@ -23,9 +23,6 @@ urlpatterns = [
 	path('ajax/load-oids-for-trip-inits/', views.ajax_load_oids_for_trip_units, name='ajax_load_oids_for_trip_units'),
 	path('ajax/load-documents-for-trip-oids/', views.ajax_load_documents_for_trip_oids, name='ajax_load_documents_for_trip_oids'),
 
-	# 
-	# 
-	# 
 	path('technical-task/create/', views.technical_task_create_view, name='technical_task_create'),
 	path('technical-task/process/', views.technical_task_process_view, name='technical_task_process_select'), # Для вибору ТЗ на формі
 	path('technical-task/<int:task_id>/process/', views.technical_task_process_view, name='technical_task_process_specific'), # Для опрацювання конкретного ТЗ
@@ -36,7 +33,6 @@ urlpatterns = [
     path('trip/result/', views.send_trip_results_view, name='send_trip_results_form'),
     # Якщо форма додавання документа викликається з контексту ОІД:
     path('oid/<int:oid_id>/document/add/', views.add_document_processing_view, name='add_document_for_oid_view_name'),
-    path('ajax/oid/create/', views.ajax_create_oid_view, name='ajax_create_oid'),
 	# Якщо форма додавання документа викликається з контексту елемента заявки:
     path('work-request-item/<int:work_request_item_id>/document/add/', views.add_document_processing_view, name='add_document_for_work_request_item_view_name'),
     path('request/add/', views.add_work_request_view, name='add_work_request_view_name'),
@@ -68,12 +64,10 @@ urlpatterns = [
     path('unit-groups/', views.unit_group_list_view, name='list_unit_groups'),
     path('document-types/', views.document_type_list_view, name='list_document_types'),
     path('persons/', views.person_list_view, name='list_persons'),
-    path('units/', views.unit_list_view, name='list_units'),
     path('oids-list/', views.oid_list_view, name='list_oids'), # назва oids_list_view щоб не плутати з oid_detail_view
     path('work-requests/', views.work_request_list_view, name='list_work_requests'),
     path('trips/', views.trip_list_view, name='list_trips'),
     path('technical-tasks/', views.technical_task_list_view, name='list_technical_tasks'),
-    path('attestation-registrations/', views.attestation_registration_list_view, name='list_attestation_registrations'),
     path('attestation-responses/', views.attestation_response_list_view, name='list_attestation_responses'),
     path('trip-results/', views.trip_result_for_unit_list_view, name='list_trip_results_for_units'),
     path('oid-status-changes/', views.oid_status_change_list_view, name='list_oid_status_changes'),

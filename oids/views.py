@@ -18,7 +18,7 @@ from .models import (Unit, UnitGroup, OID, OIDStatusChange, TerritorialManagemen
     Person, TechnicalTask, AttestationRegistration, AttestationResponse, 
 )
 from .forms import ( TripForm, TripResultSendForm, DocumentProcessingMainForm, DocumentItemFormSet, DocumentForm, 
-	WorkRequestForm, WorkRequestItemFormSet, OIDForm, OIDStatusUpdateForm, 
+	WorkRequestForm, WorkRequestItemFormSet, OIDStatusUpdateForm, TechnicalTaskCreateForm, TechnicalTaskProcessForm,
 	AttestationRegistrationSendForm, AttestationResponseMainForm, AttestationActUpdateFormSet,
     TechnicalTaskFilterForm, WorkRequestItemProcessingFilterForm
 )
@@ -290,7 +290,6 @@ def ajax_load_document_types_for_oid_and_work(request):
             return JsonResponse({'error': str(e)}, status=500)
             
     return JsonResponse(doc_types_data, safe=False)
-# AJAX view для завантаження ОІДів для Select2 у формах (якщо потрібно)
 # Цей view НЕ використовується для оновлення списків ОІД на головній панелі в цьому сценарії
 def ajax_load_oids_for_unit(request):
     unit_id_str = request.GET.get('unit_id')
@@ -424,44 +423,6 @@ def ajax_load_attestation_acts_for_multiple_oids(request):
             return JsonResponse({'error': 'Серверна помилка при завантаженні актів'}, status=500)
             
     return JsonResponse(acts_data, safe=False)
-
-def ajax_create_oid_view(request):
-    if request.method == 'POST':
-        # Якщо ВЧ передається з форми заявки для попереднього заповнення
-        initial_data = {}
-        unit_id_from_request_form = request.POST.get('unit_for_new_oid') # Це поле може передаватися з JS
-        if unit_id_from_request_form:
-            initial_data['unit'] = unit_id_from_request_form
-        
-        form = OIDForm(request.POST, initial=initial_data) # Використовуємо OIDForm
-        if form.is_valid():
-            oid = form.save()
-            return JsonResponse({
-                'status': 'success',
-                'message': f'ОІД "{oid.cipher}" успішно створено!',
-                'oid_id': oid.id,
-                'oid_cipher': oid.cipher,
-                'oid_name': str(oid) # Використовуємо __str__ моделі OID
-            })
-        else:
-            # Збираємо помилки валідації для передачі на фронтенд
-            errors = {}
-            for field, field_errors in form.errors.items():
-                errors[field] = [str(e) for e in field_errors]
-            return JsonResponse({'status': 'error', 'errors': errors}, status=400)
-    
-    # Для GET запиту (якщо модальне вікно завантажує форму через AJAX)
-    # або якщо це окрема сторінка
-    unit_id_param = request.GET.get('unit_id')
-    form = OIDForm(initial={'unit': unit_id_param} if unit_id_param else None)
-    
-    # Якщо ти хочеш рендерити форму на сервері для модального вікна (менш типово для AJAX)
-    # return render(request, 'oids/partials/create_oid_form_content.html', {'oid_form': form})
-    
-    # Зазвичай, якщо модальне вікно вже має HTML структуру форми, цей GET не потрібен,
-    # або він може повертати порожню форму як HTML для вставки.
-    # Для чистого AJAX-створення GET-обробник може бути непотрібним, якщо форма статична в модалці.
-    return JsonResponse({'error': 'Only POST requests are allowed for creating OID via AJAX here'}, status=405)
 
 
 # trip results
@@ -1135,8 +1096,6 @@ def send_attestation_for_registration_view(request):
     return render(request, 'oids/forms/send_attestation_form.html', context)
 
 
-from .forms import TechnicalTaskCreateForm, TechnicalTaskProcessForm # Додаємо нові форми
-from .models import TechnicalTask, DocumentReviewResultChoices, OID, Unit, Person # Додаємо моделі
 
 
 @login_required 
