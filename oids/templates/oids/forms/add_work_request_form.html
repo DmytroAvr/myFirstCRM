@@ -320,10 +320,7 @@ const WorkRequestItemFormsetManager = (function() {
         addDeleteButtonIfNeeded(newFormElement, currentFormCount);
         updateDeleteButtonsVisibility();
 
-        const newCreateOidBtn = newFormElement.querySelector('.add-oid-modal-per-row');
-        if (newCreateOidBtn) {
-            newCreateOidBtn.addEventListener('click', handleShowCreateOidModalForRow);
-        }
+        
     }
     
     function addDeleteButtonIfNeeded(formElement, formIndex) {
@@ -465,10 +462,7 @@ const WorkRequestItemFormsetManager = (function() {
                 oidSelect.dataset.currentOidValue = oidSelect.value;
                 initializeTomSelectForOid(oidSelect, unitSelectElement.value);
             }
-            const createOidBtn = form.querySelector('.add-oid-modal-per-row');
-            if (createOidBtn) {
-                createOidBtn.addEventListener('click', handleShowCreateOidModalForRow);
-            }
+        
             if (form.querySelector(`input[name$="-id"][value]`)) {
                 form.dataset.isSaved = 'true';
             }
