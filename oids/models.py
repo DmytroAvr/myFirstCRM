@@ -66,7 +66,7 @@ class WorkTypeChoices(models.TextChoices):
     
 class DocumentReviewResultChoices(models.TextChoices): 
     READ = 'опрацювати', 'Опрацювати'
-    AWAITING_DOCS = 'очікує в папері', 'Очікує в папері'
+    AWAITING_DOCS = 'очікуємо в папері', 'Очікуємо в папері'
     APPROVED = 'погоджено', 'Погоджено'
     FOR_REVISION = 'на доопрацювання', 'На доопрацювання'
 
@@ -1026,8 +1026,8 @@ class TechnicalTask(models.Model):
         verbose_name="Результат розгляду / Статус ТЗ" # Змінено verbose_name
     )
     note = models.TextField(blank=True, null=True, verbose_name="Примітка")
+    updated_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата опрацювання")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата внесення ТЗ\МЗ")
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
     history = HistoricalRecords()
 
     def __str__(self):

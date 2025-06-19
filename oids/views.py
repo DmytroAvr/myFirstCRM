@@ -1184,7 +1184,7 @@ def technical_task_process_view(request, task_id=None): # Може прийма�
 
             task_to_process.review_result = new_status
             task_to_process.reviewed_by = processed_by_person
-            
+            task_to_process.updated_at = timezone.now()
             # Додаємо примітку про опрацювання до існуючої або створюємо нову
             if processing_note_text:
                 if task_to_process.note:
@@ -1839,8 +1839,9 @@ def technical_task_list_view(request):
         'input_date': 'input_date', #
         'read_till_date': 'read_till_date', #
         'review_result': 'review_result', #
+		'updated_at': 'updated_at',
         'reviewed_by': 'reviewed_by__full_name',
-        'created_at': 'created_at' #
+        'created_at': 'created_at',
     }
     
     order_by_field_key = valid_sort_fields.get(sort_by_param_cleaned, 'input_date')
@@ -1857,7 +1858,7 @@ def technical_task_list_view(request):
     task_list_queryset = task_list_queryset.order_by(final_order_by_field, secondary_sort).distinct()
 
     # --- Пагінація ---
-    paginator = Paginator(task_list_queryset, 25)
+    paginator = Paginator(task_list_queryset, 50)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
         
@@ -1872,7 +1873,7 @@ def technical_task_list_view(request):
         processed_technical_tasks__isnull=False # <--- ЗМІНЕНО ТУТ
     ).distinct().order_by('full_name')        
     context = {
-        'page_title': 'Список Технічних Завдань',
+        'page_title': 'Список опрацювання ТЗ\МЗ',
         'object_list': page_obj,
         'page_obj': page_obj,
         # Фільтри

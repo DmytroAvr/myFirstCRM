@@ -851,7 +851,7 @@ class TripResultSendForm(forms.ModelForm):
                             last_updated_item.update_request_status() # Припускаючи, що цей метод існує і працює
                         print(f"DEBUG: Attempted to update overall status for WorkRequest {work_request.id}")
         return instance
-    
+     
 class TechnicalTaskCreateForm(forms.ModelForm):
     unit = forms.ModelChoiceField(
         queryset=Unit.objects.all().order_by('code'),

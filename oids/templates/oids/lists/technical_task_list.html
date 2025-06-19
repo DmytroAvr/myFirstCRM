@@ -126,12 +126,22 @@
                         </th>
                         <th>
                             <a href="{{ list_url }}?sort_by=review_result&sort_order={% if current_sort_by == 'review_result' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
-                                Результат {% if current_sort_by == 'review_result' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                                Статус {% if current_sort_by == 'review_result' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
                             </a>
                         </th>
+						<th>
+							<a href="{{ list_url }}?sort_by=updated_at&sort_order={% if current_sort_by == 'updated_at' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+								Дата оновлення {% if current_sort_by == 'updated_at' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+							</a>
+						</th>
+						<!-- <th>
+                            <a href="{{ list_url }}?sort_by=updated_at&sort_order={% if current_sort_by == 'updated_at' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+                                Коли опрацьовано {% if current_sort_by == 'updated_at' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                            </a>
+                        </th> -->
                         <th>
                             <a href="{{ list_url }}?sort_by=reviewed_by&sort_order={% if current_sort_by == 'reviewed_by' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
-                                Хто ознайомився {% if current_sort_by == 'reviewed_by' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                                Хто опрацював {% if current_sort_by == 'reviewed_by' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
                             </a>
                         </th>
                         <th>
@@ -161,6 +171,7 @@
                     <td>{{ task.input_date|date:"d.m.Y" }}</td>
                     <td>{{ task.read_till_date|date:"d.m.Y"|default:"-" }}</td>
                     <td>{{ task.get_review_result_display }}</td>
+                    <td>{{ task.updated_at|date:"d.m.Y"|default:"-" }}</td>
                     <td>{{ task.reviewed_by.full_name|default:"-" }}</td>
                     <td>{{ task.created_at|date:"d.m.Y H:i" }}</td>
                     <td>{{ task.note|truncatewords:10|default:"-" }}</td>
