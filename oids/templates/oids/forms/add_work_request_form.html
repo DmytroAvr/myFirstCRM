@@ -76,18 +76,18 @@
                         {% endwith %}
                         
                         <div class="col-md-2">
-                             <!-- {% if item_form.instance.pk or formset.forms|length > 1 and formset.can_delete %} 
+                             {% if item_form.instance.pk or formset.forms|length > 1 and formset.can_delete %} 
                                 {% with field=item_form.DELETE %}
                                 <div class="col-md-2 form-item-delete-button-container">
 									{# Кнопка видалення з'явиться, якщо форм більше однієї #}
 									{# Сюди JavaScript додасть кнопку "Видалити" або поле DELETE #}
 								</div>
                                 {% endwith %}
-                            {% endif %} -->
-							<div class="col-md-2 form-item-delete-button-container">
+                            {% endif %}
+							<!-- <div class="col-md-2 form-item-delete-button-container">
 								{# Кнопка видалення з'явиться, якщо форм більше однієї #}
 								{# Сюди JavaScript додасть кнопку "Видалити" або поле DELETE #}
-							</div>
+							</div> -->
                         </div>
                         
                     </div>
@@ -325,6 +325,11 @@ const WorkRequestItemFormsetManager = (function() {
             console.warn("Formset JS: Delete button container not found in form for index:", formIndex, formElement);
             return;
         }
+		if (totalFormsInput.value <= 1) {
+			deleteButtonContainer.innerHTML = ''; 
+			console.log(totalFormsInput.value);
+			return;
+		}
         deleteButtonContainer.innerHTML = ''; 
         
         const removeButton = document.createElement('button');
