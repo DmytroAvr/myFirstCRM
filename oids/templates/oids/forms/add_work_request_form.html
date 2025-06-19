@@ -76,20 +76,20 @@
                         {% endwith %}
                         
                         <div class="col-md-2">
-                             {% if item_form.instance.pk or formset.forms|length > 1 and formset.can_delete %} 
+                             <!-- {% if item_form.instance.pk or formset.forms|length > 1 and formset.can_delete %} 
                                 {% with field=item_form.DELETE %}
-                                <div class="form-check mt-3">
-                                    {{ field }}
-                                    <label for="{{ field.id_for_label }}" class="form-check-label">{{ field.label }}</label>
-                                </div>
+                                <div class="col-md-2 form-item-delete-button-container">
+									{# Кнопка видалення з'явиться, якщо форм більше однієї #}
+									{# Сюди JavaScript додасть кнопку "Видалити" або поле DELETE #}
+								</div>
                                 {% endwith %}
-                            {% endif %}
+                            {% endif %} -->
+							<div class="col-md-2 form-item-delete-button-container">
+								{# Кнопка видалення з'явиться, якщо форм більше однієї #}
+								{# Сюди JavaScript додасть кнопку "Видалити" або поле DELETE #}
+							</div>
                         </div>
-                        <div class="col-md-1">
-                             <button type="button" class="btn btn-sm btn-success add-oid-modal-per-row" title="Створити новий ОІД для цієї ВЧ">
-                                <i class="fas fa-plus"></i> +
-                            </button>
-                        </div>
+                        
                     </div>
                      {% if item_form.oid.help_text or item_form.work_type.help_text %}
                         <small class="form-text text-muted d-block mt-1">
@@ -134,11 +134,7 @@
                     {# Кнопка видалення з'явиться, якщо форм більше однієї #}
 					{# Сюди JavaScript додасть кнопку "Видалити" або поле DELETE #}
                 </div>			
-                <div class="col-md-1">
-                     <button type="button" class="btn btn-sm btn-success add-oid-modal-per-row" title="Створити новий ОІД для цієї ВЧ">
-                        <i class="fas fa-plus"></i> +
-                    </button>
-                </div>
+              
             </div>
         </div>
         {% endwith %}
@@ -333,7 +329,7 @@ const WorkRequestItemFormsetManager = (function() {
         
         const removeButton = document.createElement('button');
         removeButton.type = 'button';
-        removeButton.classList.add('btn', 'btn-danger', 'btn-sm', 'remove-item-button'); // Додав mt-3 для відступу
+        removeButton.classList.add('btn', 'btn-danger', 'btn-sm', 'remove-item-button'); 
         removeButton.innerHTML = '<i class="fas fa-trash" aria-hidden="true"></i>видалити'; // Тільки іконка для компактності
         removeButton.title = 'Видалити цей елемент';
         deleteButtonContainer.appendChild(removeButton);
@@ -446,7 +442,7 @@ const WorkRequestItemFormsetManager = (function() {
         const minFormsInputElement = document.getElementById(`id_${formsetPrefix}-MIN_NUM_FORMS`);
         const maxFormsInputElement = document.getElementById(`id_${formsetPrefix}-MAX_NUM_FORMS`);
         
-        minFormsCount = minFormsInputElement ? parseInt(minFormsInputElement.value) : 0;
+        minFormsCount = minFormsInputElement ? parseInt(minFormsInputElement.value) : 1;
         maxFormsCount = maxFormsInputElement ? parseInt(maxFormsInputElement.value) : 1000; 
         canDeleteForms = "{{ formset.can_delete|yesno:'true,false' }}" === 'true';
 
