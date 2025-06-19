@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     fetch(`${oidsForUnitUrl}?unit_id=${unitId}`)
                         .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t); }))
                         .then(data => {
-                            const options = data.map(oid => ({ id: oid.id.toString(), text: `${oid.cipher} (${oid.full_name || 'Без назви'})` }));
+                            const options = data.map(oid => ({ id: oid.id.toString(), text: `${oid.cipher} (${oid.full_name || 'без пов.назви'}) статус: ${oid.status}, тип ОІД: ${oid.oid_type}` }));
                             tsOid.addOptions(options);
                             tsOid.refreshOptions(false);
                             tsOid.placeholder = options.length ? 'Оберіть ОІД...' : 'Для ВЧ немає ОІДів';

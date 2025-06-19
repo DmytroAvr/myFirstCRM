@@ -33,6 +33,7 @@
     <li class="oid-info__list-item"><strong>Гриф ОІД:</strong>  <span class="oid-info__item-underline"> {{ oid.get_sec_level_display }}</span></li>
     <li class="oid-info__list-item"><strong>Повна назва:</strong>  <span class="oid-info__item-underline"> {{ oid.full_name|default:"Не вказано" }}</span></li>
     <li class="oid-info__list-item"><strong>Тип ОІД:</strong>  <span class="oid-info__item-underline"> {{ oid.get_oid_type_display }}</span></li>
+    <li class="oid-info__list-item"><strong>Клас ОІД:</strong>  <span class="oid-info__item-underline"> {{ oid.get_pemin_sub_type_display|default:"-"}}</span></li>
     <li class="oid-info__list-item"><strong>Приміщення:</strong>  <span class="oid-info__item-underline"> {{ oid.room }}</span></li>
     <li class="oid-info__list-item"><strong>Поточний стан:</strong>  <span class="oid-info__item-underline"> {{ oid.get_status_display }} >>> <a href="{% url 'oids:update_specific_oid_status' oid_id_from_url=oid.id %}">Змінити статус ОІД</a> </span></li> 
     <li class="oid-info__list-item"><strong>Примітки:</strong>  <span class="oid-info__item-underline"> {{ oid.note|default:"-" }}</span></li>

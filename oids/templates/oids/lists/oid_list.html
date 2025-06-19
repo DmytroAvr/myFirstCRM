@@ -15,13 +15,10 @@
                 <select name="filter_unit" id="filter_unit" class="form-select tomselect-field">
                     <option value="">Всі ВЧ</option>
                     {% for unit_choice in units_for_filter %}
-                        {# Make sure there are spaces around == here! #}
-					
-					
+                        {# Make sure there are spaces around == here! #}			
 						<option value="{{ unit_choice.id }}" {% if current_filter_unit_id == unit_choice.id %}selected{% endif %}>
 							{{ unit_choice.code }} - {{ unit_choice.name|default_if_none:unit_choice.city }}
-						</option> 
-					
+						</option> 					
                     {% endfor %}
                 </select>
             </div>
@@ -31,6 +28,15 @@
 					<option value="">Всі типи</option>
 					{% for value, text in oid_type_choices_for_filter %}
 					<option value="{{ value }}" {% if current_filter_oid_type == value %}selected{% endif %}>{{ text }}</option>
+					{% endfor %}
+				</select>
+			</div>
+			<div class="col-md-2">
+				<label for="filter_pemin_sub_type" class="form-label">Клас ОІД:</label>
+				<select name="filter_pemin_sub_type" id="filter_pemin_sub_type" class="form-select tomselect-field">
+					<option value="">Всі класи</option>
+					{% for value, text in pemin_sub_type_choices_for_filter %}
+					<option value="{{ value }}" {% if current_filter_pemin_sub_type == value %}selected{% endif %}>{{ text }}</option>
 					{% endfor %}
 				</select>
 			</div>
@@ -109,6 +115,11 @@
 						</a>
 					</th>
 					<th>
+						<a href="{{ list_url }}?sort_by=pemin_sub_type&sort_order={% if current_sort_by == 'pemin_sub_type' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
+							Клас {% if current_sort_by == 'pemin_sub_type' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+						</a>
+					</th>
+					<th>
 						<a href="{{ list_url }}?sort_by=room&sort_order={% if current_sort_by == 'room' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
 							Приміщення {% if current_sort_by == 'room' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
 						</a>
@@ -126,7 +137,7 @@
 					<th>Примітки</th>
 					<th>
 						<a href="{{ list_url }}?sort_by=created_at&sort_order={% if current_sort_by == 'created_at' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
-							Дата створення {% if current_sort_by == 'created_at' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+							Дата внесення ОІД {% if current_sort_by == 'created_at' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
 						</a>
 					</th>
 					<th>Дії</th>
@@ -152,6 +163,7 @@
 					</td>
 					<td>{{ oid_item.full_name|default_if_none:"Не вказано" }}</td>
 					<td>{{ oid_item.get_oid_type_display }}</td>
+					<td>{{ oid_item.get_pemin_sub_type_display|default:"-" }}</td>
 					<td>{{ oid_item.room|default_if_none:"-" }}</td>
 					<td>{{ oid_item.get_status_display }}</td>
 					<td>{{ oid_item.get_sec_level_display }}</td>
@@ -181,7 +193,7 @@
 {% block extra_js %}
 <script>
 	document.addEventListener('DOMContentLoaded', function () {
-		const selectsToInitialize = ['filter_unit', 'filter_oid_type', 'filter_status', 'filter_sec_level'];
+		const selectsToInitialize = ['filter_unit', 'filter_oid_type', 'filter_pemin_sub_type', 'filter_status', 'filter_sec_level'];
 
 		if (typeof TomSelect !== 'undefined') {
 			selectsToInitialize.forEach(function (selectId) {

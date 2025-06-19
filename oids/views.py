@@ -11,7 +11,7 @@ from django.db import  transaction
 from django.utils import timezone
 import datetime
 from .models import (OIDTypeChoices, OIDStatusChoices, SecLevelChoices, WorkRequestStatusChoices, WorkTypeChoices, 
-    DocumentReviewResultChoices, AttestationRegistrationStatusChoices, add_working_days
+    DocumentReviewResultChoices, AttestationRegistrationStatusChoices, PeminSubTypeChoices, add_working_days
 )
 from .models import (Unit, UnitGroup, OID, OIDStatusChange, TerritorialManagement, 
 	Document, DocumentType, WorkRequest, WorkRequestItem, Trip,TripResultForUnit, 
@@ -141,6 +141,7 @@ def ajax_get_oid_current_status(request):
     return JsonResponse({'status': 'error', 'message': 'Необхідно ID ОІДа'}, status=400)
 
  # changede by gemeni. перейшли від передачі словників до передачі повних екземплярів моделі OID у функцію get_last_document_expiration_date. Це важливо для коректної роботи сервера, незалежно від фронтенд-фільтрації.
+
 def ajax_load_oids_for_unit_categorized(request):
     unit_id_str = request.GET.get('unit_id')
     data = {
@@ -307,7 +308,8 @@ def ajax_load_oids_for_unit(request):
                     'id': oid.id,
                     'cipher': oid.cipher, 
                     'full_name': oid.full_name or "", # Повертаємо порожній рядок, якщо full_name None
-					'oid_type': oid.oid_type, # <--- ПЕРЕВІРТЕ ЦЕЙ РЯДОК!
+					'oid_type': oid.oid_type, 
+					'status': oid.status, 
 				    # Додайте інші поля, якщо вони потрібні для відображення в TomSelect у JS:
                     # наприклад, 'unit_code': oid.unit.code (якщо unit вже завантажено через select_related у запиті)
                 })
@@ -1094,7 +1096,6 @@ def update_oid_status_view(request, oid_id_from_url=None):
     return render(request, 'oids/forms/update_oid_status_form.html', context)
 
 
-
 @login_required 
 @transaction.atomic # Використовуємо транзакцію для цілісності даних
 def send_attestation_for_registration_view(request):
@@ -1117,8 +1118,6 @@ def send_attestation_for_registration_view(request):
     return render(request, 'oids/forms/send_attestation_form.html', context)
 
 
-
-
 @login_required 
 def technical_task_create_view(request):
     initial_data_for_form = {}
@@ -1136,7 +1135,6 @@ def technical_task_create_view(request):
                 initial_data_for_form['unit'] = oid_instance.unit_id
             except OID.DoesNotExist:
                 pass
-
 
     if request.method == 'POST':
         form = TechnicalTaskCreateForm(request.POST)
@@ -1227,8 +1225,6 @@ def technical_task_process_view(request, task_id=None): # Може прийма�
         'technical_task_instance': technical_task_instance # Для відображення деталей ТЗ на сторінці
     }
     return render(request, 'oids/forms/technical_task_process_form.html', context)
-
-
 
 
 @login_required # list info 
@@ -1418,6 +1414,7 @@ def oid_list_view(request):
     # --- Фільтрація ---
     filter_unit_id_str = request.GET.get('filter_unit')
     filter_oid_type = request.GET.get('filter_oid_type')
+    filter_pemin_sub_type = request.GET.get('filter_pemin_sub_type')
     filter_status = request.GET.get('filter_status')
     filter_sec_level = request.GET.get('filter_sec_level')
     search_query = request.GET.get('search_query')
@@ -1429,7 +1426,10 @@ def oid_list_view(request):
     
     if filter_oid_type:
         oid_list_queryset = oid_list_queryset.filter(oid_type=filter_oid_type)
-    
+
+    if filter_pemin_sub_type:
+        oid_list_queryset = oid_list_queryset.filter(pemin_sub_type=filter_pemin_sub_type)
+
     if filter_status:
         oid_list_queryset = oid_list_queryset.filter(status=filter_status)
 
@@ -1467,6 +1467,7 @@ def oid_list_view(request):
         'cipher': 'cipher',
         'full_name': 'full_name',
         'oid_type': 'oid_type',
+        'pemin_sub_type': 'pemin_sub_type',
         'room': 'room',
         'status': 'status',
         'sec_level': 'sec_level',
@@ -1488,14 +1489,15 @@ def oid_list_view(request):
     oid_list_queryset = oid_list_queryset.order_by(final_order_by_field, secondary_sort)
 
     # --- Пагінація ---
-    paginator = Paginator(oid_list_queryset, 25) # 25 ОІД на сторінку
+    paginator = Paginator(oid_list_queryset, 50) # 50 ОІД на сторінку
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
-    # Дані для фільтрів
+    # Дані для ів
     units_for_filter = Unit.objects.all().order_by('code')
     # Передаємо самі choices, а не їх відображення
     oid_type_choices_for_filter = OIDTypeChoices.choices
+    pemin_sub_type_choices_for_filter = PeminSubTypeChoices.choices
     oid_status_choices_for_filter = OIDStatusChoices.choices
     sec_level_choices_for_filter = SecLevelChoices.choices
         
@@ -1506,10 +1508,12 @@ def oid_list_view(request):
         # Фільтри
         'units_for_filter': units_for_filter,
         'oid_type_choices_for_filter': oid_type_choices_for_filter,
+        'pemin_sub_type_choices_for_filter': pemin_sub_type_choices_for_filter,
         'oid_status_choices_for_filter': oid_status_choices_for_filter,
         'sec_level_choices_for_filter': sec_level_choices_for_filter,
         'current_filter_unit_id': current_filter_unit_id,
         'current_filter_oid_type': filter_oid_type,
+        'current_filter_pemin_sub_type': filter_pemin_sub_type,
         'current_filter_status': filter_status,
         'current_filter_sec_level': filter_sec_level,
         'current_search_query': search_query,
@@ -1565,7 +1569,7 @@ def work_request_list_view(request):
             Q(unit__code__icontains=search_query) | # Пошук за кодом ВЧ
             Q(unit__name__icontains=search_query) | # Пошук за назвою ВЧ
             Q(items__oid__cipher__icontains=search_query) # Пошук за шифром ОІД в елементах заявки
-        ).distinct() # distinct потрібен через фільтрацію по M2M (items)
+        ).distinct() # distinct потрібен через ацію по M2M (items)
 
     # --- Сортування ---
     sort_by_param = request.GET.get('sort_by', '-incoming_date') # За замовчуванням - новіші заявки

@@ -146,7 +146,9 @@ class TripResultForUnitAdmin(admin.ModelAdmin):
 
 @admin.register(TechnicalTask)
 class TechnicalTaskAdmin(admin.ModelAdmin):
-    list_display = ('input_number', 'input_date', 'oid', 'review_result', 'reviewed_by', 'created_at')
+    list_display = ('oid', 'input_number', 'input_date', 'read_till_date', 'reviewed_by', 'review_result', 'updated_at', 'created_at')
     search_fields = ('input_number', 'oid__cipher', 'reviewed_by__full_name')
     list_filter = ('review_result', 'input_date', 'oid__unit')
     date_hierarchy = 'input_date'
+    
+	 

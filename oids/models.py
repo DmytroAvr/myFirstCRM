@@ -40,7 +40,7 @@ def add_working_days(start_date, days_to_add):
 class SecLevelChoices(models.TextChoices):
     S = 'Таємно', 'Таємно' 
     TS = 'Цілком таємно', 'Цілком таємно'
-    DSK = 'ДСК', 'Для службового користування'
+    # DSK = 'ДСК', 'Для службового користування'
  
 class OIDStatusChoices(models.TextChoices):
     NEW = 'створюється', 'Створюється'
@@ -79,8 +79,7 @@ class AttestationRegistrationStatusChoices(models.TextChoices):
 class PeminSubTypeChoices(models.TextChoices):
     VARM = 'ВАРМ', 'ВАРМ'
     AS1Static = 'АС1Стаціонар', 'АС1 Стаціонар'
-    AS1Portable = 'АС1Getac', 'АС1 Getac'
-    
+    AS1Portable = 'АС1Портативний', 'АС1 Портативний'    
 # --- Models ---
 
 class TerritorialManagement(models.Model):
@@ -168,7 +167,7 @@ class OID(models.Model):
     room = models.CharField(max_length=255, verbose_name="Приміщення №")
     status = models.CharField(max_length=30, choices=OIDStatusChoices.choices, default=OIDStatusChoices.NEW, verbose_name="Поточний стан ОІД")
     note = models.TextField(verbose_name="Примітка", blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення ОІД")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
     pemin_sub_type = models.CharField(
         max_length=20, 
@@ -245,7 +244,7 @@ class WorkRequest(models.Model):
         verbose_name="Статус заявки"
     )
     # Зв'язок Many-to-Many з OID буде через WorkRequestItem, щоб можна було вказувати тип роботи для кожного ОІД в заявці.
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата внесення заявки")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
     history = HistoricalRecords()
     def check_and_update_status_based_on_documents(self):
@@ -266,7 +265,8 @@ class WorkRequest(models.Model):
             key_doc_types_ik = DocumentType.objects.filter(
                 (Q(work_type=WorkTypeChoices.IK) | Q(work_type='СПІЛЬНИЙ')),
                 (Q(oid_type=wri_oid_type) | Q(oid_type='СПІЛЬНИЙ')),
-                name__icontains="Висновок ІК" # Або більш точний фільтр, наприклад, по ID типу
+                duration_months=20
+                # name__icontains="Висновок ІК" # Або більш точний фільтр, наприклад, по ID типу
             )
             if key_doc_types_ik.exists():
                 if Document.objects.filter(
@@ -284,7 +284,8 @@ class WorkRequest(models.Model):
             key_doc_types_att = DocumentType.objects.filter(
                 (Q(work_type=WorkTypeChoices.ATTESTATION) | Q(work_type='СПІЛЬНИЙ')),
                 (Q(oid_type=wri_oid_type) | Q(oid_type='СПІЛЬНИЙ')),
-                name__icontains="Акт атестації" # Або більш точний фільтр
+                duration_months=60
+				# name__icontains="Акт атестації" # Або більш точний фільтр
             )
             if key_doc_types_att.exists():
                 if Document.objects.filter(
@@ -351,7 +352,7 @@ class WorkRequestItem(models.Model):
         null=True,
         blank=True
     )
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата внесення Item заявки")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
     deadline_trigger_trip = models.ForeignKey(
         'Trip', 
@@ -688,7 +689,7 @@ class AttestationRegistration(models.Model):
         null=True,
         verbose_name="Примітка до відправки"
     )
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата внесення інф. про реєстрацію Атестації")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
     history = HistoricalRecords()
 
@@ -787,7 +788,7 @@ class Document(models.Model):
     )
     attachment = models.FileField(upload_to="attestation_docs/", blank=True, null=True, verbose_name="Прикріплений файл (Опційно)")
     note = models.TextField(blank=True, null=True, verbose_name="Примітки")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата внесення документу")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
     expiration_date = models.DateField(verbose_name="Дата завершення дії", blank=True, null=True)
     history = HistoricalRecords()
@@ -885,7 +886,7 @@ class Trip(models.Model):
         related_name='trips' # Дозволить знайти всі відрядження, в яких брала участь особа
     )
     purpose = models.TextField(blank=True, null=True, verbose_name="Мета відрядження")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення відрядження")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
     history = HistoricalRecords()
 
@@ -940,7 +941,7 @@ class OIDStatusChange(models.Model):
         related_name='oid_status_changes'
     )
     changed_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата зміни") # Змінив на DateTimeField
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису про зміну статусу")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
 
     def __str__(self):
@@ -989,7 +990,7 @@ class TripResultForUnit(models.Model):
         verbose_name="Вих. дата супровідного листа"
     )
     note = models.TextField(blank=True, null=True, verbose_name="Примітка")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата внесення запису про опрацювання відрядження")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
     history = HistoricalRecords()
     # related_request - можна отримати через trip.work_requests.all() або через documents.work_request_item.request
@@ -1025,12 +1026,12 @@ class TechnicalTask(models.Model):
         verbose_name="Результат розгляду / Статус ТЗ" # Змінено verbose_name
     )
     note = models.TextField(blank=True, null=True, verbose_name="Примітка")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата внесення ТЗ\МЗ")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
     history = HistoricalRecords()
 
     def __str__(self):
-        return f"ТЗ №{self.input_number} для ОІД: {self.oid.cipher} (статус: {self.get_review_result_display()})"
+        return f"ТЗ\МЗ для ОІД: {self.oid.cipher} (статус: {self.get_review_result_display()}) від {self.input_date.strftime("%d.%m.%Y")} вх.№{self.input_number}"
 
     class Meta:
         verbose_name = "Технічне Завдання" # Змінено
