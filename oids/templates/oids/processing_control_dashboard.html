@@ -53,13 +53,16 @@
                             <th><a href="{{ base_url }}?{{ request.GET.urlencode }}&tt_sort_by=input_date&tt_sort_order={% if current_tt_sort_by == 'input_date' and current_tt_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Вхідна дата ТЗ</a></th>
                             <th><a href="{{ base_url }}?{{ request.GET.urlencode }}&tt_sort_by=deadline&tt_sort_order={% if current_tt_sort_by == 'deadline' and current_tt_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Термін опрац.</a></th>
                             <th><a href="{{ base_url }}?{{ request.GET.urlencode }}&tt_sort_by=status&tt_sort_order={% if current_tt_sort_by == 'status' and current_tt_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Статус ТЗ</a></th>
+							<th><a href="{{ base_url }}?{{ request.GET.urlencode }}&tt_sort_by=updated_at&tt_sort_order={% if current_tt_sort_by == 'updated_at' and current_tt_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Дата оновлення</a></th>
+								<!-- {% if current_sort_by == 'updated_at' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %} -->
                             <th><a href="{{ base_url }}?{{ request.GET.urlencode }}&tt_sort_by=executor&tt_sort_order={% if current_tt_sort_by == 'executor' and current_tt_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Хто/Коли опрацював</a></th>
                             <th>Примітки</th>
                         </tr>
                     </thead>
+					
                     <tbody>
                         {% for task in technical_tasks %}
-                        <tr {% if task.read_till_date and task.read_till_date < today_date and task.review_result == 'READ' %}class="table-danger"{% elif task.review_result == 'APPROVED' %}class="table-success"{% endif %}>
+							<tr {% if task.read_till_date and task.read_till_date < today_date and task.review_result == ReviewResultChoices.READ %}class="table-danger"{% elif task.review_result == ReviewResultChoices.APPROVED or task.review_result == ReviewResultChoices.AWAITING_DOCS %}class="table-success"{% endif %}>
                             <td>
                                 <small>{{ task.oid.unit.code }}</small><br>
                                 <a href="{% url 'oids:oid_detail_view_name' task.oid.id %}#task-{{task.id}}">{{ task.oid.cipher }}</a>
@@ -68,6 +71,7 @@
                             <td>{{ task.input_date|date:"d.m.Y" }}</td>
                             <td>{{ task.read_till_date|date:"d.m.Y" }}</td>
                             <td>{{ task.get_review_result_display }}</td>
+							<td>{{ task.updated_at|date:"d.m.Y"|default:"-" }}</td>
                             <td>
                                 {{ task.reviewed_by.full_name|default:"-" }}
                                 {% if task.reviewed_by and task.updated_at != task.created_at and task.review_result != 'READ' %}
@@ -78,6 +82,7 @@
                         </tr>
                         {% endfor %}
                     </tbody>
+					
                 </table>
             </div>
             {% include "oids/includes/pagination.html" with page_obj=technical_tasks param_prefix="tt_" current_filters=request.GET.urlencode no_scroll=True %}
@@ -120,7 +125,7 @@
                     <thead class="thead-light">
                         <tr>
                             <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=unit&wri_sort_order={% if current_wri_sort_by == 'unit' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">ВЧ / ОІД</a></th>
-                            <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=unit&wri_sort_order={% if current_wri_sort_by == 'unit' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">ВЧ / ОІД</a></th>
+                            <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=unit&wri_sort_order={% if current_wri_sort_by == 'unit' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Тип ЕОТ</a></th>
                             <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=req_num&wri_sort_order={% if current_wri_sort_by == 'req_num' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Заявка (№, дата)</a></th>
                             <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=work_type&wri_sort_order={% if current_wri_sort_by == 'work_type' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Тип робіт</a></th>
                             <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=status&wri_sort_order={% if current_wri_sort_by == 'status' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Статус опрац. ОІД</a></th>
@@ -135,11 +140,11 @@
                         {% with last_trip=item.request.trips.all.0 %} {# .0 - перший елемент, бо ми сортували по -end_date #}
                         <tr {% if item.doc_processing_deadline and item.doc_processing_deadline < today_date and not item.docs_actually_processed_on %}class="table-danger"{% elif item.docs_actually_processed_on %}class="table-success"{% endif %}>
                             <td>
-                                <small>{{ item.request.unit.code }} / {{ item.oid.unit.code }}</small><br> 
+                                <small>{{ item.request.unit.code }}</small><br> 
                                 <a href="{% url 'oids:oid_detail_view_name' item.oid.id %}">{{ item.oid.cipher }}</a>
                             </td>
                             <td>
-                                <a href="{% url 'oids:oid_detail_view_name' item.oid.id %}">{{ item.oid.pemin_sub_type }}</a>
+                                {{ item.oid.pemin_sub_type|default:"-" }}</a>
                             </td>
                             <td>
                                 {# TODO: Посилання на деталі заявки, якщо є <a href="#">  </a>#}

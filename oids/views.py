@@ -2436,5 +2436,6 @@ def processing_control_view(request):
         'current_tt_sort_order': 'desc' if tt_sort_by.startswith('-') else tt_sort_order,
         'current_wri_sort_by': wri_sort_by.lstrip('-'), # Чисте ім'я поля для порівняння в шаблоні
         'current_wri_sort_order': current_wri_sort_order_for_template, # Напрямок для наступного кліку
+        'ReviewResultChoices': DocumentReviewResultChoices,
     }
     return render(request, 'oids/processing_control_dashboard.html', context)
