@@ -60,8 +60,8 @@ def plan_trip_view(request):
 
                     for item in items_to_process:
                         days_for_processing = 0
-                        if item.work_type == WorkTypeChoices.IK: days_for_processing = 15
-                        elif item.work_type == WorkTypeChoices.ATTESTATION: days_for_processing = 10
+                        if item.work_type == WorkTypeChoices.IK: days_for_processing = 10
+                        elif item.work_type == WorkTypeChoices.ATTESTATION: days_for_processing = 15
                         
                         if days_for_processing > 0:
                            new_deadline = add_working_days(start_counting_from_date, days_for_processing)

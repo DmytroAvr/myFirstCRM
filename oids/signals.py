@@ -58,9 +58,9 @@ def calculate_doc_processing_deadlines_on_trip_change(sender, instance, action, 
                 print(f"SIGNAL: Processing WRI ID {item.id} (OID: {item.oid.cipher}, WorkType: {item.work_type})")
                 days_for_processing = 0
                 if item.work_type == WorkTypeChoices.IK:
-                    days_for_processing = 15
-                elif item.work_type == WorkTypeChoices.ATTESTATION:
                     days_for_processing = 10
+                elif item.work_type == WorkTypeChoices.ATTESTATION:
+                    days_for_processing = 15
                 
                 if days_for_processing > 0:
                     # add_working_days(start_date, N) має повернути N-й робочий день ПІСЛЯ start_date
@@ -140,7 +140,7 @@ def _calculate_and_set_deadlines_for_trip(trip_instance):
     start_counting_from_date = trip_instance.end_date
 
     for item in items_to_process:
-        days = 15 if item.work_type == WorkTypeChoices.IK else (10 if item.work_type == WorkTypeChoices.ATTESTATION else 0)
+        days = 10 if item.work_type == WorkTypeChoices.IK else (15 if item.work_type == WorkTypeChoices.ATTESTATION else 0)
         if days > 0:
             new_deadline = add_working_days(start_counting_from_date, days)
             if item.doc_processing_deadline != new_deadline:

@@ -312,12 +312,12 @@ class DocumentProcessingMainForm(forms.Form):
         required=False 
     )
     process_date = forms.DateField(
-        label="Дата опрацювання документів (пакету)",
+        label="Дата опрацювання документів (підг. від)",
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         required=True
     )
     work_date = forms.DateField(
-        label="Дата виконання робіт на ОІД (для цього пакету)",
+        label="Дата виконання робіт на ОІД (для відстежування терміну дії)",
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         required=True
     )

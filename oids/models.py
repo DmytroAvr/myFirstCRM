@@ -265,8 +265,9 @@ class WorkRequest(models.Model):
             key_doc_types_ik = DocumentType.objects.filter(
                 (Q(work_type=WorkTypeChoices.IK) | Q(work_type='СПІЛЬНИЙ')),
                 (Q(oid_type=wri_oid_type) | Q(oid_type='СПІЛЬНИЙ')),
-                duration_months=20
-                # name__icontains="Висновок ІК" # Або більш точний фільтр, наприклад, по ID типу
+                # duration_months=20
+				# duration_months=20  привязати до "duration_months" адже цей показник сталий та більш точний фільтр
+                name__icontains="Висновок ІК" # Або більш точний фільтр, наприклад, по ID типу
             )
             if key_doc_types_ik.exists():
                 if Document.objects.filter(
@@ -284,8 +285,8 @@ class WorkRequest(models.Model):
             key_doc_types_att = DocumentType.objects.filter(
                 (Q(work_type=WorkTypeChoices.ATTESTATION) | Q(work_type='СПІЛЬНИЙ')),
                 (Q(oid_type=wri_oid_type) | Q(oid_type='СПІЛЬНИЙ')),
-                duration_months=60
-				# name__icontains="Акт атестації" # Або більш точний фільтр
+                # duration_months=60  привязати до "duration_months" адже цей показник сталий та більш точний фільтр
+				name__icontains="Акт атестації" # Або більш точний фільтр
             )
             if key_doc_types_att.exists():
                 if Document.objects.filter(
