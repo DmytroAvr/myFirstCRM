@@ -15,3 +15,29 @@ def get_item(dictionary, key):
         return dictionary.filter(pk=key).first()
     return None
 
+@register.filter(name='status_to_bootstrap_class')
+def status_to_bootstrap_class(status):
+    """
+    Перетворює статус заявки на відповідний CSS-клас Bootstrap.
+    """
+    mapping = {
+        'PENDING': 'bg-secondary',
+        'очікує': 'bg-secondary',
+
+        'IN_PROGRESS': 'bg-primary',
+        'в роботі': 'bg-primary',
+        
+        'COMPLETED': 'bg-success',
+        'виконано': 'bg-success',
+        
+        'CANCELED': 'bg-danger',
+        'скасовано': 'bg-danger',
+
+        # Додамо статуси для OID, якщо вони використовуються
+        'new': 'bg-info',
+        'in_progress': 'bg-primary',
+        'done': 'bg-success',
+        'cancelled': 'bg-danger',
+        'problem': 'bg-warning',
+    }
+    return mapping.get(status, 'bg-dark') # Повертаємо 'bg-dark' для невідомих статусів

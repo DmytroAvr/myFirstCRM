@@ -1,5 +1,6 @@
 {# oids/templates/oids/lists/work_request_list.html #}
 {% extends "oids/base.html" %}
+{% load my_custom_filters %}
 
 {% block title %}{{ page_title }}{% endblock %}
 
@@ -98,6 +99,7 @@
                     </tr>
                 </thead>
                 <tbody>
+					<!-- wr це змінна для work_request -->
                     {% for wr in object_list %}
                         <tr>
                             <td>
@@ -125,16 +127,20 @@
                                 {% endif %}
                             </td>
                             <td>{{ wr.note|truncatewords:10|default:"-" }}</td>
-                            <td>
-                                 <a href="#" class="btn btn-sm btn-outline-primary">Деталі</a> {# TODO: Потрібен URL для деталей заявки #}
-                            </td>
+                           <td>
+								{% if wr.pk %}
+									<a href="{% url 'oids:work_request_detail' pk=wr.pk %}" class="btn btn-sm btn-outline-primary">Деталі</a>
+								{% else %}
+									<span class="text-danger">Помилка: відсутній ID</span>
+								{% endif %}
+							</td>
                         </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
         {% if page_obj %}
-            {% include "../includes/pagination.html" with page_obj=page_obj sort_by=current_sort_by sort_order=current_sort_order_is_desc|yesno:"desc,asc" filter_unit=current_filter_unit_id filter_status=current_filter_status filter_date_from=current_filter_date_from filter_date_to=current_filter_date_to search_query=current_search_query %}
+            {% include "../includes/pagination.html" with page_obj=page_obj sort_by=current_sort_by sort_order=current_sort_order_is_desc|yesno:"desc,asc" filter_unit=current_filter_unit_id filter_status=current_filter_status filter_date_from=current_filter_date_from filter_date_to=current_filter_date_to search_query=current_search_query query=query %}
         {% endif %}
     {% else %}
         <p>Заявки на проведення робіт не знайдено (або не відповідають критеріям фільтрації).</p>

@@ -1,12 +1,11 @@
 # :\myFirstCRM\oids\views.py
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from django_tomselect.autocompletes import AutocompleteModelView
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.http import JsonResponse
 from django.urls import reverse_lazy, reverse
 from django.contrib import messages
-from django.db.models import Q, Max, Prefetch, Count 
+from django.db.models import Q, Max, Prefetch, Count, OuterRef, Subquery
 from django.db import  transaction 
 from django.utils import timezone
 import datetime
@@ -940,6 +939,57 @@ def add_work_request_view(request):
         # **context_modal_choices
     }
     return render(request, 'oids/forms/add_work_request_form.html', context)
+
+@login_required 
+def work_request_detail_view(request, pk):
+    """
+    Представлення для відображення деталей заявки на роботи
+    та оновлення статусу її окремих пунктів.
+    """
+    # Отримуємо об'єкт заявки або повертаємо помилку 404, якщо його не існує
+    work_request = get_object_or_404(WorkRequest, pk=pk)
+
+    if request.method == 'POST':
+        # Отримуємо ID пункту та новий статус із POST-запиту
+        item_id = request.POST.get('item_id')
+        new_status = request.POST.get('status')
+
+        if item_id and new_status:
+            try:
+                # Знаходимо конкретний пункт, що належить цій заявці
+                item_to_update = WorkRequestItem.objects.get(pk=item_id, request=work_request)
+                
+                # Перевіряємо, чи є такий статус у моделі
+                valid_statuses = [status[0] for status in WorkRequestStatusChoices.choices]
+                if new_status in valid_statuses:
+                    item_to_update.status = new_status
+                    item_to_update.save()
+                    messages.success(request, f'Статус для ОІД "{item_to_update.oid}" оновлено на "{item_to_update.get_status_display()}".')
+                else:
+                    messages.error(request, 'Невірний статус.')
+
+            except WorkRequestItem.DoesNotExist:
+                messages.error(request, 'Пункт заявки не знайдено.')
+        else:
+            messages.warning(request, 'Необхідно надати ID пункту та статус.')
+        
+        # Перенаправляємо користувача на цю ж сторінку, щоб уникнути повторної відправки форми
+        return redirect('oids:work_request_detail', pk=work_request.pk)
+
+    # Для GET-запиту просто готуємо дані для шаблону
+    # Отримуємо всі пункти, пов'язані з цією заявкою
+    items = work_request.items.all().select_related('oid')
+    
+    # Отримуємо доступні статуси з моделі для випадаючого списку в шаблоні
+    status_choices = WorkRequestStatusChoices.choices
+
+    context = {
+        'work_request': work_request,
+        'items': items,
+        'status_choices': status_choices,
+        'title': f'Деталі заявки №{work_request.pk}'
+    }
+    return render(request, 'oids/lists/work_request_detail.html', context)
 
 @login_required 
 def add_document_processing_view(request, oid_id=None, work_request_item_id=None):
@@ -2303,7 +2353,7 @@ def processing_control_view(request):
 
     # --- Блок 1: Читання ТЗ ---
     tt_queryset = TechnicalTask.objects.select_related('oid__unit', 'reviewed_by')
-    
+
     tt_filter_form = TechnicalTaskFilterForm(request.GET or None, prefix="tt")
     if tt_filter_form.is_valid():
         if tt_filter_form.cleaned_data.get('unit'):
@@ -2339,16 +2389,40 @@ def processing_control_view(request):
     tt_page_obj = tt_paginator.get_page(tt_page_number)
 
     # --- Блок 2: Опрацювання документів з відрядження (WorkRequestItem) ---
+     # Визначаємо типи ключових документів
+    attestation_act_type = DocumentType.objects.filter(duration_months=60).first()
+    ik_conclusion_type = DocumentType.objects.filter(duration_months=20).first()
+
+    # Створюємо підзапити для отримання дат ключових документів
+    # Підзапит для дати зареєстрованого Акту Атестації
+    attestation_date_subquery = Document.objects.filter(
+        work_request_item=OuterRef('pk'),
+        document_type=attestation_act_type,
+        dsszzi_registered_number__isnull=False,
+        dsszzi_registered_date__isnull=False
+    ).order_by('-process_date').values('process_date')[:1]
+# Підзапит для дати Висновку ІК
+    ik_date_subquery = Document.objects.filter(
+        work_request_item=OuterRef('pk'),
+        document_type=ik_conclusion_type
+    ).order_by('-process_date').values('process_date')[:1]
+
     wri_queryset = WorkRequestItem.objects.filter(
         request__trips__isnull=False 
+    ).exclude(
+        status=WorkRequestStatusChoices.CANCELED
     ).select_related(
         'request__unit', 
         'oid__unit',
-        'deadline_trigger_trip' # <--- Додаємо для сортування та відображення
-    ).prefetch_related( # Залишаємо для відображення всіх відряджень, якщо потрібно
+        'deadline_trigger_trip' 
+    ).prefetch_related(
         Prefetch('request__trips', queryset=Trip.objects.order_by('-end_date'))
+    ).annotate(
+        # Створюємо нові поля 'final_attestation_date' та 'final_ik_date' для кожного WRI
+        final_attestation_date=Subquery(attestation_date_subquery),
+        final_ik_date=Subquery(ik_date_subquery)
     ).distinct()
-
+    
     wri_filter_form = WorkRequestItemProcessingFilterForm(request.GET or None, prefix="wri")
     if wri_filter_form.is_valid(): # <--- ПОЧАТОК БЛОКУ is_valid()
         if wri_filter_form.cleaned_data.get('unit'):

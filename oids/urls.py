@@ -67,6 +67,7 @@ urlpatterns = [
     path('persons/', views.person_list_view, name='list_persons'),
     path('oids-list/', views.oid_list_view, name='list_oids'), # назва oids_list_view щоб не плутати з oid_detail_view
     path('work-requests/', views.work_request_list_view, name='list_work_requests'),
+	 path('work-requests/<int:pk>/', views.work_request_detail_view, name='work_request_detail'),
     path('trips/', views.trip_list_view, name='list_trips'),
     path('technical-tasks/', views.technical_task_list_view, name='list_technical_tasks'),
     path('attestation-responses/', views.attestation_response_list_view, name='list_attestation_responses'),
