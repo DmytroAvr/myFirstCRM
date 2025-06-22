@@ -59,8 +59,8 @@ def plan_trip_view(request):
 
                     for item in items_to_process:
                         days_for_processing = 0
-                        if item.work_type == WorkTypeChoices.IK: days_for_processing = 10
-                        elif item.work_type == WorkTypeChoices.ATTESTATION: days_for_processing = 15
+                        if item.work_type == WorkTypeChoices.IK: days_for_processing = 15 # налаштувати кількість днів для розрахунку часу на опрацювання   
+                        elif item.work_type == WorkTypeChoices.ATTESTATION: days_for_processing = 10 # налаштувати кількість днів для розрахунку часу на опрацювання 
                         
                         if days_for_processing > 0:
                            new_deadline = add_working_days(start_counting_from_date, days_for_processing)
@@ -750,29 +750,6 @@ def oid_create_view(request):
         'page_title': 'Створення нового Об\'єкта Інформаційної Діяльності'
     }
     return render(request, 'oids/forms/oid_create_form.html', context)
-
-
-@login_required 
-def plan_trip_view(request):
-    if request.method == 'POST':
-        form = TripForm(request.POST)
-        if form.is_valid():
-            trip = form.save()
-            messages.success(request, f'Відрядження заплановано успішно (ID: {trip.id}).')
-            # Оновлюємо статус пов'язаних заявок на "В роботі"
-            for work_request in form.cleaned_data.get('work_requests', []):
-                if work_request.status == WorkRequestStatusChoices.PENDING:
-                    work_request.status = WorkRequestStatusChoices.IN_PROGRESS
-                    work_request.save()
-                    # Також оновити статус WorkRequestItem, якщо потрібно
-                    WorkRequestItem.objects.filter(request=work_request, status=WorkRequestStatusChoices.PENDING)\
-                                           .update(status=WorkRequestStatusChoices.IN_PROGRESS)
-
-            return redirect('oids:main_dashboard') # Або на сторінку деталей відрядження
-    else:
-        form = TripForm()
-    
-    return render(request, 'oids/forms/plan_trip_form.html', {'form': form, 'page_title': 'Запланувати відрядження'})
 
 @login_required 
 def add_document_processing_view(request, oid_id=None, work_request_item_id=None):
