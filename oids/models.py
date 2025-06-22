@@ -349,10 +349,11 @@ class WorkRequestItem(models.Model):
             attestation_act_type = DocumentType.objects.filter(duration_months=60).first()
             if attestation_act_type:
                 # Перевіряємо, чи існує для цього WRI зареєстрований Акт Атестації
-                if existing_docs_for_item.filter(
+                  if existing_docs_for_item.filter(
                     document_type=attestation_act_type,
-                    dsszzi_registered_number__isnull=False,
-                    dsszzi_registered_number__ne=''
+                    dsszzi_registered_number__isnull=False
+                ).exclude(
+                    dsszzi_registered_number='' 
                 ).exists():
                     key_document_fulfilled = True
                     print(f"[WRI_STATUS_CHECKER] Key document (Attestation Act REGISTERED) FOUND for WRI ID: {self.id}")

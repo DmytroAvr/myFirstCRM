@@ -92,6 +92,7 @@
         </div>
     </div>
 
+	{# oids/templates/oids/processing_control_dashboard.html #}
     {# --- Блок 2: Опрацювання документів з відрядження --- #}
     <div class="card">
         <div class="card-header">
@@ -100,23 +101,51 @@
         <div class="card-body">
             <form method="GET" class="mb-3 p-3 border bg-light rounded" id="wriFilterForm">
                 {% for key, value in request.GET.items %}
-                    {% if key != wri_filter_form.prefix|add:"-unit" and key != wri_filter_form.prefix|add:"-oid" and key != wri_filter_form.prefix|add:"-status" and key != wri_filter_form.prefix|add:"-processed" and key != wri_filter_form.prefix|add:"-deadline_from" and key != wri_filter_form.prefix|add:"-deadline_to" and key != "wri_page" and key != "wri_sort_by" and key != "wri_sort_order" %}
-                        <input type="hidden" name="{{ key }}" value="{{ value }}">
+{% if key != wri_filter_form.prefix|add:"-unit" and key != wri_filter_form.prefix|add:"-oid" and key != wri_filter_form.prefix|add:"-status" and key != wri_filter_form.prefix|add:"-processed" and key != wri_filter_form.prefix|add:"-deadline_from" and key != wri_filter_form.prefix|add:"-deadline_to" and key != wri_filter_form.prefix|add:"-trip_date_from" and key != wri_filter_form.prefix|add:"-trip_date_to" and key != "wri_page" and key != "wri_sort_by" and key != "wri_sort_order" %}                        <input type="hidden" name="{{ key }}" value="{{ value }}">
                     {% endif %}
                 {% endfor %}
-                <div class="row g-2 align-items-start">
-                    <div class="col-md-3">{{ wri_filter_form.unit.label_tag }} {{ wri_filter_form.unit }}</div>
-                    <div class="col-md-3">{{ wri_filter_form.oid.label_tag }} {{ wri_filter_form.oid }}</div>
-                    <div class="col-md-3">{{ wri_filter_form.status.label_tag }} {{ wri_filter_form.status }}</div>
-                    <div class="col-md-3">{{ wri_filter_form.processed.label_tag }} {{ wri_filter_form.processed }}</div>
-                </div>
-                <div class="row g-2 mt-1 align-items-end">
-                    <div class="col-md-3">{{ wri_filter_form.deadline_from.label_tag }} {{ wri_filter_form.deadline_from }}</div>
-                    <div class="col-md-3">{{ wri_filter_form.deadline_to.label_tag }} {{ wri_filter_form.deadline_to }}</div>
-                    <div class="col-md-3 d-flex align-items-end">
-                        <button type="submit" class="btn btn-primary btn-sm w-100">Фільтр Заявок</button>
-                    </div>
-                </div>
+               <div class="row g-2 align-items-end">
+    <div class="col-md-3">
+        {{ wri_filter_form.unit.label_tag }}
+        {{ wri_filter_form.unit }}
+    </div>
+    <div class="col-md-3">
+        {{ wri_filter_form.oid.label_tag }}
+        {{ wri_filter_form.oid }}
+    </div>
+    <div class="col-md-3">
+        {{ wri_filter_form.status.label_tag }}
+        {{ wri_filter_form.status }}
+    </div>
+    <div class="col-md-3">
+        {{ wri_filter_form.processed.label_tag }}
+        {{ wri_filter_form.processed }}
+    </div>
+</div>
+<div class="row g-2 mt-2 align-items-end">
+    <div class="col-md-2">
+        {{ wri_filter_form.deadline_from.label_tag }}
+        {{ wri_filter_form.deadline_from }}
+    </div>
+    <div class="col-md-2">
+        {{ wri_filter_form.deadline_to.label_tag }}
+        {{ wri_filter_form.deadline_to }}
+    </div>
+    <div class="col-md-2">
+        {{ wri_filter_form.trip_date_from.label_tag }}
+        {{ wri_filter_form.trip_date_from }}
+    </div>
+    <div class="col-md-2">
+        {{ wri_filter_form.trip_date_to.label_tag }}
+        {{ wri_filter_form.trip_date_to }}
+    </div>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-primary btn-sm w-100">Фільтр Заявок</button>
+    </div>
+    <div class="col-md-2">
+         <a href="{% url 'oids:processing_control_dashboard' %}" class="btn btn-outline-secondary btn-sm w-100">Скинути</a>
+    </div>
+</div>
             </form>
 
             {% if work_request_items.object_list %}
@@ -202,123 +231,84 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     console.log("ProcessingControl JS: DOMContentLoaded.");
-    if (typeof TomSelect === 'undefined') { console.error("ProcessingControl JS: TomSelect not loaded!"); return; }
+    if (typeof TomSelect === 'undefined') {
+        console.error("ProcessingControl JS: TomSelect not loaded!");
+        return;
+    }
 
-    const oidsForUnitUrl = "{% url 'oids:ajax_load_oids_for_unit' %}"; 
+    const oidsForUnitUrl = "{% url 'oids:ajax_load_oids_for_unit' %}";
 
-    function initFilterTomSelect(element, placeholder, onInitCallback) {
-        if (!element) {
-            console.warn("TomSelect init: Element not found for placeholder:", placeholder);
-            return null;
+    /**
+     * Універсальна функція для налаштування каскадних випадаючих списків ВЧ -> ОІД.
+     * @param {string} unitElementId - ID select-елемента для Військової частини.
+     * @param {string} oidElementId - ID select-елемента для ОІД.
+     */
+    function setupOidFilterCascade(unitElementId, oidElementId) {
+        const unitElement = document.getElementById(unitElementId);
+        const oidElement = document.getElementById(oidElementId);
+
+        if (!unitElement || !oidElement) {
+            console.warn(`Cascade setup failed: could not find elements for #${unitElementId} or #${oidElementId}`);
+            return;
         }
-        let htmlOpts = [];
-        Array.from(element.options).forEach(opt => {if(opt.value) htmlOpts.push({id: opt.value, text: opt.text, selected: opt.selected});});
-        
-        const config = {
-            create: false, placeholder: placeholder, allowEmptyOption: true,
-            options: htmlOpts, // Використовуємо опції з HTML
-            valueField: 'id', labelField: 'text', searchField: ['text']
+
+        // --- Ініціалізуємо TomSelect для ОІДів (спочатку він неактивний) ---
+        const tsOid = new TomSelect(oidElement, {
+            create: false,
+            placeholder: 'Спочатку оберіть ВЧ...',
+            valueField: 'id',
+            labelField: 'text',
+            searchField: ['text']
+        });
+        tsOid.disable();
+
+        // --- Логіка, яка виконується при зміні ВЧ ---
+        const handleUnitChange = (unitId) => {
+            console.log(`Unit changed for ${unitElementId}. New value: ${unitId}`);
+            tsOid.clear();
+            tsOid.clearOptions();
+            tsOid.disable(); // Завжди вимикаємо перед завантаженням
+
+            if (unitId && unitId !== '') {
+                tsOid.load(function(callback) {
+                    tsOid.clearOptions(); // Очищуємо перед завантаженням
+                    fetch(`${oidsForUnitUrl}?unit_id=${unitId}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            const options = data.map(oid => ({ id: oid.id.toString(), text: `${oid.cipher} (${oid.full_name || ''})` }));
+                            callback(options);
+                            tsOid.enable(); // Вмикаємо тільки після успішного завантаження
+                            console.log(`Loaded ${options.length} OIDs for unit ${unitId}`);
+                        }).catch(() => {
+                            callback([]);
+                            tsOid.enable();
+                            console.error(`Failed to load OIDs for unit ${unitId}`);
+                        });
+                });
+            }
         };
-        const instance = new TomSelect(element, config);
-        console.log(`TomSelect init for #${element.id}. HTML Opts: ${htmlOpts.length}, TS DOM Opts: ${instance.dropdown_content.querySelectorAll('.option').length}`);
-        if (instance.dropdown_content.querySelectorAll('.option').length === 0 && htmlOpts.length > 0) {
-            instance.addOptions(htmlOpts); instance.refreshOptions(false);
-            htmlOpts.forEach(opt => { if(opt.selected) instance.addItem(opt.id, true);});
+
+        // --- Ініціалізуємо TomSelect для ВЧ і прив'язуємо логіку ---
+        const tsUnit = new TomSelect(unitElement, {
+            create: false,
+            placeholder: 'Всі ВЧ',
+            allowEmptyOption: true
+        });
+        tsUnit.on('change', handleUnitChange);
+
+        // --- Перевірка початкового значення при завантаженні сторінки ---
+        const initialUnitId = unitElement.value;
+        if (initialUnitId) {
+            console.log(`Initial value for ${unitElementId} is ${initialUnitId}. Triggering initial load.`);
+            handleUnitChange(initialUnitId);
         }
-        if (typeof onInitCallback === 'function') {
-            onInitCallback(instance); // Колбек після ініціалізації
-        }
-        return instance;
     }
 
-    // Фільтр для Технічних Завдань
-    const ttUnitFilterElement = document.getElementById('id_tt-unit'); // ID з форми tt_filter_form
-    const ttOidFilterElement = document.getElementById('id_tt-oid');
+    // Запускаємо налаштування для першого блоку фільтрів (Тех. Завдання)
+	setupOidFilterCascade('id_tt_filter_unit', 'id_tt_filter_oid');
 
-    let tsTtUnit = ttUnitFilterElement ? initFilterTomSelect(ttUnitFilterElement, 'Всі ВЧ') : null;
-    let tsTtOid = ttOidFilterElement ? initFilterTomSelect(ttOidFilterElement, 'Всі ОІДи (оберіть ВЧ)', true) : null; // true - disabled
-	// let tsTtOid = ttOidFilterElement ? initFilterTomSelect(ttOidFilterElement, 'Всі ОІДи (оберіть ВЧ)', !ttUnitFilterElement?.value) : null; 
-    if (tsTtUnit && tsTtOid) {
-        tsTtUnit.on('change', function(unitId){
-            console.log("TT Filter: Unit changed to:", unitId);
-            tsTtOid.clear(); tsTtOid.clearOptions(); tsTtOid.sync();
-            if (unitId && unitId !== "") {
-                tsTtOid.enable(); tsTtOid.placeholder = 'Завантаження ОІДів...';
-                fetch(`${oidsForUnitUrl}?unit_id=${unitId}`)
-                    .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t);}))
-                    .then(data => {
-                        const options = data.map(oid => ({id: oid.id.toString(), text: `${oid.cipher} (${oid.full_name || ''})`}));
-                        tsTtOid.addOptions(options); tsTtOid.refreshOptions(false);
-                        tsTtOid.placeholder = options.length ? 'Всі ОІДи для ВЧ' : 'Немає ОІДів';
-                    }).catch(e => { tsTtOid.placeholder = 'Помилка ОІД'; });
-            } else {
-                tsTtOid.disable(); tsTtOid.placeholder = 'Всі ОІДи (оберіть ВЧ)';
-            }
-        });
-        if (tsTtUnit.getValue()) tsTtUnit.trigger('change');
-    }
-
-    // Фільтр для Елементів Заявок
-    const wriUnitFilterElement = document.getElementById('id_wri-unit'); // ID з форми wri_filter_form
-    const wriOidFilterElement = document.getElementById('id_wri-oid');
-
-    let tsWriUnit = wriUnitFilterElement ? initFilterTomSelect(wriUnitFilterElement, 'Всі ВЧ') : null;
-
-	// let tsWriOid = wriOidFilterElement ? initFilterTomSelect(wriOidFilterElement, 'Всі ОІДи (оберіть ВЧ)', true) : null; // true - disabled
-    let tsWriOid = wriOidFilterElement ? initFilterTomSelect(wriOidFilterElement, 'Всі ОІДи (оберіть ВЧ)', !wriUnitFilterElement?.value) : null;
-
-    if (tsWriUnit && tsWriOid) {
-		tsWriUnit.on('change', function(unitId){
-			console.log("WRI Filter: Unit changed to:", unitId);
-            tsWriOid.clear(); tsWriOid.clearOptions(); tsWriOid.sync();
-            if (unitId && unitId !== "") {
-				tsWriOid.enable(); tsWriOid.placeholder = 'Завантаження ОІДів...';
-                fetch(`${oidsForUnitUrl}?unit_id=${unitId}`)
-				.then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t);}))
-                    .then(data => {
-                        const options = data.map(oid => ({id: oid.id.toString(), text: `${oid.cipher} (${oid.full_name || ''})`}));
-                        tsWriOid.addOptions(options); tsWriOid.refreshOptions(false);
-                        tsWriOid.placeholder = options.length ? 'Всі ОІДи для ВЧ' : 'Немає ОІДів';
-                    }).catch(e => { tsWriOid.placeholder = 'Помилка ОІД'; });
-            } else {
-                tsWriOid.disable(); tsWriOid.placeholder = 'Всі ОІДи (оберіть ВЧ)';
-            }
-        });
-        if (tsWriUnit.getValue()) tsWriUnit.trigger('change');
-    }
-	
-	function setupOidFilterCascade(unitSelectInstance, oidTomSelectInstance) {
-		if (!unitSelectInstance || !oidTomSelectInstance) return;
-        
-        unitSelectInstance.on('change', function(unitId){
-            oidTomSelectInstance.clear(); oidTomSelectInstance.clearOptions(); oidTomSelectInstance.sync();
-            if (unitId && unitId !== "") {
-                oidTomSelectInstance.enable(); oidTomSelectInstance.placeholder = 'Завантаження ОІДів...';
-                fetch(`${oidsForUnitUrl}?unit_id=${unitId}`)
-                    .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t);}))
-                    .then(data => {
-                        const options = data.map(oid => ({id: oid.id.toString(), text: `${oid.cipher} (${oid.full_name || ''})`}));
-                        oidTomSelectInstance.addOptions(options); oidTomSelectInstance.refreshOptions(false);
-                        oidTomSelectInstance.placeholder = options.length ? 'Всі ОІДи для ВЧ' : 'Немає ОІДів';
-                    }).catch(e => { oidTomSelectInstance.placeholder = 'Помилка ОІД'; });
-            } else {
-                oidTomSelectInstance.disable(); oidTomSelectInstance.placeholder = 'Всі ОІДи (оберіть ВЧ)';
-            }
-        });
-        if (unitSelectInstance.getValue()) unitSelectInstance.trigger('change');
-    }
-	if (tsTtUnit && tsTtOid) setupOidFilterCascade(tsTtUnit, tsTtOid);
-    if (tsWriUnit && tsWriOid) setupOidFilterCascade(tsWriUnit, tsWriOid);
+    // Запускаємо налаштування для другого блоку фільтрів (Заявки)
+    setupOidFilterCascade('id_wri_filter_unit', 'id_wri_filter_oid');
 });
 </script>
 {% endblock %}
-
-<!-- 
-Що потрібно буде доопрацювати:
-
-Пагінація для двох таблиць: Переконайтеся, що ваш pagination.html може коректно працювати з параметрами param_prefix та current_filters, щоб посилання пагінації для однієї таблиці не скидали фільтри/сторінку іншої. Можливо, доведеться генерувати URL для пагінації більш явно в JS або модифікувати логіку pagination.html.
-Сортування: Аналогічно до попередніх сторінок, можна додати сортування для стовпців обох таблиць.
-AJAX для фільтрів (опціонально): Замість перезавантаження всієї сторінки при застосуванні фільтрів, можна оновити тільки відповідну таблицю через AJAX.
-Виділення протермінованих завдань: Передайте today_date = datetime.date.today() у контекст з view, щоб працювало підсвічування.
-Це основа для вашої сторінки контролю. Почніть з цього, протестуйте фільтрацію та пагінацію. 
--->

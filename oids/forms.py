@@ -1006,6 +1006,16 @@ class WorkRequestItemProcessingFilterForm(forms.Form):
         required=False, label="Статус ел. заявки",
         widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
     )
+    trip_date_from = forms.DateField(
+        label="Дата відрядження (з)",
+        required=False,
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-sm'})
+    )
+    trip_date_to = forms.DateField(
+        label="Дата відрядження (по)",
+        required=False,
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-sm'})
+    )
     deadline_from = forms.DateField(required=False, widget=forms.DateInput(attrs={'type':'date', 'class':'form-control form-control-sm'}), label="Дедлайн з")
     deadline_to = forms.DateField(required=False, widget=forms.DateInput(attrs={'type':'date', 'class':'form-control form-control-sm'}), label="Дедлайн по")
     processed = forms.ChoiceField(

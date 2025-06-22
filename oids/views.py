@@ -2323,6 +2323,14 @@ def processing_control_view(request):
         if wri_filter_form.cleaned_data.get('deadline_to'):
             wri_queryset = wri_queryset.filter(doc_processing_deadline__lte=wri_filter_form.cleaned_data['deadline_to'])
         
+        trip_date_from = wri_filter_form.cleaned_data.get('trip_date_from') 
+        if trip_date_from:
+            wri_queryset = wri_queryset.filter(deadline_trigger_trip__end_date__gte=trip_date_from) # Знайти завдання, чиє відрядження закінчилось не раніше цієї дати
+            
+        trip_date_to = wri_filter_form.cleaned_data.get('trip_date_to')
+        if trip_date_to:
+            wri_queryset = wri_queryset.filter(deadline_trigger_trip__start_date__lte=trip_date_to) # Знайти завдання, чиє відрядження почалось не пізніше цієї дати
+
         # Переносимо цю логіку ВСЕРЕДИНУ if wri_filter_form.is_valid():
         processed_filter = wri_filter_form.cleaned_data.get('processed')
         if processed_filter == 'yes':
