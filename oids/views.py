@@ -215,7 +215,8 @@ def ajax_load_oids_for_multiple_units(request):
                     'cipher': oid.cipher, 
                     'full_name': oid.full_name or "",
                     'unit_code': oid.unit.code, # Додаємо код ВЧ для кращого відображення
-                    'unit_city': oid.unit.city  # Також місто ВЧ
+                    'unit_city': oid.unit.city,
+					'oid_type_display': oid.get_oid_type_display()
                 })
         except ValueError:
             return JsonResponse({'error': 'Невірні ID військових частин'}, status=400)
@@ -2239,10 +2240,15 @@ def processing_control_view(request):
 
     tt_filter_form = TechnicalTaskFilterForm(request.GET or None, prefix="tt")
     if tt_filter_form.is_valid():
-        if tt_filter_form.cleaned_data.get('unit'):
-            tt_queryset = tt_queryset.filter(oid__unit=tt_filter_form.cleaned_data['unit'])
-        if tt_filter_form.cleaned_data.get('oid'):
-            tt_queryset = tt_queryset.filter(oid=tt_filter_form.cleaned_data['oid'])
+        if tt_filter_form.cleaned_data.get('unit'): # Використовуємо __in для списку значень
+            tt_queryset = tt_queryset.filter(oid__unit__in=tt_filter_form.cleaned_data['unit'])
+        if tt_filter_form.cleaned_data.get('oid'): # Використовуємо __in для списку значень
+            tt_queryset = tt_queryset.filter(oid__in=tt_filter_form.cleaned_data['oid'])
+
+        # if tt_filter_form.cleaned_data.get('unit'):
+        #     tt_queryset = tt_queryset.filter(oid__unit=tt_filter_form.cleaned_data['unit'])
+        # if tt_filter_form.cleaned_data.get('oid'):
+        #     tt_queryset = tt_queryset.filter(oid=tt_filter_form.cleaned_data['oid'])
         if tt_filter_form.cleaned_data.get('review_result'):
             tt_queryset = tt_queryset.filter(review_result=tt_filter_form.cleaned_data['review_result'])
     
@@ -2308,14 +2314,24 @@ def processing_control_view(request):
     ).distinct()
     
     wri_filter_form = WorkRequestItemProcessingFilterForm(request.GET or None, prefix="wri")
-    if wri_filter_form.is_valid(): # <--- ПОЧАТОК БЛОКУ is_valid()
+    if wri_filter_form.is_valid():
         if wri_filter_form.cleaned_data.get('unit'):
             wri_queryset = wri_queryset.filter(
-                Q(request__unit=wri_filter_form.cleaned_data['unit']) | 
-                Q(oid__unit=wri_filter_form.cleaned_data['unit']) # Додано фільтр по ВЧ самого ОІДа теж
-            ).distinct()
+				# Використовуємо __in для списку значень
+				Q(request__unit__in=wri_filter_form.cleaned_data['unit']) | 
+				Q(oid__unit__in=wri_filter_form.cleaned_data['unit'])
+			).distinct()
         if wri_filter_form.cleaned_data.get('oid'):
-            wri_queryset = wri_queryset.filter(oid=wri_filter_form.cleaned_data['oid'])
+            wri_queryset = wri_queryset.filter(oid__in=wri_filter_form.cleaned_data['oid'])
+            
+        # if wri_filter_form.cleaned_data.get('unit'):
+        #     wri_queryset = wri_queryset.filter(
+        #         Q(request__unit=wri_filter_form.cleaned_data['unit']) | 
+        #         Q(oid__unit=wri_filter_form.cleaned_data['unit']) # Додано фільтр по ВЧ самого ОІДа теж
+        #     ).distinct()
+        # if wri_filter_form.cleaned_data.get('oid'):
+        #     wri_queryset = wri_queryset.filter(oid=wri_filter_form.cleaned_data['oid'])
+        
         if wri_filter_form.cleaned_data.get('status'):
             wri_queryset = wri_queryset.filter(status=wri_filter_form.cleaned_data['status'])
         if wri_filter_form.cleaned_data.get('deadline_from'):

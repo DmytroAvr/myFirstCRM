@@ -230,85 +230,96 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("ProcessingControl JS: DOMContentLoaded.");
+    console.log("--- DOMContentLoaded: Initializing dashboard scripts ---");
+
     if (typeof TomSelect === 'undefined') {
-        console.error("ProcessingControl JS: TomSelect not loaded!");
+        console.error("CRITICAL: TomSelect library is not loaded!");
         return;
     }
 
-    const oidsForUnitUrl = "{% url 'oids:ajax_load_oids_for_unit' %}";
+    const oidsForUnitsUrl = "{% url 'oids:ajax_load_oids_for_multiple_units' %}";
 
-    /**
-     * Універсальна функція для налаштування каскадних випадаючих списків ВЧ -> ОІД.
-     * @param {string} unitElementId - ID select-елемента для Військової частини.
-     * @param {string} oidElementId - ID select-елемента для ОІД.
-     */
-    function setupOidFilterCascade(unitElementId, oidElementId) {
+    function setupCascade(unitElementId, oidElementId) {
         const unitElement = document.getElementById(unitElementId);
         const oidElement = document.getElementById(oidElementId);
 
         if (!unitElement || !oidElement) {
-            console.warn(`Cascade setup failed: could not find elements for #${unitElementId} or #${oidElementId}`);
+            console.error(`Setup failed: Elements not found for #${unitElementId} or #${oidElementId}`);
             return;
         }
 
-        // --- Ініціалізуємо TomSelect для ОІДів (спочатку він неактивний) ---
         const tsOid = new TomSelect(oidElement, {
-            create: false,
             placeholder: 'Спочатку оберіть ВЧ...',
             valueField: 'id',
             labelField: 'text',
-            searchField: ['text']
+            searchField: ['text'],
         });
-        tsOid.disable();
 
-        // --- Логіка, яка виконується при зміні ВЧ ---
-        const handleUnitChange = (unitId) => {
-            console.log(`Unit changed for ${unitElementId}. New value: ${unitId}`);
+        const tsUnit = new TomSelect(unitElement, {
+            placeholder: 'Оберіть одну або декілька ВЧ...'
+        });
+
+        // Функція для завантаження ОІДів
+        const loadOidsForUnits = (selectedUnitIds) => {
+            console.log(`[${unitElementId}] Unit selection changed. Selected IDs:`, selectedUnitIds);
+            
             tsOid.clear();
             tsOid.clearOptions();
-            tsOid.disable(); // Завжди вимикаємо перед завантаженням
+            tsOid.disable();
 
-            if (unitId && unitId !== '') {
-                tsOid.load(function(callback) {
-                    tsOid.clearOptions(); // Очищуємо перед завантаженням
-                    fetch(`${oidsForUnitUrl}?unit_id=${unitId}`)
-                        .then(response => response.json())
-                        .then(data => {
-                            const options = data.map(oid => ({ id: oid.id.toString(), text: `${oid.cipher} (${oid.full_name || ''})` }));
-                            callback(options);
-                            tsOid.enable(); // Вмикаємо тільки після успішного завантаження
-                            console.log(`Loaded ${options.length} OIDs for unit ${unitId}`);
-                        }).catch(() => {
-                            callback([]);
-                            tsOid.enable();
-                            console.error(`Failed to load OIDs for unit ${unitId}`);
-                        });
-                });
+            if (!selectedUnitIds || selectedUnitIds.length === 0) {
+                console.log(`[${unitElementId}] No units selected. OID field remains disabled.`);
+                return;
             }
+
+            const params = new URLSearchParams();
+            selectedUnitIds.forEach(id => params.append('unit_ids[]', id));
+            const fetchUrl = `${oidsForUnitsUrl}?${params.toString()}`;
+
+            console.log(`[${unitElementId}] Fetching OIDs from:`, fetchUrl);
+
+            fetch(fetchUrl)
+                .then(response => {
+                    if (!response.ok) { throw new Error('Network response was not ok'); }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log(`[${unitElementId}] Received ${data.length} OIDs.`, data);
+                    // --- ПОЧАТОК ВИПРАВЛЕННЯ ---
+                    // Перетворюємо отримані дані у формат, зрозумілий для TomSelect.
+                    // Кожен елемент тепер буде мати 'id' та 'text'.
+                    const options = data.map(oid => ({
+                        id: oid.id.toString(),
+                        text: `${oid.cipher} (${oid.oid_type_display})`
+                    }));
+                    // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
+					tsOid.addOptions(options);
+                    tsOid.enable();         // Вручну вмикаємо поле
+                    console.log(`[${unitElementId}] OID field is now enabled.`);
+                })
+                .catch(error => {
+                    console.error(`[${unitElementId}] Failed to load OIDs:`, error);
+                    tsOid.enable(); // Все одно вмикаємо поле, щоб користувач не застряг
+                });
         };
 
-        // --- Ініціалізуємо TomSelect для ВЧ і прив'язуємо логіку ---
-        const tsUnit = new TomSelect(unitElement, {
-            create: false,
-            placeholder: 'Всі ВЧ',
-            allowEmptyOption: true
-        });
-        tsUnit.on('change', handleUnitChange);
+        // Прив'язуємо обробник події
+        tsUnit.on('change', loadOidsForUnits);
 
-        // --- Перевірка початкового значення при завантаженні сторінки ---
-        const initialUnitId = unitElement.value;
-        if (initialUnitId) {
-            console.log(`Initial value for ${unitElementId} is ${initialUnitId}. Triggering initial load.`);
-            handleUnitChange(initialUnitId);
+        // Початкове завантаження, якщо ВЧ вже обрані
+        if (tsUnit.items && tsUnit.items.length > 0) {
+            console.log(`[${unitElementId}] Initial units selected:`, tsUnit.items);
+            loadOidsForUnits(tsUnit.items);
+        } else {
+             tsOid.disable();
         }
     }
 
-    // Запускаємо налаштування для першого блоку фільтрів (Тех. Завдання)
-	setupOidFilterCascade('id_tt_filter_unit', 'id_tt_filter_oid');
+    // Запускаємо налаштування для обох блоків
+    setupCascade('id_tt_filter_unit', 'id_tt_filter_oid');
+    setupCascade('id_wri_filter_unit', 'id_wri_filter_oid');
 
-    // Запускаємо налаштування для другого блоку фільтрів (Заявки)
-    setupOidFilterCascade('id_wri_filter_unit', 'id_wri_filter_oid');
+    console.log("--- Dashboard scripts initialization complete ---");
 });
 </script>
 {% endblock %}

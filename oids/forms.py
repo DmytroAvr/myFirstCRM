@@ -960,134 +960,64 @@ class TechnicalTaskProcessForm(forms.ModelForm):
         # self.fields['technical_task_to_process'].queryset = ...
         
 class TechnicalTaskFilterForm(forms.Form):
-    unit = forms.ModelChoiceField(
+    unit = forms.ModelMultipleChoiceField( 
         queryset=Unit.objects.all().order_by('code'),
-        required=False, label="Військова частина",
-        widget=forms.Select(attrs={'class': 'form-select form-select-sm tomselect-field', 'id': 'id_tt_filter_unit'}), # Додав ID
-        empty_label="Всі ВЧ"
+        required=False,
+        label="Військові частини",
+        widget=forms.SelectMultiple(attrs={'id': 'id_tt_filter_unit', 'class': ' tomselect-field'}) 
+        # auto-submit-filter
+
     )
-    oid = forms.ModelChoiceField(
-        queryset=OID.objects.none(), required=False, label="ОІД",
-        widget=forms.Select(attrs={'class': 'form-select form-select-sm tomselect-field', 'id': 'id_tt_filter_oid'}), # Додав ID
-        empty_label="Всі ОІДи (оберіть ВЧ)"
+    oid = forms.ModelMultipleChoiceField(  
+        queryset=OID.objects.none(),  
+        required=False,
+        label="ОІДи",
+        widget=forms.SelectMultiple(attrs={'id': 'id_tt_filter_oid', 'class': ' tomselect-field'}) 
     )
     review_result = forms.ChoiceField(
         choices=[('', 'Всі статуси')] + DocumentReviewResultChoices.choices, # Додав порожній вибір на початок
         required=False, label="Статус ТЗ",
         widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
     )
-    def __init__(self, *args, **kwargs): # Логіка для оновлення queryset OID
-        super().__init__(*args, **kwargs)
-        unit_field_name = self.add_prefix('unit') if self.prefix else 'unit'
-        unit_id = None
-        if self.is_bound and unit_field_name in self.data and self.data.get(unit_field_name):
-            try: unit_id = int(self.data.get(unit_field_name))
-            except (ValueError, TypeError): pass
-        elif self.initial.get('unit'):
-            try: unit_id = int(self.initial.get('unit'))
-            except (ValueError, TypeError): pass
-        if unit_id: self.fields['oid'].queryset = OID.objects.filter(unit_id=unit_id).order_by('cipher')
+   
 
 
 class WorkRequestItemProcessingFilterForm(forms.Form):
-    unit = forms.ModelChoiceField(
+    unit = forms.ModelMultipleChoiceField(  
         queryset=Unit.objects.all().order_by('code'),
-        required=False, label="Військова частина",
-        widget=forms.Select(attrs={'class': 'form-select form-select-sm tomselect-field', 'id': 'id_wri_filter_unit'}), # Додав ID
-        empty_label="Всі ВЧ"
+        required=False,
+        label="Військові частини",
+        widget=forms.SelectMultiple(attrs={'id': 'id_wri_filter_unit', 'class': ' tomselect-field'})  
     )
-    oid = forms.ModelChoiceField(
-        queryset=OID.objects.none(), required=False, label="ОІД",
-        widget=forms.Select(attrs={'class': 'form-select form-select-sm tomselect-field', 'id': 'id_wri_filter_oid'}), # Додав ID
-        empty_label="Всі ОІДи (оберіть ВЧ)"
+    oid = forms.ModelMultipleChoiceField(   
+        queryset=OID.objects.none(), # Залишаємо порожнім, JS заповнить
+        required=False,
+        label="ОІДи",
+        widget=forms.SelectMultiple(attrs={'id': 'id_wri_filter_oid', 'class': ' tomselect-field'})  
     )
     status = forms.ChoiceField(
         choices=[('', 'Всі статуси')] + WorkRequestStatusChoices.choices, # Додав порожній вибір
         required=False, label="Статус ел. заявки",
-        widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm  '})
     )
     trip_date_from = forms.DateField(
         label="Дата відрядження (з)",
         required=False,
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-sm'})
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-sm '})
     )
     trip_date_to = forms.DateField(
         label="Дата відрядження (по)",
         required=False,
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-sm'})
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-sm '})
     )
-    deadline_from = forms.DateField(required=False, widget=forms.DateInput(attrs={'type':'date', 'class':'form-control form-control-sm'}), label="Дедлайн з")
-    deadline_to = forms.DateField(required=False, widget=forms.DateInput(attrs={'type':'date', 'class':'form-control form-control-sm'}), label="Дедлайн по")
+    deadline_from = forms.DateField(required=False, widget=forms.DateInput(attrs={'type':'date', 'class':'form-control form-control-sm '}), label="Дедлайн з")
+    deadline_to = forms.DateField(required=False, widget=forms.DateInput(attrs={'type':'date', 'class':'form-control form-control-sm '}), label="Дедлайн по")
     processed = forms.ChoiceField(
 		choices=[('', 'Всі'), ('yes', 'Опрацьовано'), ('no', 'Не опрацьовано')],
 		required=False,
 		label="Стан факт. опрацювання",
-		widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
+		widget=forms.Select(attrs={'class': 'form-select form-select-sm '})
 	)
-    # def __init__(self, *args, **kwargs): # Логіка для оновлення queryset OID
-    #     super().__init__(*args, **kwargs)
-    #     unit_field_name = self.add_prefix('unit') if self.prefix else 'unit'
-    #     unit_id = None
-    #     if self.is_bound and unit_field_name in self.data and self.data.get(unit_field_name):
-    #         try: unit_id = int(self.data.get(unit_field_name))
-    #         except (ValueError, TypeError): pass
-    #     elif self.initial.get('unit'):
-    #         try: unit_id = int(self.initial.get('unit'))
-    #         except (ValueError, TypeError): pass
-    #     if unit_id: self.fields['oid'].queryset = OID.objects.filter(unit_id=unit_id).order_by('cipher')
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if 'unit' in self.data and self.data.get('unit'):
-            try:
-                unit_id = int(self.data.get('unit'))
-                self.fields['oid'].queryset = OID.objects.filter(unit_id=unit_id).order_by('cipher')
-            except (ValueError, TypeError):
-                pass
-        elif self.initial.get('unit'):
-            try:
-                unit_id = int(self.initial.get('unit'))
-                self.fields['oid'].queryset = OID.objects.filter(unit_id=unit_id).order_by('cipher')
-            except (ValueError, TypeError):
-                 pass
-
-    # unit = forms.ModelChoiceField(
-    #     queryset=Unit.objects.all().order_by('code'),
-    #     required=False,
-    #     label="Військова частина",
-    #     widget=forms.Select(attrs={'class': 'form-select form-select-sm tomselect-field'}),
-    #     empty_label="Всі ВЧ"
-    # )
-    # oid = forms.ModelChoiceField( # Буде заповнюватися динамічно
-    #     queryset=OID.objects.none(),
-    #     required=False,
-    #     label="ОІД",
-    #     widget=forms.Select(attrs={'class': 'form-select form-select-sm tomselect-field'}),
-    #     empty_label="Всі ОІДи"
-    # )
-    # status = forms.ChoiceField( # Статус WorkRequestItem
-    #     choices=[('', 'Всі статуси')] + WorkRequestStatusChoices.choices,
-    #     required=False,
-    #     label="Статус опрацювання елемента заявки",
-    #     widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
-    # )
-    # # Можна додати фільтри по датах (doc_processing_deadline, docs_actually_processed_on)
-    # deadline_from = forms.DateField(
-    #     required=False, 
-    #     widget=forms.DateInput(attrs={'type':'date', 'class':'form-control form-control-sm'}),
-    #     label="Дедлайн з"
-    # )
-    # deadline_to = forms.DateField(
-    #     required=False, 
-    #     widget=forms.DateInput(attrs={'type':'date', 'class':'form-control form-control-sm'}),
-    #     label="Дедлайн по"
-    # )
-    
-    # processed = forms.ChoiceField(
-    #     choices=[('', 'Всі'), ('yes', 'Опрацьовано'), ('no', 'Не опрацьовано')],
-    #     required=False,
-    #     label="Стан опрацювання",
-    #     widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
-    # )
 
 class OIDCreateForm(forms.ModelForm):
     # Додаємо поле `unit` для вибору ВЧ, оскільки воно є ForeignKey у моделі OID
