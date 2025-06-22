@@ -263,6 +263,10 @@ class WorkRequest(models.Model):
         
         # Форматуємо рядок у бажаному вигляді
         return f"Заявка №{number_str} від {date_str} (ВЧ: {unit_code}, Статус: {status_str})"
+						# раніше форматував вигляд тут
+						# def ajax_load_work_requests_for_oids(request): 
+    					# 'text': f"заявка вх.№ {wr.incoming_number} від {wr.incoming_date.strftime('%d.%m.%Y')} (ВЧ: {wr.unit.code}) - {wr.get_status_display()}"
+
     
 class WorkRequestItem(models.Model):
     """
