@@ -2408,9 +2408,10 @@ def processing_control_view(request):
     ).order_by('-process_date').values('process_date')[:1]
 
     wri_queryset = WorkRequestItem.objects.filter(
-        request__trips__isnull=False 
+        # request__trips__isnull=False 
+        deadline_trigger_trip__isnull=False # відбирає тільки ті WorkRequestItem, у яких поле deadline_trigger_trip не є порожнім.
     ).exclude(
-        status=WorkRequestStatusChoices.CANCELED
+        # status=WorkRequestStatusChoices.CANCELED
     ).select_related(
         'request__unit', 
         'oid__unit',
