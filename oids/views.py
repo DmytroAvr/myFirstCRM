@@ -345,7 +345,8 @@ def ajax_load_work_requests_for_oids(request):
             for wr in relevant_requests:
                 work_requests_data.append({
                     'id': wr.id,
-                    'text': f"заявка вх.№ {wr.incoming_number} від {wr.incoming_date.strftime('%d.%m.%Y')} (ВЧ: {wr.unit.code}) - {wr.get_status_display()}"
+                    'text': str(wr)
+					# 'text': f"заявка вх.№ {wr.incoming_number} від {wr.incoming_date.strftime('%d.%m.%Y')} (ВЧ: {wr.unit.code}) - {wr.get_status_display()}"
                 })
         except Exception as e:
             # Обробка можливих помилок, наприклад, якщо OID.DoesNotExist (малоймовірно при filter id__in)
@@ -751,101 +752,6 @@ def oid_create_view(request):
     }
     return render(request, 'oids/forms/oid_create_form.html', context)
 
-@login_required 
-def add_document_processing_view(request, oid_id=None, work_request_item_id=None):
-    initial_data = {}
-    selected_oid = None
-    
-    if oid_id:
-        selected_oid = get_object_or_404(OID, pk=oid_id)
-        initial_data['oid'] = selected_oid
-    
-    if work_request_item_id:
-        work_request_item_instance = get_object_or_404(WorkRequestItem, pk=work_request_item_id)
-        initial_data['work_request_item'] = work_request_item_instance
-        if not selected_oid: # Якщо OID не передано, беремо з WorkRequestItem
-            selected_oid = work_request_item_instance.oid
-            initial_data['oid'] = selected_oid
-
-    if request.method == 'POST':
-        form = DocumentForm(request.POST, request.FILES, initial_oid=selected_oid) # Передаємо initial_oid для фільтрації
-        main_form = DocumentProcessingMainForm(request.POST, prefix='main') # prefix, якщо використовуєте
-        formset = DocumentItemFormSet(request.POST, request.FILES, prefix='docs') # prefix, якщо використовуєте
-        if main_form.is_valid() and formset.is_valid():
-            oid_instance = main_form.cleaned_data['oid']
-            work_request_item_instance = main_form.cleaned_data.get('work_request_item') 
-            process_date_from_main = main_form.cleaned_data['process_date']
-            work_date_from_main = main_form.cleaned_data['work_date']
-            author_instance = main_form.cleaned_data.get('author')
-
-            saved_documents = [] # Збираємо збережені документи
-            for item_form in formset:
-                if item_form.is_valid() and item_form.has_changed():
-                    document_instance = item_form.save(commit=False)
-                    document_instance.oid = oid_instance
-                    document_instance.work_request_item = work_request_item_instance
-                    document_instance.process_date = process_date_from_main
-                    document_instance.work_date = work_date_from_main
-                    document_instance.author = author_instance
-                    document_instance.save()
-                    saved_documents.append(document_instance)
-            
-            if saved_documents:
-                messages.success(request, f'{len(saved_documents)} документ(ів) успішно додано.')
-
-                # --- ОНОВЛЕННЯ WorkRequestItem ПІСЛЯ ЗБЕРЕЖЕННЯ ВСІХ ДОКУМЕНТІВ З ФОРМСЕТУ ---
-                if work_request_item_instance:
-                    # Встановлюємо docs_actually_processed_on на найпізнішу process_date
-                    # з усіх щойно доданих документів, що стосуються цього WRI
-                    # Або просто на process_date_from_main, якщо вона єдина для всього пакету
-                    
-                    # Оновлюємо дату фактичного опрацювання
-                    if work_request_item_instance.docs_actually_processed_on is None or \
-                       process_date_from_main > work_request_item_instance.docs_actually_processed_on:
-                        work_request_item_instance.docs_actually_processed_on = process_date_from_main
-                    
-                    # Перевірка, чи можна встановити статус "виконано" для WorkRequestItem
-                    # Ця логіка має перевірити, чи всі ОБОВ'ЯЗКОВІ документи для
-                    # work_request_item_instance.oid.oid_type та work_request_item_instance.work_type
-                    # тепер присутні в базі даних (включаючи ті, що були додані зараз).
-                    
-                    # Приклад спрощеної логіки (як у моделі):
-                    can_complete_wri = False
-                    for doc in saved_documents: # Перевіряємо тільки щойно збережені
-                        if doc.work_request_item == work_request_item_instance: # Переконуємось, що документ для цього WRI
-                            doc_type_name_lower = doc.document_type.name.lower()
-                            if "акт атестації" in doc_type_name_lower and \
-                               work_request_item_instance.work_type == WorkTypeChoices.ATTESTATION and \
-                               doc.dsszzi_registered_number and doc.dsszzi_registered_date:
-                                can_complete_wri = True
-                                break
-                            elif "висновок ік" in doc_type_name_lower and \
-                                 work_request_item_instance.work_type == WorkTypeChoices.IK:
-                                can_complete_wri = True
-                                break
-                    
-                    if can_complete_wri and work_request_item_instance.status != WorkRequestStatusChoices.COMPLETED:
-                        work_request_item_instance.status = WorkRequestStatusChoices.COMPLETED
-                        messages.info(request, f"Статус елемента заявки для ОІД '{work_request_item_instance.oid.cipher}' оновлено на 'Виконано'.")
-                    
-                    work_request_item_instance.save() # Зберігаємо зміни в WRI (це викличе update_request_status)
-
-                if document.document_type.name.lower().startswith('акт атестації') and current_oid.status != OIDStatusChoices.ACTIVE:
-                    current_oid.status = OIDStatusChoices.ACTIVE # Або ATTESTED, залежно від воркфлоу                 # Потрібно створити запис в OIDStatusChange
-                    current_oid.save()
-                    messages.info(request, f'Статус ОІД "{current_oid.cipher}" оновлено на "{current_oid.get_status_display()}".')
-
-                # return redirect('oids:oid_detail_view_name', oid_id=oid_instance.id)
-                return redirect('oids:oid_detail_view_name', oid_id=document.oid.id)# ... (логіка оновлення статусу ОІД, якщо потрібно) ...
-   
-    else:
-        form = DocumentForm(initial=initial_data, initial_oid=selected_oid)
-
-    return render(request, 'oids/forms/add_document_processing_form.html', {
-        'form': form, 
-        'page_title': 'Додати опрацювання документів',
-        'selected_oid': selected_oid
-    })
 
 @login_required 
 def add_work_request_view(request):

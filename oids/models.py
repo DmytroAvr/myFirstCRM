@@ -254,6 +254,16 @@ class WorkRequest(models.Model):
         verbose_name_plural = "Заявки на проведення робіт"
         unique_together = ('unit', 'incoming_number') # Заявка унікальна в межах частини
 
+    def __str__(self):
+        # Безпечно отримуємо дані, щоб уникнути помилок, якщо щось None
+        unit_code = self.unit.code if self.unit else 'N/A'
+        date_str = self.incoming_date.strftime('%d.%m.%Y') if self.incoming_date else 'N/A'
+        number_str = self.incoming_number or 'б/н' # 'б/н' - без номера
+        status_str = self.get_status_display() or 'N/A'
+        
+        # Форматуємо рядок у бажаному вигляді
+        return f"Заявка №{number_str} від {date_str} (ВЧ: {unit_code}, Статус: {status_str})"
+    
 class WorkRequestItem(models.Model):
     """
     Елемент заявки на проведення робіт.
