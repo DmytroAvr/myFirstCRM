@@ -1347,6 +1347,7 @@ def oid_list_view(request):
     )
 
     # --- Фільтрація ---
+    filter_city = request.GET.get('filter_city')
     filter_unit_id_str = request.GET.get('filter_unit')
     filter_oid_type = request.GET.get('filter_oid_type')
     filter_pemin_sub_type = request.GET.get('filter_pemin_sub_type')
@@ -1359,6 +1360,9 @@ def oid_list_view(request):
         current_filter_unit_id = int(filter_unit_id_str)
         oid_list_queryset = oid_list_queryset.filter(unit__id=current_filter_unit_id)
     
+    if filter_city:
+        oid_list_queryset = oid_list_queryset.filter(city_type=filter_city)
+        
     if filter_oid_type:
         oid_list_queryset = oid_list_queryset.filter(oid_type=filter_oid_type)
 
