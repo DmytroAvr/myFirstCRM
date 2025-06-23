@@ -2,7 +2,7 @@
 
 from django import forms
 from django.forms import inlineformset_factory, modelformset_factory, formset_factory
-from .models import (WorkRequestStatusChoices, WorkTypeChoices, OIDTypeChoices, 
+from .models import (WorkRequestStatusChoices, WorkTypeChoices, OIDTypeChoices, PeminSubTypeChoices,
 	OIDStatusChoices, AttestationRegistrationStatusChoices, DocumentReviewResultChoices
 )
 from .models import (
@@ -1060,6 +1060,14 @@ class OIDCreateForm(forms.ModelForm):
             pemin_sub_type = cleaned_data.get('pemin_sub_type')
             if not pemin_sub_type:
                 self.add_error('pemin_sub_type', 'Це поле є обов\'язковим для типу ОІД "ПЕМІН".')
+            elif pemin_sub_type == PeminSubTypeChoices.SPEAK:
+                self.add_error('pemin_sub_type', 'нє є типу "ПЕМІН".')
+        # Якщо тип ОІД - МОВНА, автоматично встановлюємо "Клас ОІД"
+        elif oid_type == OIDTypeChoices.SPEAK:
+            cleaned_data['pemin_sub_type'] = PeminSubTypeChoices.MOVNA
+            # І очищуємо поля, що стосуються тільки ПЕМІН
+            cleaned_data['serial_number'] = ''
+            cleaned_data['inventory_number'] = ''
         
         # Якщо тип не ПЕМІН, очищаємо специфічні поля, щоб вони не збереглися в БД випадково
         else:
@@ -1068,5 +1076,3 @@ class OIDCreateForm(forms.ModelForm):
             cleaned_data['inventory_number'] = ''
             
         return cleaned_data
-            
-

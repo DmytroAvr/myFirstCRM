@@ -60,7 +60,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-	"django_tomselect.middleware.TomSelectMiddleware",
+	'django_tomselect.middleware.TomSelectMiddleware',
 	'simple_history.middleware.HistoryRequestMiddleware',
 ]
 

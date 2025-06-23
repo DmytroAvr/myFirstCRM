@@ -21,7 +21,7 @@ class UnitGroupAdmin(admin.ModelAdmin):
 
 
 @admin.register(Unit)
-class UnitAdmin(admin.ModelAdmin):
+class UnitAdmin(SimpleHistoryAdmin):
     list_display = ('code', 'name', 'city', 'territorial_management')
     search_fields = ('code', 'name', 'city')
     list_filter = ('territorial_management', 'unit_groups')
@@ -33,11 +33,11 @@ class OIDAdmin(SimpleHistoryAdmin):
     list_filter = ('oid_type', 'status', 'unit__territorial_management')
     search_fields = ('cipher', 'full_name', 'room')
     date_hierarchy = 'created_at' # Дозволяє навігацію по даті створення
-    history_list_display = ["status"]
+    # history_list_display = ["status"]
 
 
 @admin.register(Person)
-class PersonAdmin(admin.ModelAdmin):
+class PersonAdmin(SimpleHistoryAdmin):
     list_display = ('full_name', 'position', 'is_active')
     list_filter = ('is_active',)
     search_fields = ('full_name', 'position')
@@ -59,7 +59,7 @@ class WorkRequestItemAdmin(SimpleHistoryAdmin):
 
 
 @admin.register(DocumentType)
-class DocumentTypeAdmin(admin.ModelAdmin):
+class DocumentTypeAdmin(SimpleHistoryAdmin):
     list_display = ('name', 'oid_type', 'work_type', 'has_expiration', 'duration_months', 'is_required')
     list_filter = ('oid_type', 'work_type', 'has_expiration', 'is_required')
     search_fields = ('name',)
@@ -81,11 +81,11 @@ class DocumentAdmin(SimpleHistoryAdmin):
     list_filter = ('document_type', 'work_date', 'author', 'oid__unit', 'attestation_registration_sent')
     search_fields = ('document_number', 'oid__cipher', 'dsszzi_registered_number')
     date_hierarchy = 'process_date'
-    history_list_display = ["document_type", 'work_date', 'author', 'oid__unit' ]
+    # history_list_display = ["document_type", 'work_date', 'author', 'oid__unit' ]
 
 
 @admin.register(Trip)
-class TripAdmin(admin.ModelAdmin):
+class TripAdmin(SimpleHistoryAdmin):
     list_display = ('__str__', 'start_date', 'end_date', 'purpose_short') # Використовуємо __str__ для кращого представлення
     filter_horizontal = ('units', 'oids', 'persons', 'work_requests')
     list_filter = ('start_date', 'units', 'persons')
@@ -100,7 +100,7 @@ class TripAdmin(admin.ModelAdmin):
 
 
 @admin.register(OIDStatusChange)
-class OIDStatusChangeAdmin(admin.ModelAdmin):
+class OIDStatusChangeAdmin(SimpleHistoryAdmin):
     list_display = ('oid', 'old_status', 'new_status', 'changed_at', 'changed_by', 'reason_short')
     list_filter = ('old_status', 'new_status', 'changed_at', 'changed_by', 'oid__unit')
     search_fields = ('oid__cipher', 'reason', 'changed_by__full_name')
@@ -114,7 +114,7 @@ class OIDStatusChangeAdmin(admin.ModelAdmin):
 
 
 @admin.register(AttestationRegistration)
-class AttestationRegistrationAdmin(admin.ModelAdmin):
+class AttestationRegistrationAdmin(SimpleHistoryAdmin):
     # Оновлюємо поля згідно з новими назвами в моделі AttestationRegistration
     list_display = ('outgoing_letter_number', 'outgoing_letter_date', 'sent_by', 'status', 'created_at')
     list_filter = ('status', 'outgoing_letter_date', 'sent_by')
@@ -123,7 +123,7 @@ class AttestationRegistrationAdmin(admin.ModelAdmin):
     date_hierarchy = 'outgoing_letter_date'
 
 @admin.register(AttestationResponse)
-class AttestationResponseAdmin(admin.ModelAdmin):
+class AttestationResponseAdmin(SimpleHistoryAdmin):
     # Оновлюємо поля згідно з новими назвами в моделі AttestationResponse
     list_display = ('attestation_registration_sent', 'response_letter_number', 'response_letter_date', 'received_by', 'created_at')
     list_filter = ('response_letter_date', 'received_by', 'attestation_registration_sent__status')
@@ -132,7 +132,7 @@ class AttestationResponseAdmin(admin.ModelAdmin):
 
 
 @admin.register(TripResultForUnit)
-class TripResultForUnitAdmin(admin.ModelAdmin):
+class TripResultForUnitAdmin(SimpleHistoryAdmin):
     list_display = ('outgoing_letter_date', 'trip_info')
     filter_horizontal = ('units', 'oids', 'documents')
     list_filter = ('outgoing_letter_date', 'units')
@@ -145,7 +145,7 @@ class TripResultForUnitAdmin(admin.ModelAdmin):
 
 
 @admin.register(TechnicalTask)
-class TechnicalTaskAdmin(admin.ModelAdmin):
+class TechnicalTaskAdmin(SimpleHistoryAdmin):
     list_display = ('oid', 'input_number', 'input_date', 'read_till_date', 'reviewed_by', 'review_result', 'updated_at', 'created_at')
     search_fields = ('input_number', 'oid__cipher', 'reviewed_by__full_name')
     list_filter = ('review_result', 'input_date', 'oid__unit')

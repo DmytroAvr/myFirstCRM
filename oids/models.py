@@ -140,7 +140,7 @@ class Unit(models.Model):
         # related_name='units_in_group' # Дозволить отримати всі частини для групи: `group_instance.units.all()`
     )
     note = models.TextField(verbose_name="Примітки", blank=True, null=True)
-
+    history = HistoricalRecords()
     def __str__(self):
         return f"{self.code} - {self.name or self.city}" # Виводимо код і назву/місто
 
@@ -212,8 +212,8 @@ class Person(models.Model):
     """
     full_name = models.CharField(max_length=255, verbose_name="Прізвище, ім'я") # Змінив name на full_name
     position = models.CharField(max_length=255, verbose_name="Посада")
-    is_active = models.BooleanField(default=True, verbose_name="Активний") # Додав поле активності
-
+    is_active = models.BooleanField(default=True, verbose_name="Активний")
+    history = HistoricalRecords()
     def __str__(self):
         return self.full_name
 
@@ -266,8 +266,7 @@ class WorkRequest(models.Model):
 						# раніше форматував вигляд тут
 						# def ajax_load_work_requests_for_oids(request): 
     					# 'text': f"заявка вх.№ {wr.incoming_number} від {wr.incoming_date.strftime('%d.%m.%Y')} (ВЧ: {wr.unit.code}) - {wr.get_status_display()}"
-
-    
+  
 class WorkRequestItem(models.Model):
     """
     Елемент заявки на проведення робіт.
@@ -313,7 +312,6 @@ class WorkRequestItem(models.Model):
         verbose_name="Відрядження, що встановило дедлайн опрацювання",
         related_name="triggered_work_items" 
     )
-
     history = HistoricalRecords()
     class Meta:
         unique_together = ('request', 'oid', 'work_type') # Один ОІД не може мати двічі одну і ту ж роботу в одній заявці
@@ -462,7 +460,6 @@ class WorkRequestItem(models.Model):
             print(f"[DEBUG] WorkRequest ID {work_request.id} status '{work_request.get_status_display()}' remains unchanged.")
         print(f"--- [DEBUG] WRI.update_request_status() FINISHED for WRI ID: {self.id} ---")
 #
-
 class DocumentType(models.Model):
     """
     Тип документа
@@ -488,8 +485,8 @@ class DocumentType(models.Model):
         default=0, 
         help_text="Якщо документ має термін дії, вкажіть тривалість у місяцях. Якщо не обмежений — залишити 0."
     )
-    is_required = models.BooleanField("Обов'язковість", default=True) # Додав поле обов'язковості
-
+    is_required = models.BooleanField("Обов'язковість", default=True)
+    history = HistoricalRecords()
     class Meta:
         unique_together = ('oid_type', 'work_type', 'name') # Документ унікальний для комбінації тип ОІД/робота/назва
         verbose_name = "Тип документа"
@@ -791,7 +788,7 @@ class OIDStatusChange(models.Model):
     changed_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата зміни") # Змінив на DateTimeField
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення запису про зміну статусу")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
-
+    history = HistoricalRecords()
     def __str__(self):
         return f"{self.oid.cipher}: {self.old_status} → {self.new_status} ({self.changed_at.strftime('%Y-%m-%d')})"
 
