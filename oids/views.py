@@ -8,6 +8,7 @@ from django.contrib import messages
 from django.db.models import Q, Max, Prefetch, Count, OuterRef, Subquery
 from django.db import  transaction 
 from django.utils import timezone
+from .utils import export_to_excel
 import datetime
 from .models import (OIDTypeChoices, OIDStatusChoices, SecLevelChoices, WorkRequestStatusChoices, WorkTypeChoices, 
     DocumentReviewResultChoices, AttestationRegistrationStatusChoices, PeminSubTypeChoices, add_working_days
@@ -1532,6 +1533,23 @@ def work_request_list_view(request):
     secondary_sort = '-pk' if order_by_field_key != 'incoming_date' else 'unit__code'
 
     work_request_list_queryset = work_request_list_queryset.order_by(final_order_by_field, secondary_sort)
+
+
+	# --- КОДУ імпорту excel ---
+    if request.GET.get('export') == 'excel':
+        # Визначаємо, які стовпці та з якими назвами ми хочемо бачити в Excel
+        columns = {
+            'id': 'ID Заявки',
+			'unit__code': 'ВЧ',
+			'incoming_number': 'Вх. номер заявки',
+			'incoming_date': 'Вх. дата заявки',
+			'get_status_display': 'Статус заявки',
+			'get_items_for_export': 'ОІДи в заявці (Тип робіт / Статус по ОІД)',
+			'note': 'Примітки',
+        }
+        # Передаємо ВІДФІЛЬТРОВАНИЙ queryset у нашу функцію
+        return export_to_excel(work_request_list_queryset, columns, filename='work_requests_export.xlsx')
+    # --- КІНЕЦЬ КОДУ імпорту excel ---
 
     # --- Пагінація ---
     paginator = Paginator(work_request_list_queryset, 25)

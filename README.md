@@ -37,7 +37,7 @@ pip install django-multiselectfield
 pip install django-tomselect
 pip install python-dateutil
 pip install django-simple-history
-
+pip install openpyxl
 
 <!-- pip install django-import-export -->
 

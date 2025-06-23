@@ -60,8 +60,8 @@ class WorkRequestItemAdmin(SimpleHistoryAdmin):
 
 @admin.register(DocumentType)
 class DocumentTypeAdmin(SimpleHistoryAdmin):
-    list_display = ('name', 'oid_type', 'work_type', 'has_expiration', 'duration_months', 'is_required')
-    list_filter = ('oid_type', 'work_type', 'has_expiration', 'is_required')
+    list_display = ('name', 'oid_type', 'work_type', 'has_expiration', 'duration_months')
+    list_filter = ('oid_type', 'work_type', 'has_expiration')
     search_fields = ('name',)
 
 

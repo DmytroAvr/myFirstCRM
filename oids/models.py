@@ -266,7 +266,27 @@ class WorkRequest(models.Model):
 						# раніше форматував вигляд тут
 						# def ajax_load_work_requests_for_oids(request): 
     					# 'text': f"заявка вх.№ {wr.incoming_number} від {wr.incoming_date.strftime('%d.%m.%Y')} (ВЧ: {wr.unit.code}) - {wr.get_status_display()}"
-  
+    @property
+    def get_items_for_export(self):
+        """
+        Повертає відформатований рядок з інформацією про всі елементи заявки
+        для експорту в Excel.
+        """
+        # Важливо: цей метод буде ефективним, оскільки у work_request_list_view
+        # ми вже використовуємо prefetch_related('items'), що завантажує всі
+        # пов'язані елементи одним запитом.
+        if not self.items.all().exists():
+            return "Немає ОІД"
+        
+        item_strings = []
+        for item in self.items.all():
+            item_strings.append(
+                f"{item.oid.cipher} {item.get_work_type_display()} ({item.get_status_display()})"
+            )
+        
+        # Повертаємо всі записи, розділені символом нового рядка
+        return "\n".join(item_strings)
+    
 class WorkRequestItem(models.Model):
     """
     Елемент заявки на проведення робіт.
@@ -485,7 +505,7 @@ class DocumentType(models.Model):
         default=0, 
         help_text="Якщо документ має термін дії, вкажіть тривалість у місяцях. Якщо не обмежений — залишити 0."
     )
-    is_required = models.BooleanField("Обов'язковість", default=True)
+    # is_required = models.BooleanField("Обов'язковість", default=True) # раніше логіка будувалась на обов`язковості документів, зараз перебудував на duration
     history = HistoricalRecords()
     class Meta:
         unique_together = ('oid_type', 'work_type', 'name') # Документ унікальний для комбінації тип ОІД/робота/назва

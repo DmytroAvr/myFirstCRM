@@ -6,9 +6,17 @@
 
 {% block content %}
 <div class="container-fluid">
-    <h2 class="mb-4">{{ page_title }}</h2>
-    <a href="{% url 'oids:add_work_request_view_name' %}" class="btn btn-primary mb-3">Додати нову Заявку</a>
-
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">{{ page_title }}</h2>
+        <div>
+            <a href="{% url 'oids:add_work_request_view_name' %}" class="btn btn-primary">Додати нову Заявку</a>
+            
+            {# --- НОВА КНОПКА ЕКСПОРТУ --- #}
+            <a href="?{{ request.GET.urlencode }}&export=excel" class="btn btn-success">
+                Експорт в Excel
+            </a>
+        </div>
+    </div>
     {# Форма для фільтрації Заявок #}
     <form method="GET" action="{% url 'oids:list_work_requests' %}" class="mb-4 p-3 border bg-light rounded">
         <div class="row g-3">
@@ -78,12 +86,12 @@
                         </th>
                         <th>
                             <a href="{{ list_url }}?sort_by=number&sort_order={% if current_sort_by == 'number' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
-                                Номер заявки {% if current_sort_by == 'number' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                                Вх. номер заявки {% if current_sort_by == 'number' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
                             </a>
                         </th>
                         <th>
                             <a href="{{ list_url }}?sort_by=date&sort_order={% if current_sort_by == 'date' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
-                                Дата заявки {% if current_sort_by == 'date' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                                Вх. дата заявки {% if current_sort_by == 'date' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
                             </a>
                         </th>
                         <th>

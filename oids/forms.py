@@ -979,10 +979,13 @@ class TechnicalTaskFilterForm(forms.Form):
         required=False, label="Статус ТЗ",
         widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
     )
-   
-
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Встановлюємо актуальний queryset для поля 'unit' при кожному створенні форми
+        self.fields['unit'].queryset = Unit.objects.all().order_by('code')
 
 class WorkRequestItemProcessingFilterForm(forms.Form):
+    prefix = 'wri'
     unit = forms.ModelMultipleChoiceField(  
         queryset=Unit.objects.all().order_by('code'),
         required=False,
@@ -1018,6 +1021,10 @@ class WorkRequestItemProcessingFilterForm(forms.Form):
 		label="Стан факт. опрацювання",
 		widget=forms.Select(attrs={'class': 'form-select form-select-sm '})
 	)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Встановлюємо актуальний queryset для поля 'unit'
+        self.fields['unit'].queryset = Unit.objects.all().order_by('code')
 
 class OIDCreateForm(forms.ModelForm):
     # Додаємо поле `unit` для вибору ВЧ, оскільки воно є ForeignKey у моделі OID
