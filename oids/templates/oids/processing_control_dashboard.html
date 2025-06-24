@@ -249,14 +249,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const tsOid = new TomSelect(oidElement, {
+			create: false, 
             placeholder: 'Спочатку оберіть ВЧ...',
             valueField: 'id',
             labelField: 'text',
             searchField: ['text'],
+			allowEmptyOption: true, // Дозволяє вибрати пусту опцію для скидання фільтра
+			plugins: ['remove_button'], // Якщо потрібна кнопка очищення
         });
 
         const tsUnit = new TomSelect(unitElement, {
-            placeholder: 'Оберіть одну або декілька ВЧ...'
+            placeholder: 'Оберіть одну або декілька ВЧ...',
+			searchField: ['text'],
+			allowEmptyOption: true, // Дозволяє вибрати пусту опцію для скидання фільтра
+			plugins: ['remove_button'], // Якщо потрібна кнопка очищення
         });
 
         // Функція для завантаження ОІДів
