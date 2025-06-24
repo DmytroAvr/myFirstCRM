@@ -15,80 +15,47 @@
     </div>
 
 	{# Форма для фільтрації ОІД #}
-	<form method="GET" action="{% url 'oids:list_oids' %}" class="mb-4 p-3 border bg-light rounded">
-		<div class="row g-3">
-			<div class="col-md-3">
-                <label for="filter_unit" class="form-label">Військова частина:</label>
-                <select name="filter_unit" id="filter_unit" class="form-select tomselect-field">
-                    <option value="">Всі ВЧ</option>
-                    {% for unit_choice in units_for_filter %}
-                        {# Make sure there are spaces around == here! #}			
-						<option value="{{ unit_choice.id }}" {% if current_filter_unit_id == unit_choice.id %}selected{% endif %}>
-							{{ unit_choice.code }} - {{ unit_choice.name|default_if_none:unit_choice.city }}
-						</option> 					
-                    {% endfor %}
-                </select>
-            </div>
-			<div class="col-md-2">
-				<label for="filter_oid_type" class="form-label">Тип ОІД:</label>
-				<select name="filter_oid_type" id="filter_oid_type" class="form-select tomselect-field">
-					<option value="">Всі типи</option>
-					{% for value, text in oid_type_choices_for_filter %}
-					<option value="{{ value }}" {% if current_filter_oid_type == value %}selected{% endif %}>{{ text }}</option>
-					{% endfor %}
-				</select>
-			</div>
-			<div class="col-md-2">
-				<label for="filter_pemin_sub_type" class="form-label">Клас ОІД:</label>
-				<select name="filter_pemin_sub_type" id="filter_pemin_sub_type" class="form-select tomselect-field">
-					<option value="">Всі класи</option>
-					{% for value, text in pemin_sub_type_choices_for_filter %}
-					<option value="{{ value }}" {% if current_filter_pemin_sub_type == value %}selected{% endif %}>{{ text }}</option>
-					{% endfor %}
-				</select>
-			</div>
-			<div class="col-md-2">
-				<label for="filter_status" class="form-label">Стан:</label>
-				<select name="filter_status" id="filter_status" class="form-select tomselect-field">
-					<option value="">Всі стани</option>
-					{% for value, text in oid_status_choices_for_filter %}
-					<option value="{{ value }}" {% if current_filter_status == value %}selected{% endif %}>{{ text }}</option>
-					{% endfor %}
-				</select>
-			</div>
-			<div class="col-md-2">
-				<label for="filter_sec_level" class="form-label">Гриф:</label>
-				<select name="filter_sec_level" id="filter_sec_level" class="form-select tomselect-field">
-					<option value="">Всі грифи</option>
-					{% for value, text in sec_level_choices_for_filter %}
-					<option value="{{ value }}" {% if current_filter_sec_level == value %}selected{% endif %}>{{ text }}</option>
-					{% endfor %}
-				</select>
-			</div>
-			<div class="col-md-3">
-				<label for="search_query_filter_oid" class="form-label">Пошук (шифр, назва, прим.):</label>
-				<input type="text" name="search_query" id="search_query_filter_oid" class="form-control" value="{{ current_search_query|default:'' }}">
-			</div>
-		</div>
-		<div class="row g-3 mt-2">
-			<div class="col-md-auto">
-				<button type="submit" class="btn btn-primary">Фільтрувати</button>
-			</div>
-			<div class="col-md-auto">
-				<a href="{% url 'oids:list_oids' %}" class="btn btn-secondary">Скинути фільтри</a>
-			</div>
-		</div>
-		{# Приховані поля для збереження поточного сортування при фільтрації #}
-		{% if current_sort_by %}
-		<input type="hidden" name="sort_by" value="{{ current_sort_by }}">
-		{% comment %} sort_order визначається напрямком (знак '-' у sort_by або значення desc) {% endcomment %}
-		{% if current_sort_order_is_desc %}
-		<input type="hidden" name="sort_order" value="desc">
-		{% else %}
-		<input type="hidden" name="sort_order" value="asc">
-		{% endif %}
-		{% endif %}
-	</form>
+	{# --- НОВА ФОРМА ФІЛЬТРІВ --- #}
+<form method="GET" class="mb-4 p-3 border bg-light rounded">
+    <div class="row g-3">
+        <div class="col-md-4">
+            {{ form.city.label_tag }}
+            {{ form.city }}
+        </div>
+        <div class="col-md-4">
+            {{ form.unit.label_tag }}
+            {{ form.unit }}
+        </div>
+        <div class="col-md-2">
+            {{ form.oid_type.label_tag }}
+            {{ form.oid_type }}
+        </div>
+        <div class="col-md-2">
+            {{ form.pemin_sub_type.label_tag }}
+            {{ form.pemin_sub_type }}
+        </div>
+        <div class="col-md-2">
+            {{ form.status.label_tag }}
+            {{ form.status }}
+        </div>
+        <div class="col-md-2">
+            {{ form.sec_level.label_tag }}
+            {{ form.sec_level }}
+        </div>
+    </div>
+    <div class="row g-3 mt-2">
+        <div class="col-md-8">
+            {{ form.search_query.label_tag }}
+            {{ form.search_query }}
+        </div>
+        <div class="col-md-2 align-self-end">
+            <button type="submit" class="btn btn-primary w-100">Фільтрувати</button>
+        </div>
+        <div class="col-md-2 align-self-end">
+            <a href="{% url 'oids:list_oids' %}" class="btn btn-secondary w-100">Скинути</a>
+        </div>
+    </div>
+</form>
 
 	{# <a href="URL_ДЛЯ_ДОДАВАННЯ_ОІД" class="btn btn-primary mb-3">Додати новий ОІД</a> #}
 
@@ -210,25 +177,18 @@
 
 {% block extra_js %}
 <script>
-	document.addEventListener('DOMContentLoaded', function () {
-		const selectsToInitialize = ['filter_unit', 'filter_oid_type', 'filter_pemin_sub_type', 'filter_status', 'filter_sec_level'];
-
-		if (typeof TomSelect !== 'undefined') {
-			selectsToInitialize.forEach(function (selectId) {
-				const element = document.getElementById(selectId);
-				if (element) {
-					new TomSelect(element, {
-						create: false, // Заборонити створення нових опцій, якщо не потрібно
-						// sortField: { field: "text", direction: "asc" }, // Можна вимкнути, якщо сортування не потрібне для опцій
-						placeholder: element.querySelector('option[value=""]').textContent || "Оберіть...", // Текст з пустої опції
-						allowEmptyOption: true, // Дозволяє вибрати пусту опцію для скидання фільтра
-						plugins: ['remove_button'], // Якщо потрібна кнопка очищення
-					});
-				}
-			});
-		} else {
-			console.log("TomSelect library not found. Filters will use standard select fields.");
-		}
-	});
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof TomSelect !== 'undefined') {
+        console.log("Initializing TomSelect for OID list filters...");
+        // Знаходимо всі поля з класом 'tomselect-field'
+        document.querySelectorAll('.tomselect-field').forEach(function(element) {
+            new TomSelect(element, {
+                // TomSelect автоматично розпізнає атрибут 'multiple'
+                // і ввімкне режим множинного вибору.
+                plugins: ['remove_button'], // Додає 'хрестик' для видалення обраних елементів
+            });
+        });
+    }
+});
 </script>
 {% endblock %}

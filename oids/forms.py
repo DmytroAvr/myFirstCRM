@@ -1093,11 +1093,11 @@ class OIDFilterForm(forms.Form):
         label="Військова частина",
         widget=forms.SelectMultiple(attrs={'class': 'tomselect-field', 'placeholder': 'Оберіть одну або декілька ВЧ...'})
     )
-    city = forms.ModelMultipleChoiceField(
-        queryset=Unit.objects.all().order_by('city'),
+    city = forms.MultipleChoiceField(
+        choices=[], # Заповнимо динамічно в __init__
         required=False,
         label="Місто",
-        widget=forms.SelectMultiple(attrs={'class': 'tomselect-field', 'placeholder': 'Оберіть Місто...'})
+        widget=forms.SelectMultiple(attrs={'class': 'tomselect-field', 'placeholder': 'Оберіть місто...'})
     )
     # Використовуємо MultipleChoiceField для полів з вибором (choices)
     oid_type = forms.MultipleChoiceField(
@@ -1130,3 +1130,10 @@ class OIDFilterForm(forms.Form):
         label="Пошук",
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Пошук по шифру, назві, кімнаті...'})
     )
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Динамічно отримуємо список унікальних міст з моделі Unit
+        # і встановлюємо його як вибір для поля 'city'
+        cities = Unit.objects.exclude(city__isnull=True).exclude(city__exact='')\
+                             .values_list('city', 'city').distinct().order_by('city')
+        self.fields['city'].choices = cities

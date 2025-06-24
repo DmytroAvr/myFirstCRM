@@ -18,7 +18,7 @@ from .models import (Unit, UnitGroup, OID, OIDStatusChange, TerritorialManagemen
     Person, TechnicalTask, AttestationRegistration, AttestationResponse, 
 )
 from .forms import ( TripForm, TripResultSendForm, DocumentProcessingMainForm, DocumentItemFormSet, DocumentForm, 
-	WorkRequestForm, WorkRequestItemFormSet,OIDCreateForm, OIDStatusUpdateForm, TechnicalTaskCreateForm, TechnicalTaskProcessForm,
+	WorkRequestForm, WorkRequestItemFormSet,OIDCreateForm, OIDStatusUpdateForm, OIDFilterForm, TechnicalTaskCreateForm, TechnicalTaskProcessForm,
 	AttestationRegistrationSendForm, AttestationResponseMainForm, AttestationActUpdateFormSet,
     TechnicalTaskFilterForm, WorkRequestItemProcessingFilterForm
 )
@@ -1347,44 +1347,29 @@ def oid_list_view(request):
     )
 	
     # --- Фільтрація ---
-    filter_city = request.GET.get('filter_city')
-    filter_unit_id_str = request.GET.get('filter_unit')
-    filter_oid_type = request.GET.get('filter_oid_type')
-    filter_pemin_sub_type = request.GET.get('filter_pemin_sub_type')
-    filter_status = request.GET.get('filter_status')
-    filter_sec_level = request.GET.get('filter_sec_level')
-    search_query = request.GET.get('search_query')
-
-    current_filter_unit_id = None
-    if filter_city:
-        oid_list_queryset = oid_list_queryset.filter(city_id_str=filter_city)
+    form = OIDFilterForm(request.GET or None)
+    if form.is_valid():
+        if form.cleaned_data.get('city'):
+            oid_list_queryset = oid_list_queryset.filter(unit__city__in=form.cleaned_data['city'])
+        if form.cleaned_data.get('unit'):
+            oid_list_queryset = oid_list_queryset.filter(unit__in=form.cleaned_data['unit'])
+        if form.cleaned_data.get('oid_type'):
+            oid_list_queryset = oid_list_queryset.filter(oid_type__in=form.cleaned_data['oid_type'])
+        if form.cleaned_data.get('pemin_sub_type'):
+            oid_list_queryset = oid_list_queryset.filter(pemin_sub_type__in=form.cleaned_data['pemin_sub_type'])
+        if form.cleaned_data.get('status'):
+            oid_list_queryset = oid_list_queryset.filter(status__in=form.cleaned_data['status'])
+        if form.cleaned_data.get('sec_level'):
+            oid_list_queryset = oid_list_queryset.filter(sec_level__in=form.cleaned_data['sec_level'])
         
-    if filter_unit_id_str and filter_unit_id_str.isdigit():
-        current_filter_unit_id = int(filter_unit_id_str)
-        oid_list_queryset = oid_list_queryset.filter(unit__id=current_filter_unit_id)
-    
-    if filter_city:
-        oid_list_queryset = oid_list_queryset.filter(city_type=filter_city)
-        
-    if filter_oid_type:
-        oid_list_queryset = oid_list_queryset.filter(oid_type=filter_oid_type)
-
-    if filter_pemin_sub_type:
-        oid_list_queryset = oid_list_queryset.filter(pemin_sub_type=filter_pemin_sub_type)
-
-    if filter_status:
-        oid_list_queryset = oid_list_queryset.filter(status=filter_status)
-
-    if filter_sec_level:
-        oid_list_queryset = oid_list_queryset.filter(sec_level=filter_sec_level)
-    
-    if search_query:
-        oid_list_queryset = oid_list_queryset.filter(
-            Q(cipher__icontains=search_query) |
-            Q(full_name__icontains=search_query) |
-            Q(room__icontains=search_query) |
-            Q(note__icontains=search_query) # Додамо пошук по примітках ОІД
-        )
+        search_query = form.cleaned_data.get('search_query')
+        if search_query:
+            oid_list_queryset = oid_list_queryset.filter(
+                Q(cipher__icontains=search_query) |
+                Q(full_name__icontains=search_query) |
+                Q(room__icontains=search_query) |
+                Q(note__icontains=search_query)
+            )
 
     # --- Сортування ---
     # За замовчуванням сортуємо за датою створення (новіші спочатку), якщо поле created_at існує
@@ -1431,6 +1416,7 @@ def oid_list_view(request):
 
     oid_list_queryset = oid_list_queryset.order_by(final_order_by_field, secondary_sort)
 
+
 	# --- ЕКСПОРТ В EXCEL ---
     if request.GET.get('export') == 'excel':
         # Стовпці для Excel, що відповідають таблиці на сторінці
@@ -1465,27 +1451,13 @@ def oid_list_view(request):
     pemin_sub_type_choices_for_filter = PeminSubTypeChoices.choices
     oid_status_choices_for_filter = OIDStatusChoices.choices
     sec_level_choices_for_filter = SecLevelChoices.choices
-        
     context = {
         'page_title': 'Список Об\'єктів Інформаційної Діяльності (ОІД)',
-        'object_list': page_obj, # 'object_list' використовується у вашому шаблоні
-        'page_obj': page_obj,    # для пагінації
-        # Фільтри
-        'units_for_filter': units_for_filter,
-        'oid_type_choices_for_filter': oid_type_choices_for_filter,
-        'pemin_sub_type_choices_for_filter': pemin_sub_type_choices_for_filter,
-        'oid_status_choices_for_filter': oid_status_choices_for_filter,
-        'sec_level_choices_for_filter': sec_level_choices_for_filter,
-        'current_filter_city': filter_city,
-        'current_filter_unit_id': current_filter_unit_id,
-        'current_filter_oid_type': filter_oid_type,
-        'current_filter_pemin_sub_type': filter_pemin_sub_type,
-        'current_filter_status': filter_status,
-        'current_filter_sec_level': filter_sec_level,
-        'current_search_query': search_query,
-        # Сортування
-        'current_sort_by': sort_by_param_cleaned, # Чистий параметр сортування
-        'current_sort_order_is_desc': actual_sort_order_is_desc, # Поточний напрямок desc (true/false)
+        'object_list': page_obj,
+        'page_obj': page_obj,
+        'form': form, 
+        'current_sort_by': sort_by_param.lstrip('-'),
+        'current_sort_order_is_desc': sort_by_param.startswith('-'),
     }
     return render(request, 'oids/lists/oid_list.html', context)
 
