@@ -18,9 +18,13 @@ from .models import (Unit, UnitGroup, OID, OIDStatusChange, TerritorialManagemen
     Person, TechnicalTask, AttestationRegistration, AttestationResponse, 
 )
 from .forms import ( TripForm, TripResultSendForm, DocumentProcessingMainForm, DocumentItemFormSet, DocumentForm, 
-	WorkRequestForm, WorkRequestItemFormSet,OIDCreateForm, OIDStatusUpdateForm, OIDFilterForm, TechnicalTaskCreateForm, TechnicalTaskProcessForm,
+	WorkRequestForm, WorkRequestItemFormSet,  OIDCreateForm, OIDStatusUpdateForm,  TechnicalTaskCreateForm, TechnicalTaskProcessForm,
 	AttestationRegistrationSendForm, AttestationResponseMainForm, AttestationActUpdateFormSet,
-    TechnicalTaskFilterForm, WorkRequestItemProcessingFilterForm
+    
+)
+from .forms import (
+    WorkRequestFilterForm, OIDFilterForm, TechnicalTaskFilterForm, WorkRequestItemProcessingFilterForm, DocumentFilterForm,
+    TechnicalTaskFilterForm, AttestationRegistrationFilterForm, AttestationResponseFilterForm, RegisteredActsFilterForm, 
 )
 
 # from .utils import add_working_days # Або перемістіть add_working_days сюди
@@ -1162,7 +1166,9 @@ def technical_task_process_view(request, task_id=None): # Може прийма�
     return render(request, 'oids/forms/technical_task_process_form.html', context)
 
 
-@login_required # list info 
+# list info 
+
+@login_required 
 def summary_information_hub_view(request):
     """
     Сторінка-хаб з посиланнями на списки об'єктів різних моделей.
@@ -1179,6 +1185,7 @@ def summary_information_hub_view(request):
         {'label': 'Технічні завдання', 'url_name': 'oids:list_technical_tasks'},
         {'label': 'Надсилання на реєстрацію Актів Атестації', 'url_name': 'oids:list_attestation_registrations'},
         {'label': 'Відповіді Реєстрація Атестації', 'url_name': 'oids:list_attestation_responses'},
+        {'label': 'Всі Акти зареєстровані Атестації', 'url_name': 'oids:list_registered_acts'},
         {'label': 'Надсилання до частин пакетів документів', 'url_name': 'oids:list_trip_results_for_units'},
         {'label': 'Історія змін статусу ОІД', 'url_name': 'oids:list_oid_status_changes'},
         {'label': 'Довідник: Територіальні управління', 'url_name': 'oids:list_territorial_managements'},
@@ -1194,23 +1201,64 @@ def summary_information_hub_view(request):
 
 @login_required 
 def document_list_view(request):
+
     documents_list = Document.objects.select_related(
-        'oid__unit__territorial_management', # Оптимізація для доступу до Unit та OID
         'oid__unit',
-        'oid',
         'document_type', 
         'author',
         'work_request_item__request'
-    ).order_by('-process_date', '-created_at') # Новіші за датою опрацювання, потім за датою створення
+    ).order_by('-process_date', '-created_at')
+    form = DocumentFilterForm(request.GET or None)
+    if form.is_valid():
+        if form.cleaned_data.get('unit'):
+            documents_list = documents_list.filter(oid__unit__in=form.cleaned_data['unit'])
+        if form.cleaned_data.get('document_type'):
+            documents_list = documents_list.filter(document_type__in=form.cleaned_data['document_type'])
+        if form.cleaned_data.get('author'):
+            documents_list = documents_list.filter(author__in=form.cleaned_data['author'])
+        if form.cleaned_data.get('date_from'):
+            documents_list = documents_list.filter(process_date__gte=form.cleaned_data['date_from'])
+        if form.cleaned_data.get('date_to'):
+            documents_list = documents_list.filter(process_date__lte=form.cleaned_data['date_to'])
 
-    paginator = Paginator(documents_list, 25) # 25 документів на сторінку
+        search_query = form.cleaned_data.get('search_query')
+        if search_query:
+            documents_list = documents_list.filter(
+                Q(document_number__icontains=search_query) |
+                Q(oid__cipher__icontains=search_query) |
+                Q(note__icontains=search_query)
+            ).distinct()
+
+    # --- ЛОГІКА ЕКСПОРТУ В EXCEL ---
+    if request.GET.get('export') == 'excel':
+        columns = {
+            'oid__unit__code': 'ВЧ',
+            'oid__cipher': 'ОІД',
+            'document_type__name': 'Тип документа',
+            'document_number': 'Підг. №',
+            'process_date': 'Підг. від',
+            'work_date': 'Дата проведення робіт',
+            'expiration_date': 'Термін дії', 
+            'author__full_name': 'Автор',
+            'note': 'Примітки',
+        }
+        return export_to_excel(
+            documents_list, 
+            columns, 
+            filename='documents_export.xlsx', 
+            include_row_numbers=True
+        )
+
+    # --- Пагінація ---
+    paginator = Paginator(documents_list, 50)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
     context = {
         'page_title': 'Список опрацьованих документів',
-        'documents': page_obj, # Передаємо об'єкт сторінки пагінатора
-        'page_obj': page_obj # Для навігації пагінатора
+        'documents': page_obj,
+        'page_obj': page_obj,
+        'form': form, # Передаємо форму в шаблон
     }
     return render(request, 'oids/lists/document_list.html', context)
 
@@ -1444,13 +1492,6 @@ def oid_list_view(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
-    # Дані для ів
-    units_for_filter = Unit.objects.all().order_by('code')
-    # Передаємо самі choices, а не їх відображення
-    oid_type_choices_for_filter = OIDTypeChoices.choices
-    pemin_sub_type_choices_for_filter = PeminSubTypeChoices.choices
-    oid_status_choices_for_filter = OIDStatusChoices.choices
-    sec_level_choices_for_filter = SecLevelChoices.choices
     context = {
         'page_title': 'Список Об\'єктів Інформаційної Діяльності (ОІД)',
         'object_list': page_obj,
@@ -1470,45 +1511,27 @@ def work_request_list_view(request):
         Prefetch('items', queryset=WorkRequestItem.objects.select_related('oid')) 
     )
 
-    # --- Фільтрація ---
-    filter_unit_id_str = request.GET.get('filter_unit')
-    filter_status = request.GET.get('filter_status')
-    filter_date_from_str = request.GET.get('filter_date_from')
-    filter_date_to_str = request.GET.get('filter_date_to')
-    search_query = request.GET.get('search_query')
+    # --- ЛОГІКА ФІЛЬТРАЦІЇ ---
+    form = WorkRequestFilterForm(request.GET or None)
+    if form.is_valid():
+        if form.cleaned_data.get('unit'):
+            work_request_list_queryset = work_request_list_queryset.filter(unit__in=form.cleaned_data['unit'])
+        if form.cleaned_data.get('status'):
+            work_request_list_queryset = work_request_list_queryset.filter(status__in=form.cleaned_data['status'])
+        if form.cleaned_data.get('date_from'):
+            work_request_list_queryset = work_request_list_queryset.filter(incoming_date__gte=form.cleaned_data['date_from'])
+        if form.cleaned_data.get('date_to'):
+            work_request_list_queryset = work_request_list_queryset.filter(incoming_date__lte=form.cleaned_data['date_to'])
 
-    current_filter_unit_id = None
-    if filter_unit_id_str and filter_unit_id_str.isdigit():
-        current_filter_unit_id = int(filter_unit_id_str)
-        work_request_list_queryset = work_request_list_queryset.filter(unit__id=current_filter_unit_id)
-    
-    if filter_status:
-        work_request_list_queryset = work_request_list_queryset.filter(status=filter_status)
-
-    current_filter_date_from = None
-    if filter_date_from_str:
-        try:
-            current_filter_date_from = datetime.strptime(filter_date_from_str, '%Y-%m-%d').date()
-            work_request_list_queryset = work_request_list_queryset.filter(incoming_date__gte=current_filter_date_from)
-        except ValueError:
-            current_filter_date_from = None # Якщо дата невалідна, ігноруємо
-
-    current_filter_date_to = None
-    if filter_date_to_str:
-        try:
-            current_filter_date_to = datetime.strptime(filter_date_to_str, '%Y-%m-%d').date()
-            work_request_list_queryset = work_request_list_queryset.filter(incoming_date__lte=current_filter_date_to)
-        except ValueError:
-            current_filter_date_to = None # Якщо дата невалідна, ігноруємо
+        search_query = form.cleaned_data.get('search_query')
+        if search_query:
+            work_request_list_queryset = work_request_list_queryset.filter(
+                Q(incoming_number__icontains=search_query) |
+                Q(unit__code__icontains=search_query) |
+                Q(unit__name__icontains=search_query) |
+                Q(items__oid__cipher__icontains=search_query)
+            ).distinct()
             
-    if search_query:
-        work_request_list_queryset = work_request_list_queryset.filter(
-            Q(incoming_number__icontains=search_query) |
-            Q(unit__code__icontains=search_query) | # Пошук за кодом ВЧ
-            Q(unit__name__icontains=search_query) | # Пошук за назвою ВЧ
-            Q(items__oid__cipher__icontains=search_query) # Пошук за шифром ОІД в елементах заявки
-        ).distinct() # distinct потрібен через ацію по M2M (items)
-
     # --- Сортування ---
     sort_by_param = request.GET.get('sort_by', '-incoming_date') # За замовчуванням - новіші заявки
     sort_order_from_request = request.GET.get('sort_order', '') 
@@ -1542,16 +1565,21 @@ def work_request_list_view(request):
     if request.GET.get('export') == 'excel':
         # Визначаємо, які стовпці та з якими назвами ми хочемо бачити в Excel
         columns = {
-            'id': 'ID Заявки',
 			'unit__code': 'ВЧ',
 			'incoming_number': 'Вх. номер заявки',
 			'incoming_date': 'Вх. дата заявки',
 			'get_status_display': 'Статус заявки',
 			'get_items_for_export': 'ОІДи в заявці (Тип робіт / Статус по ОІД)',
+            'id': 'ID Заявки',
 			'note': 'Примітки',
         }
         # Передаємо ВІДФІЛЬТРОВАНИЙ queryset у нашу функцію
-        return export_to_excel(work_request_list_queryset, columns, filename='work_requests_export.xlsx')
+        return export_to_excel(
+            work_request_list_queryset, 
+            columns, 
+            filename='work_requests_export.xlsx', 
+            include_row_numbers=True
+        )
     # --- КІНЕЦЬ КОДУ імпорту excel ---
 
     # --- Пагінація ---
@@ -1559,25 +1587,13 @@ def work_request_list_view(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
         
-    # Дані для фільтрів
-    units_for_filter = Unit.objects.all().order_by('code')
-    status_choices_for_filter = WorkRequestStatusChoices.choices
-        
     context = {
         'page_title': 'Список Заявок на Проведення Робіт',
         'object_list': page_obj,
         'page_obj': page_obj,
-        # Фільтри
-        'units_for_filter': units_for_filter,
-        'status_choices_for_filter': status_choices_for_filter,
-        'current_filter_unit_id': current_filter_unit_id,
-        'current_filter_status': filter_status,
-        'current_filter_date_from': filter_date_from_str, # Передаємо рядок для заповнення поля форми
-        'current_filter_date_to': filter_date_to_str,     # Передаємо рядок для заповнення поля форми
-        'current_search_query': search_query,
-        # Сортування
-        'current_sort_by': sort_by_param_cleaned,
-        'current_sort_order_is_desc': actual_sort_order_is_desc,
+        'form': form, # <--- Передаємо екземпляр форми
+        'current_sort_by': sort_by_param.lstrip('-'),
+        'current_sort_order_is_desc': sort_by_param.startswith('-'),
     }
     return render(request, 'oids/lists/work_request_list.html', context)
 
@@ -1704,76 +1720,33 @@ def technical_task_list_view(request):
     )
 
     # --- Фільтрація ---
-    filter_unit_id_str = request.GET.get('filter_unit')
-    filter_oid_id_str = request.GET.get('filter_oid')
-    filter_review_result = request.GET.get('filter_review_result')
-    filter_reviewed_by_id_str = request.GET.get('filter_reviewed_by')
-    
-    filter_input_date_from_str = request.GET.get('filter_input_date_from')
-    filter_input_date_to_str = request.GET.get('filter_input_date_to')
-    filter_read_till_date_from_str = request.GET.get('filter_read_till_date_from')
-    filter_read_till_date_to_str = request.GET.get('filter_read_till_date_to')
-    
-    search_query = request.GET.get('search_query')
+    form = TechnicalTaskFilterForm(request.GET or None)
+    if form.is_valid():
+        if form.cleaned_data.get('unit'):
+            task_list_queryset = task_list_queryset.filter(oid__unit__in=form.cleaned_data['unit'])
+        if form.cleaned_data.get('oid'):
+            task_list_queryset = task_list_queryset.filter(oid__in=form.cleaned_data['oid'])
+        if form.cleaned_data.get('review_result'):
+            task_list_queryset = task_list_queryset.filter(review_result__in=form.cleaned_data['review_result'])
+        if form.cleaned_data.get('reviewed_by'):
+            task_list_queryset = task_list_queryset.filter(reviewed_by__in=form.cleaned_data['reviewed_by'])
+        if form.cleaned_data.get('input_date_from'):
+            task_list_queryset = task_list_queryset.filter(input_date__gte=form.cleaned_data['input_date_from'])
+        if form.cleaned_data.get('input_date_to'):
+            task_list_queryset = task_list_queryset.filter(input_date__lte=form.cleaned_data['input_date_to'])
+        if form.cleaned_data.get('read_till_date_from'):
+            task_list_queryset = task_list_queryset.filter(read_till_date__gte=form.cleaned_data['read_till_date_from'])
+        if form.cleaned_data.get('read_till_date_to'):
+            task_list_queryset = task_list_queryset.filter(read_till_date__lte=form.cleaned_data['read_till_date_to'])
 
-    current_filter_unit_id = None
-    if filter_unit_id_str and filter_unit_id_str.isdigit():
-        current_filter_unit_id = int(filter_unit_id_str)
-        task_list_queryset = task_list_queryset.filter(oid__unit__id=current_filter_unit_id)
-
-    current_filter_oid_id = None
-    if filter_oid_id_str and filter_oid_id_str.isdigit():
-        current_filter_oid_id = int(filter_oid_id_str)
-        task_list_queryset = task_list_queryset.filter(oid__id=current_filter_oid_id)
-    
-    if filter_review_result:
-        task_list_queryset = task_list_queryset.filter(review_result=filter_review_result)
-
-    current_filter_reviewed_by_id = None
-    if filter_reviewed_by_id_str and filter_reviewed_by_id_str.isdigit():
-        current_filter_reviewed_by_id = int(filter_reviewed_by_id_str)
-        task_list_queryset = task_list_queryset.filter(reviewed_by__id=current_filter_reviewed_by_id)
-
-    # Фільтри по датах
-    current_filter_input_date_from = None
-    if filter_input_date_from_str:
-        try:
-            current_filter_input_date_from = datetime.strptime(filter_input_date_from_str, '%Y-%m-%d').date()
-            task_list_queryset = task_list_queryset.filter(input_date__gte=current_filter_input_date_from)
-        except ValueError:
-            current_filter_input_date_from = None
-
-    current_filter_input_date_to = None
-    if filter_input_date_to_str:
-        try:
-            current_filter_input_date_to = datetime.strptime(filter_input_date_to_str, '%Y-%m-%d').date()
-            task_list_queryset = task_list_queryset.filter(input_date__lte=current_filter_input_date_to)
-        except ValueError:
-            current_filter_input_date_to = None
-            
-    current_filter_read_till_date_from = None
-    if filter_read_till_date_from_str:
-        try:
-            current_filter_read_till_date_from = datetime.strptime(filter_read_till_date_from_str, '%Y-%m-%d').date()
-            task_list_queryset = task_list_queryset.filter(read_till_date__gte=current_filter_read_till_date_from) #
-        except ValueError:
-            current_filter_read_till_date_from = None
-            
-    current_filter_read_till_date_to = None
-    if filter_read_till_date_to_str:
-        try:
-            current_filter_read_till_date_to = datetime.strptime(filter_read_till_date_to_str, '%Y-%m-%d').date()
-            task_list_queryset = task_list_queryset.filter(read_till_date__lte=current_filter_read_till_date_to) #
-        except ValueError:
-            current_filter_read_till_date_to = None
-            
-    if search_query:
-        task_list_queryset = task_list_queryset.filter(
-            Q(input_number__icontains=search_query) |
-            Q(oid__cipher__icontains=search_query) |
-            Q(oid__full_name__icontains=search_query) |
-            Q(note__icontains=search_query)
-        ).distinct()
+        search_query = form.cleaned_data.get('search_query')
+        if search_query:
+            task_list_queryset = task_list_queryset.filter(
+                Q(input_number__icontains=search_query) |
+                Q(oid__cipher__icontains=search_query) |
+                Q(oid__full_name__icontains=search_query) |
+                Q(note__icontains=search_query)
+            ).distinct()
 
     # --- Сортування ---
     sort_by_param = request.GET.get('sort_by', '-input_date') # За замовчуванням, як у вас було
@@ -1812,62 +1785,40 @@ def technical_task_list_view(request):
 
     task_list_queryset = task_list_queryset.order_by(final_order_by_field, secondary_sort).distinct()
 
+    # --- ЕКСПОРТ В EXCEL ---
+    if request.GET.get('export') == 'excel':
+        columns = {
+            'oid__unit__code': 'ВЧ', 
+            'oid__cipher': 'ОІД (Шифр)',
+            'input_number': 'Вхідний № ТЗ',
+            'input_date': 'Вхідна дата',
+            'read_till_date': 'Опрацювати ДО',
+            'get_review_result_display': 'Статус',
+            'reviewed_by__full_name': 'Хто опрацював',
+            'updated_at': 'Дата опрацювання',
+            'note': 'Примітки',
+        }
+        return export_to_excel(
+            task_list_queryset, 
+            columns, 
+            filename='technical_tasks_export.xlsx', 
+            include_row_numbers=True
+        )
+
     # --- Пагінація ---
     paginator = Paginator(task_list_queryset, 50)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-        
-    # Дані для фільтрів
-    units_for_filter = Unit.objects.all().order_by('code')
-    # Якщо ОІДів дуже багато, цей список може бути великим. 
-    # Розгляньте можливість динамічного завантаження ОІДів залежно від обраної ВЧ у фільтрі, якщо це стане проблемою.
-    oids_for_filter = OID.objects.select_related('unit').all().order_by('unit__code', 'cipher') 
-    review_result_choices_for_filter = DocumentReviewResultChoices.choices #
-    # Фільтруємо осіб, які справді щось розглядали, щоб список не був занадто великим
-    persons_for_filter = Person.objects.filter(
-        processed_technical_tasks__isnull=False # <--- ЗМІНЕНО ТУТ
-    ).distinct().order_by('full_name')        
+
     context = {
-        'page_title': 'Список опрацювання ТЗ\МЗ',
+        'page_title': 'Список опрацювання ТЗ/МЗ',
         'object_list': page_obj,
         'page_obj': page_obj,
-        # Фільтри
-        'units_for_filter': units_for_filter,
-        'oids_for_filter': oids_for_filter,
-        'review_result_choices_for_filter': review_result_choices_for_filter,
-		'persons_for_filter': persons_for_filter,
-        'current_filter_unit_id': current_filter_unit_id,
-        'current_filter_oid_id': current_filter_oid_id,
-        'current_filter_review_result': filter_review_result,
-        'current_filter_reviewed_by_id': current_filter_reviewed_by_id,
-        'current_filter_input_date_from': filter_input_date_from_str,
-        'current_filter_input_date_to': filter_input_date_to_str,
-        'current_filter_read_till_date_from': filter_read_till_date_from_str,
-        'current_filter_read_till_date_to': filter_read_till_date_to_str,
-        'current_search_query': search_query,
-        # Сортування
-        'current_sort_by': sort_by_param_cleaned,
-        'current_sort_order_is_desc': actual_sort_order_is_desc,
+        'form': form, # Передаємо форму в шаблон
+        'current_sort_by': sort_by_param.lstrip('-'),
+        'current_sort_order_is_desc': sort_by_param.startswith('-'),
     }
     return render(request, 'oids/lists/technical_task_list.html', context)
-
-@login_required 
-def attestation_registration_list_view(request):
-    registration_list_queryset = AttestationRegistration.objects.prefetch_related(
-        'units',  # ManyToMany зв'язок з Unit
-        Prefetch('attestation_items', queryset=AttestationItem.objects.select_related('oid__unit', 'document')) # Для доступу до ОІД та документів
-    ).order_by('-process_date') # Сортуємо за датою відправки, новіші зверху
-
-    paginator = Paginator(registration_list_queryset, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-        
-    context = {
-        'page_title': 'Список Реєстрацій Актів Атестації',
-        'object_list': page_obj,
-        'page_obj': page_obj
-    }
-    return render(request, 'oids/lists/attestation_registration_list.html', context)
 
 @login_required 
 def attestation_response_list_view(request):
@@ -2055,77 +2006,200 @@ def oid_status_change_list_view(request):
 
 @login_required 
 def attestation_registration_list_view(request):
-    """
-    Відображає список Відправок Актів Атестації на реєстрацію ДССЗЗІ.
-    """
-    # Додамо фільтрацію та сортування пізніше, якщо потрібно
     registration_list_queryset = AttestationRegistration.objects.select_related(
         'sent_by'
     ).prefetch_related(
         'units', 
-        'registered_documents' # related_name з Document.attestation_registration_sent
+        # Одразу завантажуємо пов'язані документи та їхні ОІДи, щоб уникнути N+1 запитів
+        Prefetch('registered_documents', queryset=Document.objects.select_related('oid__unit'))
     ).order_by('-outgoing_letter_date', '-id')
 
-    # --- Фільтрація (приклад, можна розширити) ---
-    filter_status = request.GET.get('status')
-    filter_unit_id_str = request.GET.get('unit_id')
+    # --- НОВА ЛОГІКА ФІЛЬТРАЦІЇ ---
+    form = AttestationRegistrationFilterForm(request.GET or None)
+    if form.is_valid():
+        if form.cleaned_data.get('units'):
+            registration_list_queryset = registration_list_queryset.filter(units__in=form.cleaned_data['units']).distinct()
+        if form.cleaned_data.get('status'):
+            registration_list_queryset = registration_list_queryset.filter(status__in=form.cleaned_data['status'])
+        if form.cleaned_data.get('sent_by'):
+            registration_list_queryset = registration_list_queryset.filter(sent_by__in=form.cleaned_data['sent_by'])
+        if form.cleaned_data.get('date_from'):
+            registration_list_queryset = registration_list_queryset.filter(outgoing_letter_date__gte=form.cleaned_data['date_from'])
+        if form.cleaned_data.get('date_to'):
+            registration_list_queryset = registration_list_queryset.filter(outgoing_letter_date__lte=form.cleaned_data['date_to'])
 
-    if filter_status:
-        registration_list_queryset = registration_list_queryset.filter(status=filter_status)
+        search_query = form.cleaned_data.get('search_query')
+        if search_query:
+            registration_list_queryset = registration_list_queryset.filter(
+                Q(outgoing_letter_number__icontains=search_query) |
+                Q(note__icontains=search_query)
+            )
+
+	# --- ДОДАЄМО НОВУ ЛОГІКУ ЕКСПОРТУ ---
+    if request.GET.get('export') == 'excel':
+        columns = {
+            'outgoing_letter_number': 'Вихідний №',
+            'outgoing_letter_date': 'Дата вих. листа',
+            'get_units_for_export': 'ВЧ у відправці',
+            'get_documents_for_export': 'Акти, надіслані на реєстр.',
+            'sent_by__full_name': 'Хто відправив',
+            'get_status_display': 'Статус',
+        }
+        return export_to_excel(
+            registration_list_queryset, 
+            columns, 
+            filename='attestation_registrations_export.xlsx',
+            include_row_numbers=True
+        )
+    # --- КІНЕЦЬ БЛОКУ ЕКСПОРТУ ---
     
-    current_filter_unit_id = None
-    if filter_unit_id_str and filter_unit_id_str.isdigit():
-        current_filter_unit_id = int(filter_unit_id_str)
-        registration_list_queryset = registration_list_queryset.filter(units__id=current_filter_unit_id).distinct()
-
-
-    paginator = Paginator(registration_list_queryset, 25) # 25 записів на сторінку
+    paginator = Paginator(registration_list_queryset, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    
+
     context = {
         'page_title': 'Відправки Актів Атестації на реєстрацію (ДССЗЗІ)',
         'object_list': page_obj,
         'page_obj': page_obj,
-        'status_choices': AttestationRegistrationStatusChoices.choices, # Для фільтра
-        'all_units': Unit.objects.all().order_by('code'), # Для фільтра
-        'current_filter_status': filter_status,
-        'current_filter_unit_id': current_filter_unit_id,
+        'form': form, # Передаємо форму в шаблон
     }
     return render(request, 'oids/lists/attestation_registration_list.html', context)
 
 @login_required 
 def attestation_response_list_view(request):
-    """
-    Відображає список Отриманих відповідей від ДССЗЗІ.
-    """
-    # Додамо фільтрацію та сортування пізніше, якщо потрібно
     response_list_queryset = AttestationResponse.objects.select_related(
-        'attestation_registration_sent__sent_by', # Доступ до пов'язаних даних
+        'attestation_registration_sent__sent_by', 
         'received_by'
+    ).prefetch_related(
+        # Оптимізація для доступу до даних в шаблоні та експорті
+        Prefetch('attestation_registration_sent__registered_documents', 
+                 queryset=Document.objects.select_related('oid__unit'))
     ).order_by('-response_letter_date', '-id')
 
-    # --- Фільтрація (приклад) ---
-    filter_att_reg_id_str = request.GET.get('att_reg_id') # Фільтр за ID відправки
+    # --- НОВА ЛОГІКА ФІЛЬТРАЦІЇ ---
+    form = AttestationResponseFilterForm(request.GET or None)
+    if form.is_valid():
+        if form.cleaned_data.get('attestation_registration_sent'):
+            response_list_queryset = response_list_queryset.filter(
+                attestation_registration_sent__in=form.cleaned_data['attestation_registration_sent']
+            )
+        if form.cleaned_data.get('received_by'):
+            response_list_queryset = response_list_queryset.filter(
+                received_by__in=form.cleaned_data['received_by']
+            )
+        if form.cleaned_data.get('date_from'):
+            response_list_queryset = response_list_queryset.filter(
+                response_letter_date__gte=form.cleaned_data['date_from']
+            )
+        if form.cleaned_data.get('date_to'):
+            response_list_queryset = response_list_queryset.filter(
+                response_letter_date__lte=form.cleaned_data['date_to']
+            )
+        search_query = form.cleaned_data.get('search_query')
+        if search_query:
+            response_list_queryset = response_list_queryset.filter(
+                Q(response_letter_number__icontains=search_query) |
+                Q(attestation_registration_sent__outgoing_letter_number__icontains=search_query)
+            )
 
-    current_filter_att_reg_id = None
-    if filter_att_reg_id_str and filter_att_reg_id_str.isdigit():
-        current_filter_att_reg_id = int(filter_att_reg_id_str)
-        response_list_queryset = response_list_queryset.filter(attestation_registration_sent__id=current_filter_att_reg_id)
+    # --- ЛОГІКА ЕКСПОРТУ В EXCEL ---
+    if request.GET.get('export') == 'excel':
+        columns = {
+            'response_letter_number': 'Вхідний №',
+            'response_letter_date': 'Вхідна дата',
+            'attestation_registration_sent': 'На вих. лист',
+            'get_registered_acts_for_export': 'Акти у відповіді',
+            'received_by__full_name': 'Хто отримав/вніс',
+        }
+        return export_to_excel(
+            response_list_queryset, 
+            columns, 
+            filename='attestation_responses_export.xlsx', 
+            include_row_numbers=True
+        )
 
     paginator = Paginator(response_list_queryset, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    
+
     context = {
         'page_title': 'Відповіді від ДССЗЗІ на реєстрацію Актів',
         'object_list': page_obj,
         'page_obj': page_obj,
-        'all_registrations_sent': AttestationRegistration.objects.order_by('-outgoing_letter_date'), # Для фільтра
-        'current_filter_att_reg_id': current_filter_att_reg_id,
+        'form': form, # Передаємо форму в шаблон
     }
     return render(request, 'oids/lists/attestation_response_list.html', context)
 
+@login_required
+def attestation_registered_acts_list_view(request):
+    # 1. Початковий запит: обираємо тільки Акти Атестації, які зареєстровані
+    try:
+        attestation_act_type = DocumentType.objects.get(duration_months=60)
+        base_queryset = Document.objects.filter(
+            document_type=attestation_act_type,
+            dsszzi_registered_number__isnull=False
+        ).exclude(dsszzi_registered_number__exact='').select_related(
+            'oid__unit', 
+            'attestation_registration_sent', 
+            'attestation_registration_sent__response_received'
+        )
+    except DocumentType.DoesNotExist:
+        base_queryset = Document.objects.none()
+
+    # 2. Фільтрація
+    form = RegisteredActsFilterForm(request.GET or None)
+    if form.is_valid():
+        if form.cleaned_data.get('unit'):
+            base_queryset = base_queryset.filter(oid__unit__in=form.cleaned_data['unit'])
+        if form.cleaned_data.get('registration_date_from'):
+            base_queryset = base_queryset.filter(dsszzi_registered_date__gte=form.cleaned_data['registration_date_from'])
+        if form.cleaned_data.get('registration_date_to'):
+            base_queryset = base_queryset.filter(dsszzi_registered_date__lte=form.cleaned_data['registration_date_to'])
+
+        search_query = form.cleaned_data.get('search_query')
+        if search_query:
+            base_queryset = base_queryset.filter(
+                Q(document_number__icontains=search_query) |
+                Q(oid__cipher__icontains=search_query) |
+                Q(dsszzi_registered_number__icontains=search_query)
+            )
+
+    # 3. Сортування
+    sort_by = request.GET.get('sort_by', '-dsszzi_registered_date') # За замовчуванням - найновіші
+    # (можна додати більш складну логіку сортування, як на інших сторінках)
+    final_queryset = base_queryset.order_by(sort_by)
+
+    # 4. Експорт в Excel
+    if request.GET.get('export') == 'excel':
+        columns = {
+            'oid__unit__code': 'ВЧ', 
+            'oid__cipher': 'ОІД (Шифр)',
+            'document_number': 'Акт атестації (підг. №)',
+            'work_date': 'Дата підг. акту',
+            'get_sent_info_for_export': 'Відправлено (Вих. лист)',
+            'dsszzi_registered_number': 'Номер реєстрації ДССЗЗІ',
+            'dsszzi_registered_date': 'Дата реєстрації ДССЗЗІ',
+            'get_response_info_for_export': 'Лист-відповідь ДССЗЗІ',
+        }
+        return export_to_excel(
+            final_queryset, 
+            columns, 
+            filename='registered_acts.xlsx', 
+            include_row_numbers=True
+        )
+
+    # 5. Пагінація
+    paginator = Paginator(final_queryset, 50)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'page_title': 'Реєстр Актів Атестації',
+        'object_list': page_obj,
+        'page_obj': page_obj,
+        'form': form,
+    }
+    return render(request, 'oids/lists/attestation_registered_num_list.html', context)
 
 # View для внесення "Відповіді від ДССЗЗІ"
 

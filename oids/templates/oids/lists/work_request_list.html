@@ -17,59 +17,41 @@
             </a>
         </div>
     </div>
-    {# Форма для фільтрації Заявок #}
-    <form method="GET" action="{% url 'oids:list_work_requests' %}" class="mb-4 p-3 border bg-light rounded">
-        <div class="row g-3">
-            <div class="col-md-3">
-                <label for="filter_unit_wr" class="form-label">Військова частина:</label>
-                <select name="filter_unit" id="filter_unit_wr" class="form-select tomselect-field">
-                    <option value="">Всі ВЧ</option>
-                    {% for unit_choice in units_for_filter %}
-                        <option value="{{ unit_choice.id }}" {% if current_filter_unit_id == unit_choice.id %}selected{% endif %}>
-                            {{ unit_choice.code }} - {{ unit_choice.name|default_if_none:unit_choice.city }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label for="filter_status_wr" class="form-label">Статус заявки:</label>
-                <select name="filter_status" id="filter_status_wr" class="form-select tomselect-field">
-                    <option value="">Всі статуси</option>
-                    {% for value, text in status_choices_for_filter %}
-                        <option value="{{ value }}" {% if current_filter_status == value %}selected{% endif %}>{{ text }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-2">
-                <label for="filter_date_from_wr" class="form-label">Дата заявки (з):</label>
-                <input type="date" name="filter_date_from" id="filter_date_from_wr" class="form-control" value="{{ current_filter_date_from|default:'' }}">
-            </div>
-            <div class="col-md-2">
-                <label for="filter_date_to_wr" class="form-label">Дата заявки (по):</label>
-                <input type="date" name="filter_date_to" id="filter_date_to_wr" class="form-control" value="{{ current_filter_date_to|default:'' }}">
-            </div>
-            <div class="col-md-2">
-                <label for="search_query_filter_wr" class="form-label">Пошук:</label>
-                <input type="text" name="search_query" id="search_query_filter_wr" class="form-control" value="{{ current_search_query|default:'' }}">
-            </div>
+{# oids/templates/oids/lists/work_request_list.html #}
+
+{# --- НОВА ФОРМА ФІЛЬТРІВ --- #}
+<form method="GET" class="mb-4 p-3 border bg-light rounded">
+    <div class="row g-3 align-items-end">
+        <div class="col-md-4">
+            {{ form.unit.label_tag }}
+            {{ form.unit }}
         </div>
-        <div class="row g-3 mt-2">
-            <div class="col-md-auto">
-                <button type="submit" class="btn btn-primary">Фільтрувати</button>
-            </div>
-            <div class="col-md-auto">
-                <a href="{% url 'oids:list_work_requests' %}" class="btn btn-secondary">Скинути фільтри</a>
-            </div>
+        <div class="col-md-2">
+            {{ form.status.label_tag }}
+            {{ form.status }}
         </div>
-        {% if current_sort_by %}
-            <input type="hidden" name="sort_by" value="{{ current_sort_by }}">
-            {% if current_sort_order_is_desc %}
-                 <input type="hidden" name="sort_order" value="desc">
-            {% else %}
-                 <input type="hidden" name="sort_order" value="asc">
-            {% endif %}
-        {% endif %}
-    </form>
+        <div class="col-md-3">
+            {{ form.date_from.label_tag }}
+            {{ form.date_from }}
+        </div>
+        <div class="col-md-3">
+            {{ form.date_to.label_tag }}
+            {{ form.date_to }}
+        </div>
+    </div>
+    <div class="row g-3 mt-2">
+        <div class="col-md-8">
+            {{ form.search_query.label_tag }}
+            {{ form.search_query }}
+        </div>
+        <div class="col-md-2 align-self-end">
+            <button type="submit" class="btn btn-primary w-100">Фільтрувати</button>
+        </div>
+        <div class="col-md-2 align-self-end">
+            <a href="{% url 'oids:list_work_requests' %}" class="btn btn-secondary w-100">Скинути</a>
+        </div>
+    </div>
+</form>
 
     {% if object_list %}
         <div class="table-responsive">
@@ -79,7 +61,8 @@
                         {% url 'oids:list_work_requests' as list_url %}
                         {% with unit_param=current_filter_unit_id|default_if_none:""|stringformat:"s" status_param=current_filter_status|default_if_none:"" date_from_param=current_filter_date_from|default_if_none:"" date_to_param=current_filter_date_to|default_if_none:"" search_param=current_search_query|default_if_none:"" %}
                         {% with base_filter_params="filter_unit="|add:unit_param|add:"&filter_status="|add:status_param|add:"&filter_date_from="|add:date_from_param|add:"&filter_date_to="|add:date_to_param|add:"&search_query="|add:search_param %}
-                        <th>
+                        <th>№<br>з/п</th>
+						<th>
                             <a href="{{ list_url }}?sort_by=unit&sort_order={% if current_sort_by == 'unit' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
                                 ВЧ {% if current_sort_by == 'unit' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
                             </a>
@@ -110,6 +93,7 @@
 					<!-- wr це змінна для work_request -->
                     {% for wr in object_list %}
                         <tr>
+							<td>{{ page_obj.start_index|add:forloop.counter0 }}.</td>
                             <td>
                                 {% if wr.unit %}
                                 <a href="{% url 'oids:main_dashboard' %}?unit={{ wr.unit.id }}">
@@ -160,39 +144,14 @@
 {% endblock %}
 
 {% block extra_js %}
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const selectsToInitializeWR = ['filter_unit_wr', 'filter_status_wr'];
-    
     if (typeof TomSelect !== 'undefined') {
-        selectsToInitializeWR.forEach(function(selectId) {
-            const element = document.getElementById(selectId);
-            if (element) {
-                new TomSelect(element, {
-                    create: false,
-                    placeholder: element.querySelector('option[value=""]').textContent || "Оберіть...",
-                    allowEmptyOption: true,
-                });
-            }
-        });
-    } else {
-        console.log("TomSelect library not found for Work Request list. Filters will use standard select fields.");
-    }
-
-    // Логіка для обмеження дат "з" і "по" (якщо потрібно)
-    const dateFromInput = document.getElementById('filter_date_from_wr');
-    const dateToInput = document.getElementById('filter_date_to_wr');
-
-    if (dateFromInput && dateToInput) {
-        dateFromInput.addEventListener('change', function() {
-            if (this.value) {
-                dateToInput.min = this.value;
-            }
-        });
-        dateToInput.addEventListener('change', function() {
-            if (this.value) {
-                dateFromInput.max = this.value;
-            }
+        document.querySelectorAll('.tomselect-field').forEach(function(element) {
+            new TomSelect(element, {
+                plugins: ['remove_button'],
+            });
         });
     }
 });

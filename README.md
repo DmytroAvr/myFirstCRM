@@ -99,3 +99,13 @@ http://127.0.0.1:8000/oids/technical_tasks/create/
 
 http://127.0.0.1:8000/oids/attestation/new/
 додати можливість додавати ОІД. Якщо реєструють ОІД створений самотужки
+
+
+
+<!-- date -->
+
+return "\n".join(
+	[f"{doc.oid.cipher} ({doc.document_number} від {doc.process_date.strftime('%d.%m.%Y')})" for doc in self.registered_documents.all()]
+)
+
+форматувати цю дату всередині самого методу за допомогою .strftime('%d.%m.%Y').

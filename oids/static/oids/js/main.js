@@ -78,19 +78,24 @@ function hideMessages() {
 /**
  * Встановлює обмеження для полів дати (початок не може бути пізніше кінця, кінець не раніше початку).
  */
+
 function setupDateRangeFilter() {
     const startDateInput = document.querySelector(SELECTORS.START_DATE_INPUT);
     const endDateInput = document.querySelector(SELECTORS.END_DATE_INPUT);
-
+	
     if (startDateInput && endDateInput) {
-        startDateInput.addEventListener("change", function () {
-            endDateInput.setAttribute("min", this.value);
+		startDateInput.addEventListener("change", function () {
+			if (this.value) {
+				endDateInput.setAttribute("min", this.value);
+			}
         });
-
-        endDateInput.addEventListener("change", function () {
-            startDateInput.setAttribute("max", this.value);
+		
+		endDateInput.addEventListener("change", function () {
+			if (this.value) {
+				startDateInput.setAttribute("max", this.value);
+			}
         });
-    }
+	}
 }
 
 // =====================================================================================================

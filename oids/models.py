@@ -557,10 +557,28 @@ class AttestationRegistration(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата внесення інф. про реєстрацію Атестації")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
     history = HistoricalRecords()
+    
+    @property    
+    def get_documents_for_export(self):
+        """
+        Повертає рядок з деталями документів, розділеними символом нового рядка.
+        """
 
+        return "\n".join(
+            [f"{doc.oid.cipher} (підг. № {doc.document_number} від {doc.process_date.strftime('%d.%m.%Y')})" for doc in self.registered_documents.all()]
+        )
+    
     def __str__(self):
         return f"Відправка до ДССЗЗІ №{self.outgoing_letter_number} від {self.outgoing_letter_date.strftime('%d.%m.%Y')}"
+    @property
+    def get_units_for_export(self):
+        """
+        Повертає рядок з кодами ВЧ, розділеними комою.
+        """
+        # prefetch_related('units') у view робить цей запит ефективним
+        return ", ".join([unit.code for unit in self.units.all()])
 
+   
     class Meta:
         verbose_name = "Відправка актів на реєстрацію (ДССЗЗІ)"
         verbose_name_plural = "Відправки актів на реєстрацію (ДССЗЗІ)"
@@ -595,7 +613,23 @@ class AttestationResponse(models.Model):
     created_at = models.DateTimeField(auto_now_add=True) 
     updated_at = models.DateTimeField(auto_now=True)
     history = HistoricalRecords()
-
+    
+    @property
+    def get_registered_acts_for_export(self):
+        """
+        Повертає відформатований рядок з деталями актів для експорту.
+        """
+        if not hasattr(self, 'attestation_registration_sent') or not self.attestation_registration_sent:
+            return "ші not hasattr"
+        
+        items = []
+        for act_doc in self.attestation_registration_sent.registered_documents.all():
+            reg_num = act_doc.dsszzi_registered_number or "немає"
+            reg_date_str = act_doc.dsszzi_registered_date.strftime('%d.%m.%Y') if act_doc.dsszzi_registered_date else "N/A"
+            items.append(
+                f"{act_doc.oid.cipher} (Акт №{act_doc.document_number}, Реєстр.№{reg_num} від {reg_date_str})"
+            )
+        return "\n".join(items)
     def __str__(self):
         return f"Відповідь №{self.response_letter_number} від {self.response_letter_date.strftime('%d.%m.%Y')} на вих. №{self.attestation_registration_sent.outgoing_letter_number}"
 
@@ -683,7 +717,25 @@ class Document(models.Model):
     )
     # Можна додати статус реєстрації саме для цього документа, якщо потрібно більш детально
     # dsszzi_document_status = models.CharField(max_length=20, choices=..., null=True, blank=True)
+	
+    @property
+    def get_sent_info_for_export(self):
+        """Повертає рядок з інформацією про відправку для експорту."""
+        if self.attestation_registration_sent:
+            reg = self.attestation_registration_sent
+            date_str = reg.outgoing_letter_date.strftime('%d.%m.%Y')
+            return f"№ {reg.outgoing_letter_number} від {date_str}"
+        return "N/A"
 
+    @property
+    def get_response_info_for_export(self):
+        """Повертає рядок з інформацією про відповідь для експорту."""
+        if hasattr(self.attestation_registration_sent, 'response_received'):
+            response = self.attestation_registration_sent.response_received
+            date_str = response.response_letter_date.strftime('%d.%m.%Y')
+            return f"№ {response.response_letter_number} від {date_str}"
+        return "N/A"
+    
     def save(self, *args, **kwargs):
          # Логіка обчислення expiration_date
         if self.document_type and self.document_type.has_expiration and self.document_type.duration_months > 0 and self.work_date:

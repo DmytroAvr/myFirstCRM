@@ -68,7 +68,7 @@
 					{# Побудова базових параметрів для фільтрації, щоб не втрачати їх при сортуванні #}
 					{% with unit_param=current_filter_unit_id|default_if_none:""|stringformat:"s" type_param=current_filter_oid_type|default_if_none:"" status_param=current_filter_status|default_if_none:"" sec_param=current_filter_sec_level|default_if_none:"" search_param=current_search_query|default_if_none:"" %}
 					{% with base_filter_params="filter_unit="|add:unit_param|add:"&filter_oid_type="|add:type_param|add:"&filter_status="|add:status_param|add:"&filter_sec_level="|add:sec_param|add:"&search_query="|add:search_param %}
-					<th>№ з/п</th>
+					<th>№<br>з/п</th>
 					<th>
 						<a href="{{ list_url }}?sort_by=city&sort_order={% if current_sort_by == 'city' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
 							Місто {% if current_sort_by == 'city' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
