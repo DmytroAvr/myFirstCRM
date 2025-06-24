@@ -1223,8 +1223,8 @@ def unit_list_view(request):
         'oids' 
     ).annotate(
         oid_count=Count('oids')
-    )
-
+    )   
+    
     # --- Фільтрація ---
     selected_tm_id_str = request.GET.get('territorial_management')
     current_tm_id_int = None # Буде None або int
@@ -1345,8 +1345,9 @@ def oid_list_view(request):
         'unit',  # Завантажуємо пов'язану військову частину
         'unit__territorial_management' # А також ТУ для ВЧ, якщо потрібно (наприклад, для відображення)
     )
-
+	
     # --- Фільтрація ---
+    filter_city = request.GET.get('filter_city')
     filter_unit_id_str = request.GET.get('filter_unit')
     filter_oid_type = request.GET.get('filter_oid_type')
     filter_pemin_sub_type = request.GET.get('filter_pemin_sub_type')
@@ -1355,6 +1356,9 @@ def oid_list_view(request):
     search_query = request.GET.get('search_query')
 
     current_filter_unit_id = None
+    if filter_city:
+        oid_list_queryset = oid_list_queryset.filter(city_id_str=filter_city)
+        
     if filter_unit_id_str and filter_unit_id_str.isdigit():
         current_filter_unit_id = int(filter_unit_id_str)
         oid_list_queryset = oid_list_queryset.filter(unit__id=current_filter_unit_id)
@@ -1398,6 +1402,7 @@ def oid_list_view(request):
             actual_sort_order_is_desc = True
     
     valid_sort_fields = {
+        'city': 'unit__city',
         'unit': 'unit__code',
         'cipher': 'cipher',
         'full_name': 'full_name',
@@ -1423,6 +1428,28 @@ def oid_list_view(request):
 
     oid_list_queryset = oid_list_queryset.order_by(final_order_by_field, secondary_sort)
 
+	# --- ЕКСПОРТ В EXCEL ---
+    if request.GET.get('export') == 'excel':
+        # Стовпці для Excel, що відповідають таблиці на сторінці
+        columns = {
+            'unit__city': 'Місто',
+            'unit__code': 'В/Ч',
+            'cipher': 'Шифр ОІД',
+            'full_name': 'Повна назва ОІД',
+            'get_oid_type_display': 'Тип ОІД',
+            'get_pemin_sub_type_display': 'Клас',
+            'room': 'Приміщення №',
+            'get_status_display': 'Статус',
+            'get_sec_level_display': 'Гриф',
+            'unit__note': 'Примітка',
+        }
+        return export_to_excel(
+            oid_list_queryset, 
+            columns, 
+            filename='OID_list_export.xlsx', 
+            include_row_numbers=True # Вмикаємо нумерацію
+        )
+    
     # --- Пагінація ---
     paginator = Paginator(oid_list_queryset, 50) # 50 ОІД на сторінку
     page_number = request.GET.get('page')
@@ -1446,6 +1473,7 @@ def oid_list_view(request):
         'pemin_sub_type_choices_for_filter': pemin_sub_type_choices_for_filter,
         'oid_status_choices_for_filter': oid_status_choices_for_filter,
         'sec_level_choices_for_filter': sec_level_choices_for_filter,
+        'current_filter_city': filter_city,
         'current_filter_unit_id': current_filter_unit_id,
         'current_filter_oid_type': filter_oid_type,
         'current_filter_pemin_sub_type': filter_pemin_sub_type,

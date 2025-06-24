@@ -5,7 +5,14 @@
 
 {% block content %}
 <div class="container-fluid">
-	<h2 class="mb-4">{{ page_title }}</h2>
+	 <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">{{ page_title }}</h2>
+        <div>
+            <a href="?{{ request.GET.urlencode }}&export=excel" class="btn btn-success">
+                Експорт в Excel
+            </a>
+        </div>
+    </div>
 
 	{# Форма для фільтрації ОІД #}
 	<form method="GET" action="{% url 'oids:list_oids' %}" class="mb-4 p-3 border bg-light rounded">
@@ -94,6 +101,7 @@
 					{# Побудова базових параметрів для фільтрації, щоб не втрачати їх при сортуванні #}
 					{% with unit_param=current_filter_unit_id|default_if_none:""|stringformat:"s" type_param=current_filter_oid_type|default_if_none:"" status_param=current_filter_status|default_if_none:"" sec_param=current_filter_sec_level|default_if_none:"" search_param=current_search_query|default_if_none:"" %}
 					{% with base_filter_params="filter_unit="|add:unit_param|add:"&filter_oid_type="|add:type_param|add:"&filter_status="|add:status_param|add:"&filter_sec_level="|add:sec_param|add:"&search_query="|add:search_param %}
+					<th>№ з/п</th>
 					<th>
 						<a href="{{ list_url }}?sort_by=city&sort_order={% if current_sort_by == 'city' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
 							Місто {% if current_sort_by == 'city' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
@@ -153,6 +161,7 @@
 			<tbody>
 				{% for oid_item in object_list %}
 				<tr>
+					<td>{{ page_obj.start_index|add:forloop.counter0 }}.</td>
 					<td>
 						{% if oid_item.unit.city %}{{ oid_item.unit.city }}
 						{% else %}

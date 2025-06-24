@@ -2,8 +2,8 @@
 
 from django import forms
 from django.forms import inlineformset_factory, modelformset_factory, formset_factory
-from .models import (WorkRequestStatusChoices, WorkTypeChoices, OIDTypeChoices, PeminSubTypeChoices,
-	OIDStatusChoices, AttestationRegistrationStatusChoices, DocumentReviewResultChoices
+from .models import (OIDTypeChoices, OIDStatusChoices, SecLevelChoices, WorkRequestStatusChoices, WorkTypeChoices, 
+    DocumentReviewResultChoices, AttestationRegistrationStatusChoices, PeminSubTypeChoices
 )
 from .models import (
     WorkRequest, WorkRequestItem, OID, Unit, Person, Trip, TripResultForUnit, Document, DocumentType,
@@ -1083,3 +1083,50 @@ class OIDCreateForm(forms.ModelForm):
             cleaned_data['inventory_number'] = ''
             
         return cleaned_data
+    
+
+class OIDFilterForm(forms.Form):
+    # Використовуємо ModelMultipleChoiceField для полів, пов'язаних з моделями
+    unit = forms.ModelMultipleChoiceField(
+        queryset=Unit.objects.all().order_by('code'),
+        required=False,
+        label="Військова частина",
+        widget=forms.SelectMultiple(attrs={'class': 'tomselect-field', 'placeholder': 'Оберіть одну або декілька ВЧ...'})
+    )
+    city = forms.ModelMultipleChoiceField(
+        queryset=Unit.objects.all().order_by('city'),
+        required=False,
+        label="Місто",
+        widget=forms.SelectMultiple(attrs={'class': 'tomselect-field', 'placeholder': 'Оберіть Місто...'})
+    )
+    # Використовуємо MultipleChoiceField для полів з вибором (choices)
+    oid_type = forms.MultipleChoiceField(
+        choices=OIDTypeChoices.choices,
+        required=False,
+        label="Тип ОІД",
+        widget=forms.SelectMultiple(attrs={'class': 'tomselect-field', 'placeholder': 'Оберіть тип...'})
+    )
+    pemin_sub_type = forms.MultipleChoiceField(
+        choices=PeminSubTypeChoices.choices,
+        required=False,
+        label="Клас (ПЕМІН)",
+        widget=forms.SelectMultiple(attrs={'class': 'tomselect-field', 'placeholder': 'Оберіть клас...'})
+    )
+    status = forms.MultipleChoiceField(
+        choices=OIDStatusChoices.choices,
+        required=False,
+        label="Статус",
+        widget=forms.SelectMultiple(attrs={'class': 'tomselect-field', 'placeholder': 'Оберіть статус...'})
+    )
+    sec_level = forms.MultipleChoiceField(
+        choices=SecLevelChoices.choices,
+        required=False,
+        label="Гриф",
+        widget=forms.SelectMultiple(attrs={'class': 'tomselect-field', 'placeholder': 'Оберіть гриф...'})
+    )
+    # Поле для повнотекстового пошуку
+    search_query = forms.CharField(
+        required=False,
+        label="Пошук",
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Пошук по шифру, назві, кімнаті...'})
+    )
