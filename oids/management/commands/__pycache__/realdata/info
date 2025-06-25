@@ -1,0 +1,15 @@
+'oids.csv '
+unit_code — це ключ для звязку з уже існуючою в базі військовою частиною.
+Важливо: значення в колонках 'oid_type', 'status', 'sec_level' мають точно відповідати внутрішнім значенням з 'choices' у вашій моделі (наприклад, активний, а не Активний (В дії)).
+
+
+
+'work_request_items.csv'
+Тут для звязку з батьківською заявкою використовуються 'request_unit_code' та 'request_incoming_number', а для звязку з ОІД — 'oid_cipher'.
+
+'documents.csv '
+Це найскладніший файл, оскільки містить багато звязків.
+Зверніть увагу: 'document_type_name', 'document_type_oid_type', 'document_type_work_type' разом ідентифікують тип документа.
+'wri_request_number' та 'wri_oid_cipher' разом ідентифікують елемент заявки ('WorkRequestItem').
+
+

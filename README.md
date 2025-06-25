@@ -66,7 +66,20 @@ del db.sqlite3
 
 {% extends 'base.html' %}
 
-2. запропонуй атрибути які можуть допомогти узагальнювати інформацію. в яких моделях є потреба в їх доданні. спитай мене про кожній моделі, яка інформація та звязок може бути корисним. на підставі запитань запропонуй нову будову атрибутів та звязків
+
+
+запуск 
+D:\myFirstCRM\oids\management\commands\check.py
+D:\myFirstCRM\oids\management\commands\populate_other_data.py
+
+<!-- python manage.py check -->
+<!-- python manage.py populate_other_data -->
+python manage.py import_real_data tu.csv units.csv
+
+<!-- актуально -->
+python manage.py import_real_data tu.csv units.csv persons.csv document_types.csv oids.csv work_requests.csv work_request_items.csv documents.csv
+
+1. запропонуй атрибути які можуть допомогти узагальнювати інформацію. в яких моделях є потреба в їх доданні. спитай мене про кожній моделі, яка інформація та звязок може бути корисним. на підставі запитань запропонуй нову будову атрибутів та звязків
 
 
 <!-- Тепер важливий момент. Описую звязок документів який потрібно реалізувати.

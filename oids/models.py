@@ -79,8 +79,10 @@ class AttestationRegistrationStatusChoices(models.TextChoices):
     
 class PeminSubTypeChoices(models.TextChoices):
     VARM = 'ВАРМ', 'ВАРМ'
-    AS1Static = 'АС1Стаціонар', 'АС1 Стаціонар'
-    AS1Portable = 'АС1Портативний', 'АС1 Портативний'    
+    AS1StaticSTANDART = 'АС1Стаціонар(стандарт)', 'АС1 Стаціонар (стандарт)'
+    AS1PortableSTANDART = 'АС1Портативний(стандарт)', 'АС1 Портативний (стандарт)'
+    AS1StaticWAR = 'АС1Стаціонар(поВійні)', 'АС1 Стаціонар (по війні)'
+    AS1PortableWAR = 'АС1Портативний(поВійні)', 'АС1 Портативний (по війні)'
     MOVNA = 'МОВНА', 'МОВНА'    
 # --- Models ---
 
@@ -172,7 +174,7 @@ class OID(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення ОІД")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
     pemin_sub_type = models.CharField(
-        max_length=20, 
+        max_length=25, 
         choices=PeminSubTypeChoices.choices, 
         verbose_name="Тип ЕОТ",
         blank=True, # Дозволяє бути порожнім у формах
