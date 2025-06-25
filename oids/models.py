@@ -40,6 +40,7 @@ def add_working_days(start_date, days_to_add):
 class SecLevelChoices(models.TextChoices):
     S = 'Таємно', 'Таємно' 
     TS = 'Цілком таємно', 'Цілком таємно'
+    OTHER = 'уточнити', 'уточнити'
     # DSK = 'ДСК', 'Для службового користування'
  
 class OIDStatusChoices(models.TextChoices):

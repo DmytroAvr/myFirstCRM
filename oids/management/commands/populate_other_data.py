@@ -48,11 +48,11 @@ def populate_data():
     # 2. DocumentType (Типи документів)
     # Створимо кілька типів документів, якщо їх ще немає
     doc_types_data = [
-        {"name": "Акт атестації (DocumentType Name)", "oid_type": "СПІЛЬНИЙ", "work_type": "Атестація", "has_expiration": True, "duration_months": 60, "is_required": True},
-        {"name": "Висновок ІК (DocumentType Name)", "oid_type": "СПІЛЬНИЙ", "work_type": "ІК", "has_expiration": True, "duration_months": 20, "is_required": True},
-        {"name": "Припис на експлуатацію (DocumentType Name)", "oid_type": "СПІЛЬНИЙ", "work_type": "Атестація", "has_expiration": True, "duration_months": 60, "is_required": False},
-        {"name": "План пошуку ЗП (DocumentType Name)", "oid_type": "СПІЛЬНИЙ", "work_type": "СПІЛЬНИЙ", "is_required": True},
-        {"name": "Протокол огляду (DocumentType Name)", "oid_type": "ПЕМІН", "work_type": "Атестація", "is_required": False},
+        {"name": "Акт атестації", "oid_type": "СПІЛЬНИЙ", "work_type": "Атестація", "has_expiration": True, "duration_months": 60},
+        {"name": "Висновок ІК", "oid_type": "СПІЛЬНИЙ", "work_type": "ІК", "has_expiration": True, "duration_months": 20},
+        {"name": "Припис на експлуатацію", "oid_type": "СПІЛЬНИЙ", "work_type": "Атестація", "has_expiration": True, "duration_months": 60},
+        {"name": "План пошуку ЗП", "oid_type": "СПІЛЬНИЙ", "work_type": "СПІЛЬНИЙ"},
+        {"name": "Протокол пошуку ЗП", "oid_type": "ПЕМІН", "work_type": "Атестація"},
     ]
     created_doc_types = []
     for i, dt_data in enumerate(doc_types_data):
