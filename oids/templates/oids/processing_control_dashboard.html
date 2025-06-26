@@ -59,7 +59,6 @@
                             <th>Примітки</th>
                         </tr>
                     </thead>
-					
                     <tbody>
                         {% for task in technical_tasks %}
 							<tr {% if task.read_till_date and task.read_till_date < today_date and task.review_result == ReviewResultChoices.READ %}class="table-danger"{% elif task.review_result == ReviewResultChoices.APPROVED or task.review_result == ReviewResultChoices.AWAITING_DOCS %}class="table-success"{% endif %}>
@@ -101,7 +100,7 @@
         <div class="card-body">
             <form method="GET" class="mb-3 p-3 border bg-light rounded" id="wriFilterForm">
                 {% for key, value in request.GET.items %}
-{% if key != wri_filter_form.prefix|add:"-unit" and key != wri_filter_form.prefix|add:"-oid" and key != wri_filter_form.prefix|add:"-status" and key != wri_filter_form.prefix|add:"-processed" and key != wri_filter_form.prefix|add:"-deadline_from" and key != wri_filter_form.prefix|add:"-deadline_to" and key != wri_filter_form.prefix|add:"-trip_date_from" and key != wri_filter_form.prefix|add:"-trip_date_to" and key != "wri_page" and key != "wri_sort_by" and key != "wri_sort_order" %}                        <input type="hidden" name="{{ key }}" value="{{ value }}">
+					{% if key != wri_filter_form.prefix|add:"-unit" and key != wri_filter_form.prefix|add:"-oid" and key != wri_filter_form.prefix|add:"-status" and key != wri_filter_form.prefix|add:"-processed" and key != wri_filter_form.prefix|add:"-deadline_from" and key != wri_filter_form.prefix|add:"-deadline_to" and key != wri_filter_form.prefix|add:"-trip_date_from" and key != wri_filter_form.prefix|add:"-trip_date_to" and key != "wri_page" and key != "wri_sort_by" and key != "wri_sort_order" %}                        <input type="hidden" name="{{ key }}" value="{{ value }}">
                     {% endif %}
                 {% endfor %}
                <div class="row g-2 align-items-end">
@@ -230,102 +229,109 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("--- DOMContentLoaded: Initializing dashboard scripts ---");
+    if (typeof TomSelect !== 'undefined') {
 
-    if (typeof TomSelect === 'undefined') {
-        console.error("CRITICAL: TomSelect library is not loaded!");
-        return;
-    }
+		const oidsForUnitsUrl = "{% url 'oids:ajax_load_oids_for_multiple_units' %}";
+		
+		function setupCascade(unitElementId, oidElementId) {
+			const unitElement = document.getElementById(unitElementId);
+			const oidElement = document.getElementById(oidElementId);
 
-    const oidsForUnitsUrl = "{% url 'oids:ajax_load_oids_for_multiple_units' %}";
+			if (!unitElement || !oidElement) {
+				console.error(`Setup failed: Elements not found for #${unitElementId} or #${oidElementId}`);
+				return;
+			}
 
-    function setupCascade(unitElementId, oidElementId) {
-        const unitElement = document.getElementById(unitElementId);
-        const oidElement = document.getElementById(oidElementId);
+			const tsOid = new TomSelect(oidElement, {
+				create: false, 
+				placeholder: 'Спочатку оберіть ВЧ...',
+				valueField: 'id',
+				labelField: 'text',
+				searchField: ['text'],
+				allowEmptyOption: true, // Дозволяє вибрати пусту опцію для скидання фільтра
+				plugins: ['remove_button'], // Якщо потрібна кнопка очищення
+			});
 
-        if (!unitElement || !oidElement) {
-            console.error(`Setup failed: Elements not found for #${unitElementId} or #${oidElementId}`);
-            return;
-        }
+			const tsUnit = new TomSelect(unitElement, {
+				placeholder: 'Оберіть одну або декілька ВЧ...',
+				searchField: ['text'],
+				allowEmptyOption: true, // Дозволяє вибрати пусту опцію для скидання фільтра
+				plugins: ['remove_button'], // Якщо потрібна кнопка очищення
+			});
 
-        const tsOid = new TomSelect(oidElement, {
-			create: false, 
-            placeholder: 'Спочатку оберіть ВЧ...',
-            valueField: 'id',
-            labelField: 'text',
-            searchField: ['text'],
-			allowEmptyOption: true, // Дозволяє вибрати пусту опцію для скидання фільтра
-			plugins: ['remove_button'], // Якщо потрібна кнопка очищення
+			// Функція для завантаження ОІДів
+			const loadOidsForUnits = (selectedUnitIds) => {
+				console.log(`[${unitElementId}] Unit selection changed. Selected IDs:`, selectedUnitIds);
+				
+				tsOid.clear();
+				tsOid.clearOptions();
+				tsOid.disable();
+
+				if (!selectedUnitIds || selectedUnitIds.length === 0) {
+					console.log(`[${unitElementId}] No units selected. OID field remains disabled.`);
+					return;
+				}
+
+				const params = new URLSearchParams();
+				selectedUnitIds.forEach(id => params.append('unit_ids[]', id));
+				const fetchUrl = `${oidsForUnitsUrl}?${params.toString()}`;
+
+				console.log(`[${unitElementId}] Fetching OIDs from:`, fetchUrl);
+
+				fetch(fetchUrl)
+					.then(response => {
+						if (!response.ok) { throw new Error('Network response was not ok'); }
+						return response.json();
+					})
+					.then(data => {
+						console.log(`[${unitElementId}] Received ${data.length} OIDs.`, data);
+						// --- ПОЧАТОК ВИПРАВЛЕННЯ ---
+						// Перетворюємо отримані дані у формат, зрозумілий для TomSelect.
+						// Кожен елемент тепер буде мати 'id' та 'text'.
+						const options = data.map(oid => ({
+							id: oid.id.toString(),
+							text: `${oid.cipher} (${oid.oid_type_display})`
+						}));
+						// --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
+						tsOid.addOptions(options);
+						tsOid.enable();         // Вручну вмикаємо поле
+						console.log(`[${unitElementId}] OID field is now enabled.`);
+					})
+					.catch(error => {
+						console.error(`[${unitElementId}] Failed to load OIDs:`, error);
+						tsOid.enable(); // Все одно вмикаємо поле, щоб користувач не застряг
+					});
+			};
+
+			// Прив'язуємо обробник події
+			tsUnit.on('change', loadOidsForUnits);
+
+			// Початкове завантаження, якщо ВЧ вже обрані
+			if (tsUnit.items && tsUnit.items.length > 0) {
+				console.log(`[${unitElementId}] Initial units selected:`, tsUnit.items);
+				loadOidsForUnits(tsUnit.items);
+			} else {
+				tsOid.disable();
+			}
+		}
+		setupCascade('id_tt-unit', 'id_tt-oid');
+		setupCascade('id_wri_filter_unit', 'id_wri_filter_oid');
+
+		console.log("--- Dashboard scripts initialization complete ---");
+
+
+
+		// init other
+		console.log("Initializing TomSelect for OID list filters...");
+        // Знаходимо всі поля з класом 'tomselect-field'
+        document.querySelectorAll('#id_tt-review_result').forEach(function(element) {
+            new TomSelect(element, {
+                // TomSelect автоматично розпізнає атрибут 'multiple'
+                // і ввімкне режим множинного вибору.
+                plugins: ['remove_button'], // Додає 'хрестик' для видалення обраних елементів
+            });
         });
-
-        const tsUnit = new TomSelect(unitElement, {
-            placeholder: 'Оберіть одну або декілька ВЧ...',
-			searchField: ['text'],
-			allowEmptyOption: true, // Дозволяє вибрати пусту опцію для скидання фільтра
-			plugins: ['remove_button'], // Якщо потрібна кнопка очищення
-        });
-
-        // Функція для завантаження ОІДів
-        const loadOidsForUnits = (selectedUnitIds) => {
-            console.log(`[${unitElementId}] Unit selection changed. Selected IDs:`, selectedUnitIds);
-            
-            tsOid.clear();
-            tsOid.clearOptions();
-            tsOid.disable();
-
-            if (!selectedUnitIds || selectedUnitIds.length === 0) {
-                console.log(`[${unitElementId}] No units selected. OID field remains disabled.`);
-                return;
-            }
-
-            const params = new URLSearchParams();
-            selectedUnitIds.forEach(id => params.append('unit_ids[]', id));
-            const fetchUrl = `${oidsForUnitsUrl}?${params.toString()}`;
-
-            console.log(`[${unitElementId}] Fetching OIDs from:`, fetchUrl);
-
-            fetch(fetchUrl)
-                .then(response => {
-                    if (!response.ok) { throw new Error('Network response was not ok'); }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log(`[${unitElementId}] Received ${data.length} OIDs.`, data);
-                    // --- ПОЧАТОК ВИПРАВЛЕННЯ ---
-                    // Перетворюємо отримані дані у формат, зрозумілий для TomSelect.
-                    // Кожен елемент тепер буде мати 'id' та 'text'.
-                    const options = data.map(oid => ({
-                        id: oid.id.toString(),
-                        text: `${oid.cipher} (${oid.oid_type_display})`
-                    }));
-                    // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
-					tsOid.addOptions(options);
-                    tsOid.enable();         // Вручну вмикаємо поле
-                    console.log(`[${unitElementId}] OID field is now enabled.`);
-                })
-                .catch(error => {
-                    console.error(`[${unitElementId}] Failed to load OIDs:`, error);
-                    tsOid.enable(); // Все одно вмикаємо поле, щоб користувач не застряг
-                });
-        };
-
-        // Прив'язуємо обробник події
-        tsUnit.on('change', loadOidsForUnits);
-
-        // Початкове завантаження, якщо ВЧ вже обрані
-        if (tsUnit.items && tsUnit.items.length > 0) {
-            console.log(`[${unitElementId}] Initial units selected:`, tsUnit.items);
-            loadOidsForUnits(tsUnit.items);
-        } else {
-             tsOid.disable();
-        }
     }
-
-    // Запускаємо налаштування для обох блоків
-    setupCascade('id_tt_filter_unit', 'id_tt_filter_oid');
-    setupCascade('id_wri_filter_unit', 'id_wri_filter_oid');
-
-    console.log("--- Dashboard scripts initialization complete ---");
 });
 </script>
 {% endblock %}
