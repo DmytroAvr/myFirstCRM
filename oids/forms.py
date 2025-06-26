@@ -1004,10 +1004,10 @@ class OIDCreateForm(forms.ModelForm):
                 self.add_error('pemin_sub_type', 'Це поле є обов\'язковим для типу ОІД "ПЕМІН".')
             elif pemin_sub_type == PeminSubTypeChoices.SPEAK:
                 self.add_error('pemin_sub_type', 'нє є типу "ПЕМІН".')
-        # Якщо тип ОІД - МОВНА, автоматично встановлюємо "Клас ОІД"
+                
+        # Якщо тип ОІД - МОВНА, автоматично встановлюємо "Клас ОІД" І очищуємо поля, що стосуються тільки ПЕМІН
         elif oid_type == OIDTypeChoices.SPEAK:
-            cleaned_data['pemin_sub_type'] = PeminSubTypeChoices.MOVNA
-            # І очищуємо поля, що стосуються тільки ПЕМІН
+            cleaned_data['pemin_sub_type'] = PeminSubTypeChoices.SPEAKSUBTYPE
             cleaned_data['serial_number'] = ''
             cleaned_data['inventory_number'] = ''
         

@@ -49,7 +49,7 @@
 					{% with base_params="territorial_management="|add:tm_param_str|add:"&search_query="|add:search_param_str %}
 					<th>
 						<a href="{{ list_url }}?sort_by=code&sort_order={% if current_sort_by == 'code' and not is_sorted_desc %}desc{% else %}asc{% endif %}&{{ base_params }}">
-							Код ВЧ {% if current_sort_by == 'code' %}{% if is_sorted_desc %}▼{% else %}▲{% endif %}{% endif %}
+							№<br>ВЧ {% if current_sort_by == 'code' %}{% if is_sorted_desc %}▼{% else %}▲{% endif %}{% endif %}
 						</a>
 					</th>
 					<th>
