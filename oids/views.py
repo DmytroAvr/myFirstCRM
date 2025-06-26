@@ -1179,18 +1179,18 @@ def summary_information_hub_view(request):
     model_views = [
         {'label': 'Військові частини', 'url_name': 'oids:list_units'},
         {'label': 'Об\'єкти інформаційної діяльності (ОІД)', 'url_name': 'oids:list_oids'},
+        {'label': 'Історія змін статусу ОІД', 'url_name': 'oids:list_oid_status_changes'},
+        {'label': 'опрацювання Технічні завдання/Моделі загроз', 'url_name': 'oids:list_technical_tasks'},
         {'label': 'Заявки на проведення робіт', 'url_name': 'oids:list_work_requests'},
-        {'label': 'Опрацьовані документи', 'url_name': 'oids:list_documents'},
         {'label': 'Відрядження', 'url_name': 'oids:list_trips'},
-        {'label': 'Технічні завдання', 'url_name': 'oids:list_technical_tasks'},
         {'label': 'Надсилання на реєстрацію Актів Атестації', 'url_name': 'oids:list_attestation_registrations'},
         {'label': 'Відповіді Реєстрація Атестації', 'url_name': 'oids:list_attestation_responses'},
         {'label': 'Всі Акти зареєстровані Атестації', 'url_name': 'oids:list_registered_acts'},
         {'label': 'Надсилання до частин пакетів документів', 'url_name': 'oids:list_trip_results_for_units'},
-        {'label': 'Історія змін статусу ОІД', 'url_name': 'oids:list_oid_status_changes'},
         {'label': 'Довідник: Територіальні управління', 'url_name': 'oids:list_territorial_managements'},
         {'label': 'Довідник: Групи військових частин', 'url_name': 'oids:list_unit_groups'},
         {'label': 'Довідник: Типи документів', 'url_name': 'oids:list_document_types'},
+        {'label': 'Довідник: Опрацьовані документи', 'url_name': 'oids:list_documents'},
         {'label': 'Довідник: Виконавці (Особи)', 'url_name': 'oids:list_persons'},
     ]
     context = {
@@ -2134,6 +2134,16 @@ def attestation_response_list_view(request):
 def attestation_registered_acts_list_view(request):
     # 1. Початковий запит: обираємо тільки Акти Атестації, які зареєстровані
     try:
+	# 	        attestation_act_type = DocumentType.objects.get(
+    #     duration_months=60,
+    #     # Додайте інші поля для унікальності, наприклад:
+    #     name="Акт атестації комплексу ТЗІ"
+    # )
+    # except DocumentType.DoesNotExist:
+    #         attestation_act_type = DocumentType.objects.filter(duration_months=60).first() # Якщо все ще повертається кілька об'єктів
+    #         pass
+    # except DocumentType.MultipleObjectsReturned: 
+    #     attestation_act_type = DocumentType.objects.filter(duration_months=60).first() # Якщо все ще повертається кілька об'єктів
         attestation_act_type = DocumentType.objects.get(duration_months=60)
         base_queryset = Document.objects.filter(
             document_type=attestation_act_type,
@@ -2200,7 +2210,6 @@ def attestation_registered_acts_list_view(request):
         'form': form,
     }
     return render(request, 'oids/lists/attestation_registered_num_list.html', context)
-
 # View для внесення "Відповіді від ДССЗЗІ"
 
 @login_required 

@@ -1,0 +1,4 @@
+unit_code,full_name,city,distance,tu_code
+3001,101-ша бригада,Київ,10,TU_CENTER
+3011,1-ша бригада,Гончарівське,150,TU_CENTER
+А0284,24-та бригада,Яворів,550,TU_WEST

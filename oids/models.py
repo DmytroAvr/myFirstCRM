@@ -143,6 +143,7 @@ class Unit(models.Model):
         # related_name='units_in_group' # Дозволить отримати всі частини для групи: `group_instance.units.all()`
     )
     note = models.TextField(verbose_name="Примітки", blank=True, null=True)
+    is_active = models.BooleanField(default=True, verbose_name="Активний")
     history = HistoricalRecords()
     def __str__(self):
         return f"{self.code} - {self.name or self.city}" # Виводимо код і назву/місто
