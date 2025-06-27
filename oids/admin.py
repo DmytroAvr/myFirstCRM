@@ -5,7 +5,8 @@ from .models import (
     Person, WorkRequest, WorkRequestItem,
     DocumentType, Document, Trip, OIDStatusChange,
     AttestationRegistration, AttestationResponse,
-    TripResultForUnit, TechnicalTask,
+    TripResultForUnit, TechnicalTask, ProcessTemplate,
+    ProcessStep, OIDProcess, OIDProcessStepInstance,
 )
 
 @admin.register(TerritorialManagement)
@@ -150,5 +151,19 @@ class TechnicalTaskAdmin(SimpleHistoryAdmin):
     search_fields = ('input_number', 'oid__cipher', 'reviewed_by__full_name')
     list_filter = ('review_result', 'input_date', 'oid__unit')
     date_hierarchy = 'input_date'
+
+@admin.register(ProcessTemplate)
+class ProcessTemplateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description', 'applies_to_oid_type', 'applies_to_pemin_subtype', 'is_active')
+
+@admin.register(ProcessStep)
+class ProcessStepAdmin(admin.ModelAdmin):
+    list_display = ('template', 'name', 'order', 'description', 'document_type', 'trigger_document_status', 'responsible_party', 'description')
+
+@admin.register(OIDProcess)
+class OIDProcessAdmin(admin.ModelAdmin):
+    list_display = ('oid', 'template', 'start_date', 'end_date', 'status')
     
-	 
+@admin.register(OIDProcessStepInstance)
+class OIDProcessStepInstanceAdmin(admin.ModelAdmin):
+    list_display = ('oid_process', 'process_step', 'status', 'linked_document', 'completed_at')

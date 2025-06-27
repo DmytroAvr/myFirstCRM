@@ -45,8 +45,11 @@ class SecLevelChoices(models.TextChoices):
  
 class OIDStatusChoices(models.TextChoices):
     NEW = 'створюється', 'Створюється'
-    RECEIVED_TZ = 'отримано ТЗ', 'Отримано ТЗ' # Додано з твого опису "Стан ОІД"
-    RECEIVED_REQUEST = 'отримано заявку', 'Отримано Заявку' # Додано з твого опису "Стан ОІД"
+    RECEIVED_TZ = 'отримано ТЗ/МЗ', 'Отримано ТЗ/МЗ' 
+    RECEIVED_TZ_APPROVE = 'ТЗ/МЗ погоджено', 'ТЗ/МЗ Погоджено' 
+    RECEIVED_REQUEST = 'отримано заявку', 'Отримано Заявку' 
+    RECEIVED_AZR = 'отримано АЗР', 'Отримано АЗР' 
+    RECEIVED_DECLARATION = 'отримано Декларацію', 'Отримано Декларацію' 
     ACTIVE = 'активний', 'Активний (В дії)'
     TERMINATED = 'призупинено', 'Призупинено'
     CANCELED = 'скасований', 'Скасований'
@@ -78,12 +81,26 @@ class AttestationRegistrationStatusChoices(models.TextChoices):
     CANCELED = 'canceled', 'Скасовано (відправку)'
     
 class PeminSubTypeChoices(models.TextChoices):
-    VARM = 'ВАРМ', 'ВАРМ'
-    AS1StaticSTANDART = 'АС1Стаціонар(стандарт)', 'АС1 Стаціонар (стандарт)'
-    AS1PortableSTANDART = 'АС1Портативний(стандарт)', 'АС1 Портативний (стандарт)'
-    AS1StaticWAR = 'АС1Стаціонар(поВійні)', 'АС1 Стаціонар (по війні)'
-    AS1PortableWAR = 'АС1Портативний(поВійні)', 'АС1 Портативний (по війні)'
     SPEAKSUBTYPE = 'МОВНА', 'МОВНА'    
+    VARM = 'ВАРМ', 'ВАРМ'
+    ZARM = 'ЗАРМ', 'ЗАРМ'
+    AS1_23PORTABLE ='АС1-2/3 портативний', 'АС1-2/3 Портативний'
+    AS1_23STAC ='АС1-2/3 Стаціонар', 'АС1-2/3 Стаціонар'
+    AS1_4 ='АС1-4 ДСК', 'АС1-4 ДСК'
+    AS23_4 ='АС2/3-4 ДСК', 'АС2/3-4 МОСІ Соц і т.п.'
+
+class DocumentProcessingStatusChoices(models.TextChoices):
+    DRAFT = 'чернетка', 'Чернетка'
+    SENT_FOR_REGISTRATION = 'надіслано на реєстрацію', 'Надіслано на реєстрацію'
+    REGISTERED = 'зареєстровано', 'Зареєстровано'
+    SENT_TO_UNIT = 'надіслано до в/ч', 'Надіслано до в/ч'
+    COMPLETED = 'завершено', 'Завершено'
+
+class ProcessStepStatusChoices(models.TextChoices):
+    PENDING = 'очікує', 'Очікує'
+    COMPLETED = 'виконано', 'Виконано'
+    SKIPPED = 'пропущено', 'Пропущено'
+
 # --- Models ---
 
 class TerritorialManagement(models.Model):
@@ -694,6 +711,13 @@ class Document(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата внесення документу")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
     expiration_date = models.DateField(verbose_name="Дата завершення дії", blank=True, null=True)
+    processing_status = models.CharField(
+        "Статус опрацювання документа",
+        max_length=30,
+        choices=DocumentProcessingStatusChoices.choices,
+        default=DocumentProcessingStatusChoices.DRAFT,
+        db_index=True
+    )
     history = HistoricalRecords()
 
     # --- НОВІ ПОЛЯ для реєстрації в ДССЗЗІ (для актів атестації) ---
@@ -959,3 +983,97 @@ class TechnicalTask(models.Model):
         verbose_name_plural = "Технічні Завдання" # Змінено
         ordering = ['-input_date', '-read_till_date', '-created_at'] # Додав created_at
 # 
+
+# --- Нові моделі для системи процесів ---
+
+class ProcessTemplate(models.Model):
+    """Шаблон процесу, напр. 'Атестація ПЕОМ (ВАРМ)'."""
+    name = models.CharField("Назва шаблону процесу", max_length=255, unique=True)
+    description = models.TextField("Опис", blank=True)
+    # Поля для визначення, до якого типу ОІД застосовується цей шаблон
+    applies_to_oid_type = MultiSelectField(
+        "Тип ОІД", choices=OIDTypeChoices.choices, max_length=100
+    )
+    applies_to_pemin_subtype = MultiSelectField(
+        "Підтип ПЕМІН", choices=PeminSubTypeChoices.choices, max_length=100, blank=True, null=True
+    )
+    is_active = models.BooleanField("Активний", default=True, help_text="Чи можна використовувати цей шаблон для нових ОІД")
+
+    def __str__(self):
+        return self.name
+    class Meta:
+        verbose_name = "Шаблон процесу"
+        verbose_name_plural = "БізнесПроцес: 1. Шаблони процесів"
+        ordering = ['-id']
+        
+class ProcessStep(models.Model):
+    """Один крок у шаблоні процесу."""
+    class ResponsiblePartyChoices(models.TextChoices):
+        VTZI = 'ВТЗІ', 'ВТЗІ'
+        GU = 'ГУ', 'ГУ'
+        UNIT = 'в/ч', 'в/ч'
+        DSSZZI = 'ДССЗЗІ', 'ДССЗЗІ'
+
+    template = models.ForeignKey(ProcessTemplate, on_delete=models.CASCADE, related_name="steps", verbose_name="Шаблон")
+    name = models.CharField("Назва кроку", max_length=255)
+    order = models.PositiveIntegerField("Порядок виконання", default=10)
+    
+    # Який документ має бути створений/опрацьований на цьому кроці
+    document_type = models.ForeignKey(DocumentType, on_delete=models.PROTECT, verbose_name="Тип документа для кроку")
+    
+    # Який статус документа завершує цей крок
+    trigger_document_status = models.CharField(
+        "Статус документа, що завершує крок",
+        max_length=30,
+        choices=DocumentProcessingStatusChoices.choices,
+        default=DocumentProcessingStatusChoices.COMPLETED
+    )
+    
+    responsible_party = models.CharField("Відповідальний за крок", max_length=20, choices=ResponsiblePartyChoices.choices)
+    description = models.TextField("Інструкції до кроку", blank=True)
+
+    class Meta:
+        verbose_name = "Крок у шаблоні процесу"
+        verbose_name_plural = "БізнесПроцес: 2. Кроки у шаблоні процесу"
+        ordering = ['template', 'order']
+        unique_together = ('template', 'order')
+
+    def __str__(self):
+        return f"{self.template.name} - Крок {self.order}: {self.name}"
+
+  
+class OIDProcess(models.Model):
+    """Екземпляр процесу для конкретного ОІД."""
+    oid = models.OneToOneField(OID, on_delete=models.CASCADE, related_name="active_process", verbose_name="ОІД")
+    template = models.ForeignKey(ProcessTemplate, on_delete=models.PROTECT, verbose_name="Використаний шаблон")
+    start_date = models.DateTimeField(auto_now_add=True, verbose_name="Дата початку")
+    end_date = models.DateTimeField("Дата завершення", null=True, blank=True)
+    status = models.CharField("Статус процесу", max_length=20, choices=ProcessStepStatusChoices.choices, default=ProcessStepStatusChoices.PENDING)
+
+    def __str__(self):
+        return f"Процес '{self.template.name}' для ОІД {self.oid.cipher}"
+    class Meta:
+        verbose_name = "Екземпляр процесу для конкретного ОІД."
+        verbose_name_plural = "БізнесПроцес: 3. Екземпляри процесів для конкретних ОІД."
+        ordering = ['-id']
+        
+class OIDProcessStepInstance(models.Model):
+    """Конкретний екземпляр кроку для процесу ОІД."""
+    oid_process = models.ForeignKey(OIDProcess, on_delete=models.CASCADE, related_name="step_instances", verbose_name="Процес ОІД")
+    process_step = models.ForeignKey(ProcessStep, on_delete=models.PROTECT, verbose_name="Крок з шаблону")
+    status = models.CharField("Статус кроку", max_length=20, choices=ProcessStepStatusChoices.choices, default=ProcessStepStatusChoices.PENDING)
+    linked_document = models.ForeignKey(
+        Document, on_delete=models.SET_NULL, null=True, blank=True,
+        verbose_name="Документ, що виконав крок"
+    )
+    completed_at = models.DateTimeField("Дата виконання", null=True, blank=True)
+
+    class Meta:
+        ordering = ['oid_process', 'process_step__order']
+
+    def __str__(self):
+        return f"{self.oid_process.oid.cipher}: {self.process_step.name} ({self.get_status_display()})"
+    class Meta:
+        verbose_name = "Конкретні екземпляри кроків для процесу ОІД."
+        verbose_name_plural = "БізнесПроцес: 4. Екземпляри кроку для процесу ОІД."
+        ordering = ['-id']
