@@ -1,0 +1,25 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="card">
+    <div class="card-header">
+      <h4 class="mb-0">{{ page_title }}</h4>
+    </div>
+    <div class="card-body">
+      <p>Ви збираєтеся виконати дію для документа <strong>{{ document }}</strong>, пов'язаного з ОІД <strong>{{ document.oid.cipher }}</strong>.</p>
+      <p>Будь ласка, підтвердьте ваші наміри.</p>
+
+      <form method="post">
+        {% csrf_token %}
+        <div class="mb-3">
+          {{ form.as_p }}
+        </div>
+        <a href="{% url 'oids:oid_detail' pk=document.oid.pk %}" class="btn btn-secondary">Скасувати</a>
+        <button type="submit" class="btn btn-primary">Підтвердити та відправити</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

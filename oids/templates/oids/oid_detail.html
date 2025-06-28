@@ -3,6 +3,7 @@
 {% block title %}Деталі ОІД: {{ oid.cipher }}{% endblock %}
 
 {% block page_title %}Деталі ОІД: {{ oid.cipher }} ({{ oid.full_name|default:"Без назви" }}){% endblock %}
+{% load my_custom_filters %}
 
 
 {% block content %}
@@ -37,7 +38,66 @@
     <li class="oid-info__list-item"><strong>Приміщення:</strong>  <span class="oid-info__item-underline"> {{ oid.room }}</span></li>
     <li class="oid-info__list-item"><strong>Поточний стан:</strong>  <span class="oid-info__item-underline"> {{ oid.get_status_display }} >>> <a href="{% url 'oids:update_specific_oid_status' oid_id_from_url=oid.id %}">Змінити статус ОІД</a> </span></li> 
     <li class="oid-info__list-item"><strong>Примітки:</strong>  <span class="oid-info__item-underline"> {{ oid.note|default:"-" }}</span></li>
-    {% if last_attestation_expiration %}
+    {% if active_process %}
+		<div class="card mt-4">
+		<div class="card-header">
+			<h5 class="mb-0">Стан поточного процесу: "{{ active_process.template.name }}"</h5>
+		</div>
+		<div class="card-body">
+			<ul class="list-group list-group-flush">
+			{% for step in step_instances %}
+			<li class="list-group-item d-flex justify-content-between align-items-center">
+				<div>
+				<h6 class="mb-1">
+					{% if step.status == 'виконано' %}
+					<i class="bi bi-check-circle-fill text-success"></i>
+					{% elif step.status == 'очікує' %}
+					<i class="bi bi-play-circle text-primary"></i>
+					{% else %}
+					<i class="bi bi-circle"></i>
+            {% endif %}
+			Крок {{ step.process_step.order|div:10 }}: {{ step.process_step.name }}  
+			Залишок: {{ step.process_step.order|mod:10 }}
+
+          </h6>
+          <small class="text-muted">{{ step.process_step.description }}</small>
+          {% if step.linked_document %}
+            <br>
+            <small>
+              Пов'язаний документ: 
+              <a href="{{ step.linked_document.get_absolute_url }}">{{ step.linked_document }}</a>
+              (Статус: <strong>{{ step.linked_document.get_processing_status_display }}</strong>)
+            </small>
+          {% endif %}
+        </div>
+        
+        {% if step == next_actionable_step %}
+          {# Ми припускаємо, що дія стосується першого документа, пов'язаного з ОІД #}
+          {# В ідеалі, `next_actionable_step` має містити посилання на документ #}
+          {% with initial_document=oid.documents.first %}
+            {% if initial_document %}
+              <a href="{% url 'oids:send_document_for_registration' pk=initial_document.pk %}" class="btn btn-primary btn-sm">
+                Виконати дію
+              </a>
+            {% else %}
+               <span class="badge bg-secondary">Немає документа для дії</span>
+            {% endif %}
+          {% endwith %}
+        {% elif step.status == 'виконано' %}
+            <span class="badge bg-success">Виконано {{ step.completed_at|date:"d.m.Y H:i" }}</span>
+        {% endif %}
+
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-info mt-4">
+  Для цього ОІД немає активних процесів.
+</div>
+{% endif %}	
+	{% if last_attestation_expiration %}
         <li><strong>Атестація дійсна до:</strong> {{ last_attestation_expiration|date:"d.m.Y" }}</li>
     {% endif %}
     {% if last_ik_expiration %}

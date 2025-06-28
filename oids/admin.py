@@ -154,11 +154,11 @@ class TechnicalTaskAdmin(SimpleHistoryAdmin):
 
 @admin.register(ProcessTemplate)
 class ProcessTemplateAdmin(admin.ModelAdmin):
-    list_display = ('name', 'description', 'applies_to_oid_type', 'applies_to_pemin_subtype', 'is_active')
+    list_display = ('name', 'applies_to_oid_type', 'applies_to_pemin_subtype', 'is_active', 'description')
 
 @admin.register(ProcessStep)
 class ProcessStepAdmin(admin.ModelAdmin):
-    list_display = ('template', 'name', 'order', 'description', 'document_type', 'trigger_document_status', 'responsible_party', 'description')
+    list_display = ('template', 'name', 'order', 'document_type', 'trigger_document_status', 'responsible_party', 'description')
 
 @admin.register(OIDProcess)
 class OIDProcessAdmin(admin.ModelAdmin):

@@ -30,6 +30,7 @@ urlpatterns = [
     # URLs для форм
     path('trip/plan/', views.plan_trip_view, name='plan_trip_view_name'),
     path('document/add/', views.add_document_processing_view, name='add_document_processing_view_name'),
+	path('document/<int:pk>/send-for-registration/', views.send_document_for_registration_view, name='send_document_for_registration'),
     path('trip/result/', views.send_trip_results_view, name='send_trip_results_form'),
     # Якщо форма додавання документа викликається з контексту ОІД:
     path('oid/<int:oid_id>/document/add/', views.add_document_processing_view, name='add_document_for_oid_view_name'),
@@ -39,7 +40,6 @@ urlpatterns = [
 	# Отримати Status OID
 	path('oid/update-status/', views.update_oid_status_view, name='update_oid_status'),
 	path('oid/<int:oid_id_from_url>/update-status/', views.update_oid_status_view, name='update_specific_oid_status'),
-
 	path('oid/create/', views.oid_create_view, name='oid_create'), # Новий URL для форми
 	
     
@@ -77,5 +77,6 @@ urlpatterns = [
     path('attestation-responses/', views.attestation_response_list_view, name='list_attestation_responses'),  # URL для списку Отриманих відповідей на реєстрацію
 
 	# path("person-autocomplete/", PersonAutocompleteView.as_view(), name="person_autocomplete"),
+    path('declaration_process/', views.start_declaration_process_view, name='declaration_process_view'),
 
 ]

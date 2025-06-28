@@ -41,3 +41,34 @@ def status_to_bootstrap_class(status):
         'problem': 'bg-warning',
     }
     return mapping.get(status, 'bg-dark') # Повертаємо 'bg-dark' для невідомих статусів
+
+
+
+
+@register.filter
+def div(value, arg):
+    try:
+        return int(value) // int(arg)
+    except (ValueError, ZeroDivisionError):
+        return ''
+
+@register.filter
+def mul(value, arg):
+    try:
+        return int(value) * int(arg)
+    except ValueError:
+        return ''
+
+@register.filter
+def sub(value, arg):
+    try:
+        return int(value) - int(arg)
+    except ValueError:
+        return ''
+
+@register.filter
+def mod(value, arg):
+    try:
+        return int(value) % int(arg)
+    except (ValueError, ZeroDivisionError):
+        return ''

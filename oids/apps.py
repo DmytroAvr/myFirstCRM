@@ -7,3 +7,4 @@ class OidsConfig(AppConfig):
 
     def ready(self):
         import oids.signals # Імпортуємо наш файл з сигналами
+        

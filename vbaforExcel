@@ -1,0 +1,156 @@
+Sub TrimAllFilledCells()
+    Dim ws As Worksheet
+    Dim rng As Range
+    Dim cell As Range
+    Dim lastRow As Long
+    Dim lastCol As Long
+    Dim processedCount As Long
+    
+    ' Отримуємо активний аркуш
+    Set ws = ActiveSheet
+    
+    ' Знаходимо останню заповнену строку та колонку
+    lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    lastCol = ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
+    
+    ' Якщо немає даних, виходимо
+    If lastRow = 1 And lastCol = 1 And IsEmpty(ws.Cells(1, 1)) Then
+        MsgBox "Аркуш порожній!", vbInformation
+        Exit Sub
+    End If
+    
+    ' Встановлюємо діапазон для обробки
+    Set rng = ws.Range(ws.Cells(1, 1), ws.Cells(lastRow, lastCol))
+    
+    ' Вимикаємо оновлення екрану для швидкості
+    Application.ScreenUpdating = False
+    Application.Calculation = xlCalculationManual
+    
+    processedCount = 0
+    
+    ' Проходимо через кожну комірку
+    For Each cell In rng
+        ' Перевіряємо чи комірка заповнена та чи містить текст
+        If Not IsEmpty(cell.Value) And VarType(cell.Value) = vbString Then
+            Dim originalValue As String
+            Dim cleanedValue As String
+            
+            originalValue = cell.Value
+            ' Спочатку прибираємо пробіли на початку та в кінці
+            cleanedValue = Trim(originalValue)
+            ' Потім замінюємо всі подвійні пробіли на одинарні
+            Do While InStr(cleanedValue, "  ") > 0
+                cleanedValue = Replace(cleanedValue, "  ", " ")
+            Loop
+            
+            ' Оновлюємо комірку тільки якщо значення змінилось
+            If originalValue <> cleanedValue Then
+                cell.Value = cleanedValue
+                processedCount = processedCount + 1
+            End If
+        End If
+    Next cell
+    
+    ' Вмикаємо назад оновлення екрану
+    Application.ScreenUpdating = True
+    Application.Calculation = xlCalculationAutomatic
+    
+    ' Показуємо результат
+    MsgBox "Оброблено " & processedCount & " комірок", vbInformation, "Trim завершено"
+    
+End Sub
+
+' Альтернативна версія для обробки тільки виділеної області
+Sub TrimSelectedCells()
+    Dim cell As Range
+    Dim processedCount As Long
+    
+    ' Перевіряємо чи щось виділено
+    If Selection Is Nothing Then
+        MsgBox "Виділіть діапазон комірок для обробки!", vbExclamation
+        Exit Sub
+    End If
+    
+    Application.ScreenUpdating = False
+    processedCount = 0
+    
+    ' Проходимо через виділені комірки
+    For Each cell In Selection
+        If Not IsEmpty(cell.Value) And VarType(cell.Value) = vbString Then
+            Dim originalValue As String
+            Dim cleanedValue As String
+            
+            originalValue = cell.Value
+            ' Спочатку прибираємо пробіли на початку та в кінці
+            cleanedValue = Trim(originalValue)
+            ' Потім замінюємо всі подвійні пробіли на одинарні
+            Do While InStr(cleanedValue, "  ") > 0
+                cleanedValue = Replace(cleanedValue, "  ", " ")
+            Loop
+            
+            ' Оновлюємо комірку тільки якщо значення змінилось
+            If originalValue <> cleanedValue Then
+                cell.Value = cleanedValue
+                processedCount = processedCount + 1
+            End If
+        End If
+    Next cell
+    
+    Application.ScreenUpdating = True
+    
+    MsgBox "Оброблено " & processedCount & " комірок у виділеній області", vbInformation, "Trim завершено"
+    
+End Sub
+
+
+
+
+
+Як впровадити та використовувати:
+1. Відкрийте редактор VBA:
+
+Натисніть Alt + F11 в Excel
+Або перейдіть до вкладки "Розробник" → "Visual Basic"
+
+2. Створіть новий модуль:
+
+У вікні VBA натисніть правою кнопкою на назву вашої книги
+Виберіть "Insert" → "Module"
+Скопіюйте та вставте код у новий модуль
+
+3. Збережіть файл:
+
+Збережіть файл як .xlsm (Excel Macro-Enabled Workbook)
+Або як .xlsb (Excel Binary Workbook)
+
+4. Використання:
+Варіант 1 - Через VBA редактор:
+
+Поставте курсор у функцію TrimAllFilledCells
+Натисніть F5 або кнопку "Run"
+
+Варіант 2 - Через Excel:
+
+Натисніть Alt + F8
+Виберіть потрібний макрос зі списку
+Натисніть "Виконати"
+
+Варіант 3 - Створіть кнопку:
+
+Вкладка "Розробник" → "Вставити" → "Кнопка"
+Намалюйте кнопку на аркуші
+Призначте їй макрос
+
+5. Функції коду:
+TrimAllFilledCells() - обробляє всі заповнені комірки на активному аркуші
+TrimSelectedCells() - обробляє тільки виділені комірки
+6. Безпека:
+
+Код перевіряє чи комірка містить текст перед обробкою
+Показує кількість оброблених комірок
+Оптимізований для швидкої роботи з великими обсягами даних
+
+7. Якщо не працює:
+
+Переконайтеся, що макроси дозволені (Файл → Параметри → Центр управління безпекою)
+Перевірте що файл збережений у форматі з підтримкою макросів

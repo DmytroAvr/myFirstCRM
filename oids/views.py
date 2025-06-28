@@ -11,18 +11,21 @@ from django.utils import timezone
 from .utils import export_to_excel
 import datetime
 from .models import (OIDTypeChoices, OIDStatusChoices, SecLevelChoices, WorkRequestStatusChoices, WorkTypeChoices, 
-    DocumentReviewResultChoices, AttestationRegistrationStatusChoices, PeminSubTypeChoices, add_working_days
+    DocumentReviewResultChoices, AttestationRegistrationStatusChoices, PeminSubTypeChoices, DocumentProcessingStatusChoices, add_working_days
 )
 from .models import (Unit, UnitGroup, OID, OIDStatusChange, TerritorialManagement, 
 	Document, DocumentType, WorkRequest, WorkRequestItem, Trip,TripResultForUnit, 
     Person, TechnicalTask, AttestationRegistration, AttestationResponse, 
+    ProcessTemplate, OIDProcess, 
+    OIDProcessStepInstance, 
 )
 from .forms import ( TripForm, TripResultSendForm, DocumentProcessingMainForm, DocumentItemFormSet, DocumentForm, 
 	WorkRequestForm, WorkRequestItemFormSet,  OIDCreateForm, OIDStatusUpdateForm,  TechnicalTaskCreateForm, TechnicalTaskProcessForm,
-	AttestationRegistrationSendForm, AttestationResponseMainForm, AttestationActUpdateFormSet,
-    
+	AttestationRegistrationSendForm, AttestationResponseMainForm, AttestationActUpdateFormSet   
 )
-from .forms import (
+from .forms_process import ( DeclarationProcessStartForm, SendForRegistrationForm    
+)
+from .forms_filters import (
     WorkRequestFilterForm, OIDFilterForm, TechnicalTaskFilterForm, WorkRequestItemProcessingFilterForm, DocumentFilterForm,
     TechnicalTaskFilterForm, AttestationRegistrationFilterForm, AttestationResponseFilterForm, RegisteredActsFilterForm, 
 )
@@ -613,7 +616,7 @@ def main_dashboard(request):
                     'status_display': oid_instance.get_status_display(),
                     'detail_url': reverse('oids:oid_detail_view_name', args=[oid_instance.id])
                 }
-                if oid_instance.status in [OIDStatusChoices.NEW, OIDStatusChoices.RECEIVED_REQUEST, OIDStatusChoices.RECEIVED_TZ]:
+                if oid_instance.status in [OIDStatusChoices.NEW, OIDStatusChoices.RECEIVED_TZ, OIDStatusChoices.RECEIVED_TZ_APPROVE, OIDStatusChoices.RECEIVED_REQUEST , OIDStatusChoices.RECEIVED_AZR , OIDStatusChoices.RECEIVED_DECLARATION]:
                     oids_creating_list.append(oid_item_data)
                 elif oid_instance.status == OIDStatusChoices.ACTIVE:
                     oid_item_data['ik_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Висновок', WorkTypeChoices.IK)
@@ -675,6 +678,18 @@ def oid_detail_view(request, oid_id):
         pk=oid_id
     )
     
+
+		# Отримуємо інформацію про активний процес для цього ОІД
+    active_process = oid.active_process if hasattr(oid, 'active_process') else None
+    step_instances = []
+    next_actionable_step = None
+
+    if active_process:
+        step_instances = active_process.step_instances.all().order_by('process_step__order')
+        # Знаходимо перший крок, який ще не виконано
+        next_actionable_step = step_instances.filter(status='очікує').first()
+        
+
     status_changes = oid.status_changes.select_related(
         'initiating_document__document_type', # initiating_document може бути null
         'changed_by'
@@ -731,6 +746,9 @@ def oid_detail_view(request, oid_id):
         'last_attestation_expiration': last_attestation_expiration,
         'last_ik_expiration': last_ik_expiration,
         'last_prescription_expiration': last_prescription_expiration,
+        'active_process': active_process,
+        'step_instances': step_instances,
+        'next_actionable_step': next_actionable_step,
     }
     return render(request, 'oids/oid_detail.html', context)
 
@@ -2525,3 +2543,101 @@ def processing_control_view(request):
         'ReviewResultChoices': DocumentReviewResultChoices,
     }
     return render(request, 'oids/processing_control_dashboard.html', context)
+
+@transaction.atomic
+def start_declaration_process_view(request):
+    template_name = "ДСК-Декларація"
+    try:
+        process_template = ProcessTemplate.objects.get(name=template_name, is_active=True)
+    except ProcessTemplate.DoesNotExist:
+        messages.error(request, f"Шаблон процесу '{template_name}' не знайдено або не активний.")
+        return redirect('oids:dashboard') # або на головну
+
+    if request.method == 'POST':
+        form = DeclarationProcessStartForm(request.POST)
+        if form.is_valid():
+            data = form.cleaned_data
+            
+            # 1. Створення ОІД
+            new_oid = OID.objects.create(
+                unit=data['unit'],
+                cipher=data['cipher'],
+                oid_type=data['oid_type'],
+                sec_level=data['sec_level'],
+                status=data['initial_oid_status'],
+                room=data['room'],
+                full_name=data.get('full_name', ''),
+                pemin_sub_type=data['pemin_sub_type'],
+                serial_number=data.get('serial_number', ''),
+                inventory_number=data.get('inventory_number', ''),
+                note=data.get('note', '')
+            )
+            messages.success(request, f"ОІД {new_oid.cipher} успішно створено.")
+
+            # 2. Створення початкового документа "Декларація"
+            declaration_doc_type = DocumentType.objects.get(name="Декларація відповідності")
+            declaration_doc = Document.objects.create(
+                oid=new_oid,
+                document_type=declaration_doc_type,
+                # Можна встановити автора, якщо є логіка визначення поточного користувача
+                # author=request.user.person,
+                document_number=f"ДЕКЛ-{new_oid.cipher}", # Генерація унікального номера
+                process_date=datetime.date.today(),
+                work_date=datetime.date.today(),
+                processing_status=DocumentProcessingStatusChoices.DRAFT # Початковий статус
+            )
+            messages.info(request, f"Створено чернетку документа '{declaration_doc.document_number}'.")
+
+            # 3. Запуск процесу для ОІД
+            oid_process = OIDProcess.objects.create(oid=new_oid, template=process_template)
+            
+            # 4. Створення екземплярів кроків
+            for step_template in process_template.steps.all():
+                OIDProcessStepInstance.objects.create(
+                    oid_process=oid_process,
+                    process_step=step_template
+                )
+            
+            messages.success(request, f"Для ОІД {new_oid.cipher} запущено процес '{process_template.name}'.")
+            return redirect('oids:oid_detail', pk=new_oid.pk) # Перенаправляємо на сторінку ОІД
+            
+    else:
+        form = DeclarationProcessStartForm()
+
+    context = {
+        'form': form,
+        'page_title': f'Ініціація процесу: {template_name}'
+    }
+    return render(request, 'oids/generic_form.html', context)
+
+
+def send_document_for_registration_view(request, pk):
+    document = get_object_or_404(Document, pk=pk)
+    
+    # Перевірка, чи можна виконати цю дію
+    if document.processing_status != DocumentProcessingStatusChoices.DRAFT:
+        messages.warning(request, "Цей документ вже було відправлено або опрацьовано.")
+        return redirect('oids:oid_detail', pk=document.oid.pk)
+
+    if request.method == 'POST':
+        form = SendForRegistrationForm(request.POST)
+        if form.is_valid():
+            # Основна логіка: змінюємо статус і зберігаємо
+            document.processing_status = DocumentProcessingStatusChoices.SENT_FOR_REGISTRATION
+            document.save(update_fields=['processing_status', 'updated_at'])
+            
+            # Сигнал `post_save` автоматично оновить крок процесу в цей момент
+            
+            messages.success(request, f"Документ '{document}' було успішно відправлено на реєстрацію.")
+            return redirect('oids:oid_detail', pk=document.oid.pk)
+    else:
+        form = SendForRegistrationForm()
+        
+    context = {
+        'form': form,
+        'document': document,
+        'page_title': f'Підтвердження: Відправити на реєстрацію {document}'
+    }
+    return render(request, 'oids/action_confirm_form.html', context)
+
+

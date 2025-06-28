@@ -41,7 +41,7 @@ class SecLevelChoices(models.TextChoices):
     S = 'Таємно', 'Таємно' 
     TS = 'Цілком таємно', 'Цілком таємно'
     OTHER = 'уточнити', 'уточнити'
-    # DSK = 'ДСК', 'Для службового користування'
+    DSK = 'ДСК', 'ДСК'
  
 class OIDStatusChoices(models.TextChoices):
     NEW = 'створюється', 'Створюється'
@@ -86,8 +86,8 @@ class PeminSubTypeChoices(models.TextChoices):
     ZARM = 'ЗАРМ', 'ЗАРМ'
     AS1_23PORTABLE ='АС1-2/3 портативний', 'АС1-2/3 Портативний'
     AS1_23STAC ='АС1-2/3 Стаціонар', 'АС1-2/3 Стаціонар'
-    AS1_4 ='АС1-4 ДСК', 'АС1-4 ДСК'
-    AS23_4 ='АС2/3-4 ДСК', 'АС2/3-4 МОСІ Соц і т.п.'
+    AS1_4_DSK ='АС1-4 ДСК', 'АС1-4 ДСК'
+    AS23_4_DSK ='АС2/3-4 ДСК', 'АС2/3-4 МОСІ Соц і т.п.'
 
 class DocumentProcessingStatusChoices(models.TextChoices):
     DRAFT = 'чернетка', 'Чернетка'
@@ -984,10 +984,11 @@ class TechnicalTask(models.Model):
         ordering = ['-input_date', '-read_till_date', '-created_at'] # Додав created_at
 # 
 
-# --- Нові моделі для системи процесів ---
 
+
+# --- Створення системи процесів ---
 class ProcessTemplate(models.Model):
-    """Шаблон процесу, напр. 'Атестація ПЕОМ (ВАРМ)'."""
+    """Шаблон процесу, """
     name = models.CharField("Назва шаблону процесу", max_length=255, unique=True)
     description = models.TextField("Опис", blank=True)
     # Поля для визначення, до якого типу ОІД застосовується цей шаблон

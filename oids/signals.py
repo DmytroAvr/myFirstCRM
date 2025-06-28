@@ -1,9 +1,10 @@
 # oids/signals.py
 from django.db.models.signals import m2m_changed
 from django.dispatch import receiver
-from .models import Trip, WorkRequestItem, WorkTypeChoices, OID, add_working_days # Переконайтесь, що всі моделі імпортовані
-# from .utils import add_working_days # Ваша функція для розрахунку робочих днів
-import datetime # Для datetime.timedelta
+import datetime 
+from .models import (Trip, WorkRequestItem, WorkTypeChoices, OID, add_working_days,
+                     Document, OIDProcessStepInstance, ProcessStepStatusChoices, 
+                     OIDStatusChoices )
 
 # Переконайтесь, що функція add_working_days визначена коректно
 # (як ми обговорювали, щоб вона додавала N робочих днів ПІСЛЯ start_date)
@@ -147,3 +148,46 @@ def _calculate_and_set_deadlines_for_trip(trip_instance):
                 item.doc_processing_deadline = new_deadline
                 item.save(update_fields=['doc_processing_deadline', 'updated_at'])
                 print(f"HELPER_DEADLINE: WRI ID {item.id} (OID: {item.oid.cipher}) deadline -> {new_deadline}")
+                
+
+@receiver(post_save, sender=Document)
+def update_process_step_on_document_change(sender, instance, created, **kwargs):
+    """
+    Оновлює статус кроку процесу, коли змінюється статус пов'язаного документа.
+    """
+    document = instance
+    
+    # Шукаємо активний процес для ОІД цього документа
+    if not hasattr(document.oid, 'active_process'):
+        return # У цього ОІД немає активного процесу
+
+    oid_process = document.oid.active_process
+    
+    # Шукаємо крок, який очікує на цей тип документа і цей статус
+    try:
+        step_instance = OIDProcessStepInstance.objects.get(
+            oid_process=oid_process,
+            status=ProcessStepStatusChoices.PENDING,
+            process_step__document_type=document.document_type,
+            process_step__trigger_document_status=document.processing_status
+        )
+    except OIDProcessStepInstance.DoesNotExist:
+        return # Не знайдено відповідного кроку для оновлення
+    except OIDProcessStepInstance.MultipleObjectsReturned:
+        # Обробка випадку, коли знайдено декілька кроків (малоймовірно при правильному дизайні)
+        return
+
+    # Оновлюємо крок
+    step_instance.status = ProcessStepStatusChoices.COMPLETED
+    step_instance.completed_at = timezone.now()
+    step_instance.linked_document = document
+    step_instance.save()
+    
+    # --- Специфічна логіка для кроку 2 з вашого шаблону ---
+    # Якщо завершено крок "Відправка реєстраційних номерів до вч"
+    if step_instance.process_step.name == "Відправка реєстраційних номерів до вч":
+        # Змінюємо статус ОІД на "Активний"
+        oid_to_update = document.oid
+        oid_to_update.status = OIDStatusChoices.ACTIVE
+        oid_to_update.save(update_fields=['status'])
+        print(f"DEBUG: Статус ОІД {oid_to_update.cipher} змінено на Активний.")
