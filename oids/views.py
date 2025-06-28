@@ -583,7 +583,7 @@ def main_dashboard(request):
     через перезавантаження сторінки.
     """
     try:
-        add_request_url = reverse('oids:add_work_request_view_name') 
+        add_request_url = reverse('oids:add_work_request') 
         plan_trip_url = reverse('oids:plan_trip_view_name')
         add_document_processing_url = reverse('oids:add_document_processing_view_name')
     except Exception:

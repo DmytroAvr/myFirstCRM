@@ -9,7 +9,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="mb-0">{{ page_title }}</h2>
         <div>
-            <a href="{% url 'oids:add_work_request_view_name' %}" class="btn btn-primary">Додати нову Заявку</a>
+            <a href="{% url 'oids:add_work_request' %}" class="btn btn-primary">Додати нову Заявку</a>
             
             {# --- НОВА КНОПКА ЕКСПОРТУ --- #}
             <a href="?{{ request.GET.urlencode }}&export=excel" class="btn btn-success">
