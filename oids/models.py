@@ -81,7 +81,7 @@ class AttestationRegistrationStatusChoices(models.TextChoices):
     CANCELED = 'canceled', 'Скасовано (відправку)'
     
 class PeminSubTypeChoices(models.TextChoices):
-    SPEAKSUBTYPE = 'МОВНА', 'МОВНА'    
+    SPEAKSUBTYPE = 'МОВНА', 'МОВНА'   
     VARM = 'ВАРМ', 'ВАРМ'
     ZARM = 'ЗАРМ', 'ЗАРМ'
     AS1_23PORTABLE ='АС1-2/3 портативний', 'АС1-2/3 Портативний'

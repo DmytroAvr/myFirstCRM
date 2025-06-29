@@ -1,0 +1,169 @@
+{# oids/templates/oids/technical_task_control.html #}
+{% extends "oids/base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-4">{{ page_title }}</h2>
+
+    {# --- Блок: Читання Технічних Завдань --- #}
+    <div class="card mb-4">
+        <div class="card-header"><h4 class="mb-0">Контроль опрацювання Технічних Завдань (ТЗ)</h4></div>
+        <div class="card-body">
+            <form method="GET" class="mb-3 p-3 border bg-light rounded" id="ttFilterForm">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                        <label for="{{ tt_filter_form.unit.id_for_label }}">{{ tt_filter_form.unit.label }}:</label>
+                        {{ tt_filter_form.unit }}
+                    </div>
+                    <div class="col-md-3">
+                         <label for="{{ tt_filter_form.oid.id_for_label }}">{{ tt_filter_form.oid.label }}:</label>
+                        {{ tt_filter_form.oid }}
+                    </div>
+                    <div class="col-md-3">
+                        <label for="{{ tt_filter_form.review_result.id_for_label }}">{{ tt_filter_form.review_result.label }}:</label>
+                        {{ tt_filter_form.review_result }}
+                    </div>
+                    <div class="col-md-1 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary btn-sm w-100">Фільтр ТЗ</button>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <a href="{% url 'oids:technical_task_control' %}" class="btn btn-outline-secondary btn-sm w-100">Скинути всі фільтри</a>
+                    </div>
+                </div>
+            </form>
+
+            {% if technical_tasks.object_list %}
+            <div class="table-responsive">
+                <table class="table table-sm table-striped table-bordered table-hover">
+                    <thead class="thead-light">
+                        <tr>
+                            {% url 'oids:technical_task_control' as base_url %}
+                            <th><a href="{{ base_url }}?{{ request.GET.urlencode }}&tt_sort_by=unit&tt_sort_order={% if current_tt_sort_by == 'unit' and current_tt_sort_order == 'asc' %}desc{% else %}asc{% endif %}">ВЧ / ОІД</a></th>
+                            <th><a href="{{ base_url }}?{{ request.GET.urlencode }}&tt_sort_by=input_num&tt_sort_order={% if current_tt_sort_by == 'input_num' and current_tt_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Вхідний № ТЗ</a></th>
+                            <th><a href="{{ base_url }}?{{ request.GET.urlencode }}&tt_sort_by=input_date&tt_sort_order={% if current_tt_sort_by == 'input_date' and current_tt_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Вхідна дата ТЗ</a></th>
+                            <th><a href="{{ base_url }}?{{ request.GET.urlencode }}&tt_sort_by=deadline&tt_sort_order={% if current_tt_sort_by == 'deadline' and current_tt_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Термін опрац.</a></th>
+                            <th><a href="{{ base_url }}?{{ request.GET.urlencode }}&tt_sort_by=status&tt_sort_order={% if current_tt_sort_by == 'status' and current_tt_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Статус ТЗ</a></th>
+							<th><a href="{{ base_url }}?{{ request.GET.urlencode }}&tt_sort_by=updated_at&tt_sort_order={% if current_tt_sort_by == 'updated_at' and current_tt_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Дата оновлення</a></th>
+                            <th><a href="{{ base_url }}?{{ request.GET.urlencode }}&tt_sort_by=executor&tt_sort_order={% if current_tt_sort_by == 'executor' and current_tt_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Хто/Коли опрацював</a></th>
+                            <th>Примітки</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in technical_tasks %}
+							<tr {% if task.read_till_date and task.read_till_date < today_date and task.review_result == ReviewResultChoices.READ %}class="table-danger"{% elif task.review_result == ReviewResultChoices.APPROVED or task.review_result == ReviewResultChoices.AWAITING_DOCS %}class="table-success"{% endif %}>
+                            <td>
+                                <small>{{ task.oid.unit.code }}</small><br>
+                                <a href="{% url 'oids:oid_detail_view_name' task.oid.id %}#task-{{task.id}}">{{ task.oid.cipher }}</a>
+                            </td>
+                            <td>{{ task.input_number }}</td>
+                            <td>{{ task.input_date|date:"d.m.Y" }}</td>
+                            <td>{{ task.read_till_date|date:"d.m.Y" }}</td>
+                            <td>{{ task.get_review_result_display }}</td>
+							<td>{{ task.updated_at|date:"d.m.Y"|default:"-" }}</td>
+                            <td>
+                                {{ task.reviewed_by.full_name|default:"-" }}
+                                {% if task.reviewed_by and task.updated_at != task.created_at and task.review_result != 'READ' %}
+                                    <br><small class="text-muted">({{ task.updated_at|date:"d.m.Y H:i" }})</small>
+                                {% endif %}
+                            </td>
+                            <td>{{ task.note|truncatechars:30|default:"-" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+					
+                </table>
+            </div>
+            {% include "oids/includes/pagination.html" with page_obj=technical_tasks param_prefix="tt_" current_filters=request.GET.urlencode no_scroll=True %}
+            {% else %}
+            <p>Технічні завдання, що відповідають фільтрам, відсутні.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{# Копіюємо той самий JS код для фільтрів з оригінального шаблону #}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof TomSelect !== 'undefined') {
+
+		const oidsForUnitsUrl = "{% url 'oids:ajax_load_oids_for_multiple_units' %}";
+		
+		function setupCascade(unitElementId, oidElementId) {
+			const unitElement = document.getElementById(unitElementId);
+			const oidElement = document.getElementById(oidElementId);
+
+			if (!unitElement || !oidElement) {
+				console.error(`Setup failed: Elements not found for #${unitElementId} or #${oidElementId}`);
+				return;
+			}
+
+			const tsOid = new TomSelect(oidElement, {
+				create: false, 
+				placeholder: 'Спочатку оберіть ВЧ...',
+				valueField: 'id',
+				labelField: 'text',
+				searchField: ['text'],
+				allowEmptyOption: true,
+				plugins: ['remove_button'],
+			});
+
+			const tsUnit = new TomSelect(unitElement, {
+				placeholder: 'Оберіть одну або декілька ВЧ...',
+				searchField: ['text'],
+				allowEmptyOption: true,
+				plugins: ['remove_button'],
+			});
+
+			const loadOidsForUnits = (selectedUnitIds) => {
+				tsOid.clear();
+				tsOid.clearOptions();
+				tsOid.disable();
+
+				if (!selectedUnitIds || selectedUnitIds.length === 0) {
+					return;
+				}
+
+				const params = new URLSearchParams();
+				selectedUnitIds.forEach(id => params.append('unit_ids[]', id));
+				const fetchUrl = `${oidsForUnitsUrl}?${params.toString()}`;
+
+				fetch(fetchUrl)
+					.then(response => response.json())
+					.then(data => {
+						const options = data.map(oid => ({
+							id: oid.id.toString(),
+							text: `${oid.cipher} (${oid.oid_type_display})`
+						}));
+						tsOid.addOptions(options);
+						tsOid.enable();
+					})
+					.catch(error => {
+						console.error(`Failed to load OIDs:`, error);
+						tsOid.enable();
+					});
+			};
+
+			tsUnit.on('change', loadOidsForUnits);
+
+			if (tsUnit.items && tsUnit.items.length > 0) {
+				loadOidsForUnits(tsUnit.items);
+			} else {
+				tsOid.disable();
+			}
+		}
+		setupCascade('id_tt-unit', 'id_tt-oid');
+
+		document.querySelectorAll('#id_tt-review_result').forEach(function(element) {
+            new TomSelect(element, {
+                plugins: ['remove_button'],
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

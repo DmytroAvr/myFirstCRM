@@ -3,11 +3,11 @@
 import datetime
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from oids.models import (PeminSubTypeChoices, OIDStatusChoices, WorkRequestStatusChoices,
+                        SecLevelChoices, WorkTypeChoices,  OIDTypeChoices, )
 from oids.models import (
     TerritorialManagement, UnitGroup, Unit, Person,
-    OID, OIDTypeChoices, SecLevelChoices, OIDStatusChoices,
-    DocumentType, WorkTypeChoices,
-    WorkRequest, WorkRequestItem, WorkRequestStatusChoices,
+    OID, DocumentType, WorkRequest, WorkRequestItem, 
     Document,
     # Додайте інші моделі, якщо їх також потрібно заповнити
     # AttestationRegistration, Trip, TechnicalTask
@@ -46,36 +46,36 @@ class Command(BaseCommand):
         self.stdout.write("Створення типів документів...")
 
         # --- Ключові документи для логіки зміни статусу WRI ---
-        DocumentType.objects.get_or_create(
+        DocumentType.objects.get_or_create( 
             name="Акт атестації комплексу ТЗІ",
-            oid_type='ПЕМІН',
+            oid_type='СПІЛЬНИЙ',
             work_type=WorkTypeChoices.ATTESTATION,
             defaults={'has_expiration': True, 'duration_months': 60}
         )
         DocumentType.objects.get_or_create(
-            name="Висновок експертизи за результатами ІК",
-            oid_type='ПЕМІН',
-            work_type=WorkTypeChoices.IK,
+            name="Висновок ІК",
+            oid_type='СПІЛЬНИЙ',
+            work_type='СПІЛЬНИЙ',
             defaults={'has_expiration': True, 'duration_months': 20}
         )
         # --- Інші документи ---
         DocumentType.objects.get_or_create(
-            name="Програма та методика випробувань",
-            oid_type='ПЕМІН',
+            name="Програма та методика атестації",
+            oid_type='СПІЛЬНИЙ',
             work_type=WorkTypeChoices.ATTESTATION,
             defaults={'has_expiration': False}
         )
         DocumentType.objects.get_or_create(
-            name="Протокол випробувань (ПЕМІН)",
-            oid_type='ПЕМІН',
+            name="Протокол ІК",
+            oid_type='СПІЛЬНИЙ',
             work_type='СПІЛЬНИЙ', # Спільний для Атестації та ІК
             defaults={'has_expiration': False}
         )
         DocumentType.objects.get_or_create(
             name="Припис на експлуатацію",
-            oid_type='МОВНА',
+            oid_type='СПІЛЬНИЙ',
             work_type=WorkTypeChoices.ATTESTATION,
-            defaults={'has_expiration': True, 'duration_months': 120} # Приклад
+            defaults={'has_expiration': True, 'duration_months': 60} # Приклад
         )
         self.stdout.write(self.style.SUCCESS("Типи документів створено."))
 
@@ -111,17 +111,17 @@ class Command(BaseCommand):
         group_kyiv, _ = UnitGroup.objects.get_or_create(name="Київський гарнізон")
 
         # Військові частини
-        unit_a0101, _ = Unit.objects.get_or_create(
-            code="А0101",
+        unit_3030, _ = Unit.objects.get_or_create(
+            code="3030",
             defaults={
                 'name': '101-ша окрема бригада охорони ГШ',
-                'city': 'м. Київ',
+                'city': 'Київ',
                 'distance_from_gu': 10,
                 'territorial_management': tu_center
             }
         )
-        unit_a0563, _ = Unit.objects.get_or_create(
-            code="А0563",
+        unit_2269, _ = Unit.objects.get_or_create(
+            code="2269",
             defaults={
                 'name': '1-ша окрема танкова сіверська бригада',
                 'city': 'смт Гончарівське',
@@ -129,8 +129,8 @@ class Command(BaseCommand):
                 'territorial_management': tu_center
             }
         )
-        unit_a0284, _ = Unit.objects.get_or_create(
-            code="А0284",
+        unit_2240, _ = Unit.objects.get_or_create(
+            code="2240",
             defaults={
                 'name': '24-та окрема механізована бригада',
                 'city': 'м. Яворів',
@@ -140,21 +140,23 @@ class Command(BaseCommand):
         )
 
         # Додавання частини до групи
-        unit_a0101.unit_groups.add(group_kyiv)
+        unit_3030.unit_groups.add(group_kyiv)
 
         self.stdout.write(self.style.SUCCESS("Територіальні управління та військові частини створено."))
 
     def _create_oids(self):
         self.stdout.write("Створення об'єктів інформаційної діяльності (ОІД)...")
         
-        unit_a0101 = Unit.objects.get(code="А0101")
-        unit_a0284 = Unit.objects.get(code="А0284")
+        unit_3030 = Unit.objects.get(code="3030")
+        unit_2240 = Unit.objects.get(code="2240")
 
         OID.objects.get_or_create(
             cipher="101/01-ПЕМІН",
-            unit=unit_a0101,
+            unit=unit_3030,
             defaults={
                 'oid_type': OIDTypeChoices.PEMIN,
+                'pemin_sub_type': PeminSubTypeChoices.AS1_23PORTABLE,
+                'serial_number': 'E325333',
                 'full_name': 'Автоматизоване робоче місце оперативного чергового',
                 'room': 'к. 112',
                 'status': OIDStatusChoices.ACTIVE,
@@ -163,9 +165,10 @@ class Command(BaseCommand):
         )
         OID.objects.get_or_create(
             cipher="101/02-МОВНА",
-            unit=unit_a0101,
+            unit=unit_3030,
             defaults={
                 'oid_type': OIDTypeChoices.SPEAK,
+                'pemin_sub_type': PeminSubTypeChoices.SPEAKSUBTYPE,
                 'full_name': 'Кімната для переговорів командування',
                 'room': 'к. 205',
                 'status': OIDStatusChoices.ACTIVE,
@@ -174,13 +177,15 @@ class Command(BaseCommand):
         )
         OID.objects.get_or_create(
             cipher="284/01-ПЕМІН",
-            unit=unit_a0284,
+            unit=unit_2240,
             defaults={
                 'oid_type': OIDTypeChoices.PEMIN,
+                'pemin_sub_type': PeminSubTypeChoices.VARM,
+                'serial_number': '654555',
                 'full_name': 'Захищений комп\'ютер штабу',
                 'room': 'к. 3, буд. 5',
                 'status': OIDStatusChoices.RECEIVED_REQUEST,
-                'sec_level': SecLevelChoices.S
+                'sec_level': SecLevelChoices.TS
             }
         )
         self.stdout.write(self.style.SUCCESS("ОІД створено."))
@@ -189,13 +194,13 @@ class Command(BaseCommand):
         self.stdout.write("Створення заявок на проведення робіт та їх елементів...")
 
         # Отримання даних, створених раніше
-        unit_a0101 = Unit.objects.get(code="А0101")
+        unit_3030 = Unit.objects.get(code="3030")
         oid_pemin_101 = OID.objects.get(cipher="101/01-ПЕМІН")
         oid_movna_101 = OID.objects.get(cipher="101/02-МОВНА")
 
-        # --- Заявка 1: на атестацію та ІК для ВЧ А0101 ---
+        # --- Заявка 1: на атестацію та ІК для ВЧ 3030 ---
         wr1, created = WorkRequest.objects.get_or_create(
-            unit=unit_a0101,
+            unit=unit_3030,
             incoming_number="123/4/567",
             defaults={
                 'incoming_date': datetime.date(2025, 5, 10),
@@ -216,9 +221,9 @@ class Command(BaseCommand):
                 work_type=WorkTypeChoices.IK
             )
         
-        # --- Заявка 2: тільки на атестацію МОВНА для ВЧ А0101 ---
+        # --- Заявка 2: тільки на атестацію МОВНА для ВЧ 3030 ---
         wr2, created = WorkRequest.objects.get_or_create(
-            unit=unit_a0101,
+            unit=unit_3030,
             incoming_number="123/4/888",
             defaults={
                 'incoming_date': datetime.date(2025, 6, 1),
@@ -244,7 +249,7 @@ class Command(BaseCommand):
         wri_ik = WorkRequestItem.objects.get(oid=oid_pemin_101, work_type=WorkTypeChoices.IK)
         
         doc_type_act = DocumentType.objects.get(name="Акт атестації комплексу ТЗІ")
-        doc_type_conclusion = DocumentType.objects.get(name="Висновок експертизи за результатами ІК")
+        doc_type_conclusion = DocumentType.objects.get(name="Висновок ІК")
         
         person_petrenko = Person.objects.get(full_name__startswith="Петренко")
 

@@ -56,6 +56,7 @@ python manage.py main_unit_data  (створити в/ч з каталогу C:\
 
 python manage.py oids/management/commands/populate_all_models.py
 
+python manage.py test
 
 # Видалити старі міграції:
 del oids/migrations/0*.py

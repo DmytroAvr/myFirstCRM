@@ -2355,82 +2355,35 @@ def record_attestation_response_view(request, att_reg_sent_id=None): # Може 
 
 @login_required 
 def processing_control_view(request):
+    """
+    Сторінка "Контроль опрацювання документів".
+    Тепер тут тільки логіка для WorkRequestItem.
+    """
     today_date = datetime.date.today()
 
-    # --- Блок 1: Читання ТЗ ---
-    tt_queryset = TechnicalTask.objects.select_related('oid__unit', 'reviewed_by')
-
-    tt_filter_form = TechnicalTaskFilterForm(request.GET or None, prefix="tt")
-    if tt_filter_form.is_valid():
-        if tt_filter_form.cleaned_data.get('unit'): # Використовуємо __in для списку значень
-            tt_queryset = tt_queryset.filter(oid__unit__in=tt_filter_form.cleaned_data['unit'])
-        if tt_filter_form.cleaned_data.get('oid'): # Використовуємо __in для списку значень
-            tt_queryset = tt_queryset.filter(oid__in=tt_filter_form.cleaned_data['oid'])
-
-        # if tt_filter_form.cleaned_data.get('unit'):
-        #     tt_queryset = tt_queryset.filter(oid__unit=tt_filter_form.cleaned_data['unit'])
-        # if tt_filter_form.cleaned_data.get('oid'):
-        #     tt_queryset = tt_queryset.filter(oid=tt_filter_form.cleaned_data['oid'])
-        if tt_filter_form.cleaned_data.get('review_result'):
-            tt_queryset = tt_queryset.filter(review_result=tt_filter_form.cleaned_data['review_result'])
-    
-    # Сортування для ТЗ (як у вашому файлі)
-    tt_sort_by = request.GET.get('tt_sort_by', '-read_till_date')
-    tt_sort_order = request.GET.get('tt_sort_order', 'asc')
-    tt_valid_sorts = {
-        'unit': 'oid__unit__code', 'oid': 'oid__cipher', 'input_num': 'input_number',
-        'input_date': 'input_date', 'deadline': 'read_till_date', 'status': 'review_result',
-        'executor': 'reviewed_by__full_name', 'exec_date': 'updated_at'
-    }
-    tt_order_by_field_key = tt_sort_by.lstrip('-') # Для отримання чистого імені поля
-    tt_order_by_field = tt_valid_sorts.get(tt_order_by_field_key, '-read_till_date')
-
-    if tt_sort_by.startswith('-'): # Якщо префікс вже є
-        if tt_sort_order == 'asc': # і ми хочемо змінити на asc
-            tt_order_by_field = tt_order_by_field_key
-        # else залишаємо desc (вже з мінусом)
-    elif tt_sort_order == 'desc': # Якщо префікса не було, але хочемо desc
-        tt_order_by_field = f"-{tt_order_by_field}"
-    # інакше залишається asc
-
-    tt_queryset = tt_queryset.order_by(tt_order_by_field, 'input_number')
-
-    tt_paginator = Paginator(tt_queryset, 15) 
-    tt_page_number = request.GET.get('tt_page') 
-    tt_page_obj = tt_paginator.get_page(tt_page_number)
-
-    # --- Блок 2: Опрацювання документів з відрядження (WorkRequestItem) ---
-     # Визначаємо типи ключових документів
+    # --- Блок: Опрацювання документів з відрядження (WorkRequestItem) ---
     attestation_act_type = DocumentType.objects.filter(duration_months=60).first()
     ik_conclusion_type = DocumentType.objects.filter(duration_months=20).first()
 
-    # Створюємо підзапити для отримання дат ключових документів
-    # Підзапит для дати зареєстрованого Акту Атестації
     attestation_date_subquery = Document.objects.filter(
         work_request_item=OuterRef('pk'),
         document_type=attestation_act_type,
         dsszzi_registered_number__isnull=False,
         dsszzi_registered_date__isnull=False
     ).order_by('-process_date').values('process_date')[:1]
-# Підзапит для дати Висновку ІК
+
     ik_date_subquery = Document.objects.filter(
         work_request_item=OuterRef('pk'),
         document_type=ik_conclusion_type
     ).order_by('-process_date').values('process_date')[:1]
 
     wri_queryset = WorkRequestItem.objects.filter(
-        # request__trips__isnull=False 
-        deadline_trigger_trip__isnull=False # відбирає тільки ті WorkRequestItem, у яких поле deadline_trigger_trip не є порожнім.
-    ).exclude(
-        # status=WorkRequestStatusChoices.CANCELED
+        deadline_trigger_trip__isnull=False
     ).select_related(
-        'request__unit', 
-        'oid__unit',
-        'deadline_trigger_trip' 
+        'request__unit', 'oid__unit', 'deadline_trigger_trip'
     ).prefetch_related(
         Prefetch('request__trips', queryset=Trip.objects.order_by('-end_date'))
     ).annotate(
-        # Створюємо нові поля 'final_attestation_date' та 'final_ik_date' для кожного WRI
         final_attestation_date=Subquery(attestation_date_subquery),
         final_ik_date=Subquery(ik_date_subquery)
     ).distinct()
@@ -2439,21 +2392,11 @@ def processing_control_view(request):
     if wri_filter_form.is_valid():
         if wri_filter_form.cleaned_data.get('unit'):
             wri_queryset = wri_queryset.filter(
-				# Використовуємо __in для списку значень
-				Q(request__unit__in=wri_filter_form.cleaned_data['unit']) | 
-				Q(oid__unit__in=wri_filter_form.cleaned_data['unit'])
-			).distinct()
+                Q(request__unit__in=wri_filter_form.cleaned_data['unit']) | 
+                Q(oid__unit__in=wri_filter_form.cleaned_data['unit'])
+            ).distinct()
         if wri_filter_form.cleaned_data.get('oid'):
             wri_queryset = wri_queryset.filter(oid__in=wri_filter_form.cleaned_data['oid'])
-            
-        # if wri_filter_form.cleaned_data.get('unit'):
-        #     wri_queryset = wri_queryset.filter(
-        #         Q(request__unit=wri_filter_form.cleaned_data['unit']) | 
-        #         Q(oid__unit=wri_filter_form.cleaned_data['unit']) # Додано фільтр по ВЧ самого ОІДа теж
-        #     ).distinct()
-        # if wri_filter_form.cleaned_data.get('oid'):
-        #     wri_queryset = wri_queryset.filter(oid=wri_filter_form.cleaned_data['oid'])
-        
         if wri_filter_form.cleaned_data.get('status'):
             wri_queryset = wri_queryset.filter(status=wri_filter_form.cleaned_data['status'])
         if wri_filter_form.cleaned_data.get('deadline_from'):
@@ -2463,19 +2406,17 @@ def processing_control_view(request):
         
         trip_date_from = wri_filter_form.cleaned_data.get('trip_date_from') 
         if trip_date_from:
-            wri_queryset = wri_queryset.filter(deadline_trigger_trip__end_date__gte=trip_date_from) # Знайти завдання, чиє відрядження закінчилось не раніше цієї дати
+            wri_queryset = wri_queryset.filter(deadline_trigger_trip__end_date__gte=trip_date_from)
             
         trip_date_to = wri_filter_form.cleaned_data.get('trip_date_to')
         if trip_date_to:
-            wri_queryset = wri_queryset.filter(deadline_trigger_trip__start_date__lte=trip_date_to) # Знайти завдання, чиє відрядження почалось не пізніше цієї дати
+            wri_queryset = wri_queryset.filter(deadline_trigger_trip__start_date__lte=trip_date_to)
 
-        # Переносимо цю логіку ВСЕРЕДИНУ if wri_filter_form.is_valid():
         processed_filter = wri_filter_form.cleaned_data.get('processed')
         if processed_filter == 'yes':
             wri_queryset = wri_queryset.filter(docs_actually_processed_on__isnull=False)
         elif processed_filter == 'no':
             wri_queryset = wri_queryset.filter(docs_actually_processed_on__isnull=True)
-    # <--- КІНЕЦЬ БЛОКУ is_valid()
 
     wri_sort_by = request.GET.get('wri_sort_by', 'doc_processing_deadline') 
     wri_sort_order = request.GET.get('wri_sort_order', 'asc')
@@ -2530,19 +2471,68 @@ def processing_control_view(request):
 
     context = {
         'page_title': 'Контроль опрацювання',
-        'tt_filter_form': tt_filter_form,
-        'technical_tasks': tt_page_obj,
         'wri_filter_form': wri_filter_form,
         'work_request_items': wri_page_obj, 
         'all_units': all_units, 
         'today_date': today_date,
-        'current_tt_sort_by': tt_sort_by.lstrip('-'),
-        'current_tt_sort_order': 'desc' if tt_sort_by.startswith('-') else tt_sort_order,
         'current_wri_sort_by': wri_sort_by.lstrip('-'), # Чисте ім'я поля для порівняння в шаблоні
         'current_wri_sort_order': current_wri_sort_order_for_template, # Напрямок для наступного кліку
         'ReviewResultChoices': DocumentReviewResultChoices,
     }
     return render(request, 'oids/processing_control_dashboard.html', context)
+
+@login_required
+def technical_task_control_view(request):
+    """
+    Нова view для сторінки "Контроль опрацювання ТЗ/МЗ".
+    """
+    today_date = datetime.date.today()
+
+    tt_queryset = TechnicalTask.objects.select_related('oid__unit', 'reviewed_by')
+
+    tt_filter_form = TechnicalTaskFilterForm(request.GET or None, prefix="tt")
+    if tt_filter_form.is_valid():
+        if tt_filter_form.cleaned_data.get('unit'):
+            tt_queryset = tt_queryset.filter(oid__unit__in=tt_filter_form.cleaned_data['unit'])
+        if tt_filter_form.cleaned_data.get('oid'):
+            tt_queryset = tt_queryset.filter(oid__in=tt_filter_form.cleaned_data['oid'])
+        if tt_filter_form.cleaned_data.get('review_result'):
+            tt_queryset = tt_queryset.filter(review_result=tt_filter_form.cleaned_data['review_result'])
+
+    # Сортування для ТЗ
+    tt_sort_by = request.GET.get('tt_sort_by', '-read_till_date')
+    tt_sort_order = request.GET.get('tt_sort_order', 'asc')
+    tt_valid_sorts = {
+        'unit': 'oid__unit__code', 'oid': 'oid__cipher', 'input_num': 'input_number',
+        'input_date': 'input_date', 'deadline': 'read_till_date', 'status': 'review_result',
+        'executor': 'reviewed_by__full_name', 'exec_date': 'updated_at'
+    }
+    tt_order_by_field_key = tt_sort_by.lstrip('-')
+    tt_order_by_field = tt_valid_sorts.get(tt_order_by_field_key, '-read_till_date')
+
+    if tt_sort_by.startswith('-'):
+        if tt_sort_order == 'asc':
+            tt_order_by_field = tt_order_by_field_key
+    elif tt_sort_order == 'desc':
+        tt_order_by_field = f"-{tt_order_by_field}"
+
+    tt_queryset = tt_queryset.order_by(tt_order_by_field, 'input_number')
+
+    tt_paginator = Paginator(tt_queryset, 15)
+    tt_page_number = request.GET.get('tt_page')
+    tt_page_obj = tt_paginator.get_page(tt_page_number)
+    
+    # Готуємо контекст для передачі в шаблон
+    context = {
+        'page_title': 'Контроль опрацювання ТЗ/МЗ',
+        'tt_filter_form': tt_filter_form,
+        'technical_tasks': tt_page_obj,
+        'today_date': today_date,
+        'current_tt_sort_by': tt_sort_by.lstrip('-'),
+        'current_tt_sort_order': 'desc' if tt_sort_by.startswith('-') else tt_sort_order,
+        'ReviewResultChoices': DocumentReviewResultChoices,
+    }
+    return render(request, 'oids/technical_task_control.html', context)
 
 @transaction.atomic
 def start_declaration_process_view(request):
