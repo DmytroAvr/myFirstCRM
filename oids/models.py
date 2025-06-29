@@ -385,7 +385,9 @@ class WorkRequestItem(models.Model):
         # --- Логіка для Атестації ---
         if self.work_type == WorkTypeChoices.ATTESTATION:
             # Шукаємо тип документа "Акт атестації"
-            attestation_act_type = DocumentType.objects.filter(duration_months=60).first()
+            attestation_act_type = DocumentType.objects.filter(name__icontains="Акт атестації").first()
+             # document_type_act_att = DocumentType.objects.filter(duration_months=60).first() # Ваш спосіб ідентифікації "Акту атестації"
+                    # attestation_act_type = DocumentType.objects.get(name__icontains="Акт атестації")
             if attestation_act_type:
                 # Перевіряємо, чи існує для цього WRI зареєстрований Акт Атестації
                   if existing_docs_for_item.filter(

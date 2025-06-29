@@ -373,7 +373,8 @@ def ajax_load_attestation_acts_for_oid(request):
         try:
             # Знаходимо тип документа "Акт атестації"
             # Краще мати більш надійний спосіб ідентифікації типу, наприклад, по slug або константі
-            attestation_act_doc_type = DocumentType.objects.filter(duration_months=60).first()
+            attestation_act_doc_type = DocumentType.objects.filter(name__icontains="Акт атестації").first()
+            
             
             if attestation_act_doc_type:
                 # Обираємо документи типу "Акт атестації" для даного ОІД,
@@ -391,7 +392,7 @@ def ajax_load_attestation_acts_for_oid(request):
                         # Можна додати більше інформації, якщо потрібно для відображення
                     })
             else:
-                print("AJAX_LOAD_ACTS: DocumentType 'Акт атестації'(duration_months=60) not found.")
+                print("AJAX_LOAD_ACTS: DocumentType 'Акт атестації'(name__icontains=Акт атестації) not found.")
         except ValueError:
             return JsonResponse({'error': 'Невірний ID ОІД'}, status=400)
         except Exception as e:
@@ -412,7 +413,7 @@ def ajax_load_attestation_acts_for_multiple_oids(request):
     if oid_ids:
         try:
             # Ваш спосіб ідентифікації типу документа "Акт атестації"
-            attestation_act_doc_type = DocumentType.objects.filter(duration_months=60).first() 
+            attestation_act_doc_type = DocumentType.objects.filter(name__icontains="Акт атестації").first() 
             # Переконайтеся, що цей фільтр надійний, або використовуйте ID/slug типу документа
 
             if attestation_act_doc_type:
@@ -428,7 +429,7 @@ def ajax_load_attestation_acts_for_multiple_oids(request):
                         'text': f"Акт №{doc.document_number} від {doc.work_date.strftime('%d.%m.%Y')} (ОІД: {doc.oid.cipher}, ВЧ: {doc.oid.unit.code})"
                     })
             else:
-                print("AJAX_LOAD_ACTS_MULTIPLE_OIDS: DocumentType 'Акт атестації' (duration_months=60) not found.")
+                print("AJAX_LOAD_ACTS_MULTIPLE_OIDS: DocumentType 'Акт атестації' (name__icontains=Акт атестації) not found.")
         except Exception as e:
             print(f"Error in ajax_load_attestation_acts_for_multiple_oids: {e}")
             return JsonResponse({'error': 'Серверна помилка при завантаженні актів'}, status=500)
@@ -523,7 +524,7 @@ def ajax_load_documents_for_trip_oids(request):
 
             # Визначаємо DocumentType для "Акт атестації" та "Висновок ІК"
             # Краще мати константи або slug для цих типів
-            attestation_act_type = DocumentType.objects.filter(duration_months="60").first()
+            attestation_act_type = DocumentType.objects.filter(name__icontains="Акт атестації").first()
             ik_conclusion_type = DocumentType.objects.filter(duration_months="20").first()
             
             # Інші типи документів, які входять до пакетів (за потреби)
@@ -711,7 +712,7 @@ def oid_detail_view(request, oid_id):
     ).order_by('-process_date', '-work_date')
 
     # Отримуємо тільки документи типу "Акт атестації" для цього ОІД для секції реєстрації
-    attestation_acts_for_oid = documents.filter(document_type__duration_months=60)
+    attestation_acts_for_oid = documents.filter(document_type__name__icontains="Акт атестації")
 
     trips_for_oid = oid.trips.prefetch_related(
         'units',
@@ -2162,7 +2163,7 @@ def attestation_registered_acts_list_view(request):
     #         pass
     # except DocumentType.MultipleObjectsReturned: 
     #     attestation_act_type = DocumentType.objects.filter(duration_months=60).first() # Якщо все ще повертається кілька об'єктів
-        attestation_act_type = DocumentType.objects.get(duration_months=60)
+        attestation_act_type = DocumentType.objects.get(name__icontains="Акт атестації")
         base_queryset = Document.objects.filter(
             document_type=attestation_act_type,
             dsszzi_registered_number__isnull=False
@@ -2362,7 +2363,7 @@ def processing_control_view(request):
     today_date = datetime.date.today()
 
     # --- Блок: Опрацювання документів з відрядження (WorkRequestItem) ---
-    attestation_act_type = DocumentType.objects.filter(duration_months=60).first()
+    attestation_act_type = DocumentType.objects.filter(name__icontains="Акт атестації").first()
     ik_conclusion_type = DocumentType.objects.filter(duration_months=20).first()
 
     attestation_date_subquery = Document.objects.filter(

@@ -476,7 +476,9 @@ class AttestationRegistrationSendForm(forms.ModelForm):
             if oid_ids_from_data:
                 valid_oid_ids = [int(oid_id) for oid_id in oid_ids_from_data if oid_id.isdigit()]
                 if valid_oid_ids:
-                    document_type_act_att = DocumentType.objects.filter(duration_months=60).first() # Ваш спосіб ідентифікації "Акту атестації"
+                    document_type_act_att = DocumentType.objects.filter(name__icontains="Акт атестації").first() # Ваш спосіб ідентифікації "Акту атестації"
+                    # document_type_act_att = DocumentType.objects.filter(duration_months=60).first() # Ваш спосіб ідентифікації "Акту атестації"
+                    # attestation_act_type = DocumentType.objects.get(name__icontains="Акт атестації")
                     if document_type_act_att:
                         self.fields['attestation_acts_to_send'].queryset = Document.objects.filter(
                             oid_id__in=valid_oid_ids,
