@@ -777,12 +777,16 @@ class TripResultSendForm(forms.ModelForm):
 
 
     def save(self, commit=True):
+        # Викликаємо стандартний метод save(), але поки не зберігаємо в базу (commit=False)
         instance = super().save(commit=False)
         
+        # Ми зберігаємо екземпляр тільки якщо commit=True
         if commit:
-            instance.save() # Спочатку зберігаємо TripResultForUnit, щоб отримати ID
+            # Спочатку зберігаємо основний об'єкт TripResultForUnit, щоб він отримав свій ID
+            instance.save()
             
-            # Тепер зберігаємо ManyToMany зв'язки з даних форми
+            # Тепер, коли об'єкт існує, ми можемо встановити ManyToMany зв'язки.
+            # `self.cleaned_data` містить валідовані дані з форми.
             selected_units = self.cleaned_data.get('units_in_trip')
             if selected_units:
                 instance.units.set(selected_units)
@@ -794,63 +798,7 @@ class TripResultSendForm(forms.ModelForm):
             selected_documents = self.cleaned_data.get('documents_to_send')
             if selected_documents:
                 instance.documents.set(selected_documents)
-            
-            # Оновлення статусу пов'язаних заявок
-            # Це більш складна логіка, оскільки WorkRequest пов'язаний з Trip, а не з TripResultForUnit напряму.
-            # І потрібно визначити, чи всі роботи по заявці завершено з відправкою цих документів.
-            trip_instance = self.cleaned_data.get('trip')
-            if trip_instance:
-                for work_request in trip_instance.work_requests.all():
-                    # Перевіряємо, чи всі WorkRequestItem для цієї заявки тепер можуть вважатися COMPLETED
-                    # на основі відправлених документів. Це потребує детальних бізнес-правил.
-                    # Приклад: якщо всі документи для всіх ОІД заявки відправлено.
-                    all_items_in_request = work_request.items.all()
-                    can_complete_request = True # Початкове припущення
-                    
-                    if not all_items_in_request.exists(): # Якщо заявка без елементів, можливо, її не треба оновлювати
-                        can_complete_request = False
-
-                    for item in all_items_in_request:
-                        # Чи є серед selected_documents ті, що закривають цей item?
-                        # Припустимо, якщо для ОІД цього item є хоча б один документ у selected_documents,
-                        # і цей item був IN_PROGRESS, то він стає COMPLETED.
-                        # Це дуже спрощена логіка!
-                        item_related_docs_sent = selected_documents.filter(oid=item.oid) # Або точніше через work_request_item
-                        
-                        if item.status == WorkRequestStatusChoices.IN_PROGRESS and item_related_docs_sent.exists():
-                            # Перевірка, чи всі необхідні документи для цього item відправлені
-                            # Наприклад, якщо це ІК, і Висновок ІК є серед відправлених документів для цього ОІД
-                            is_ik_conclusion_sent = selected_documents.filter(
-                                oid=item.oid, 
-                                document_type__name__icontains='Висновок ІК' # Або ваш надійний фільтр
-                            ).exists()
-                            # Якщо це Атестація, і зареєстрований Акт Атестації відправлено
-                            is_att_act_sent_and_registered = selected_documents.filter(
-                                oid=item.oid,
-                                document_type__name__icontains='Акт атестації',
-                                dsszzi_registered_number__isnull=False # Перевірка, що він зареєстрований
-                            ).exists()
-
-                            if (item.work_type == WorkTypeChoices.IK and is_ik_conclusion_sent) or \
-                               (item.work_type == WorkTypeChoices.ATTESTATION and is_att_act_sent_and_registered):
-                                item.status = WorkRequestStatusChoices.COMPLETED
-                                item.save(update_fields=['status', 'updated_at'])
-                                print(f"DEBUG: WorkRequestItem {item.id} status updated to COMPLETED.")
-                            else:
-                                can_complete_request = False # Не всі елементи завершені
-                                break 
-                        elif item.status != WorkRequestStatusChoices.COMPLETED and item.status != WorkRequestStatusChoices.CANCELED:
-                            can_complete_request = False # Є незавершені елементи
-                            break
-                    
-                    if can_complete_request:
-                        # Метод save() для WorkRequestItem має викликати оновлення статусу WorkRequest
-                        # Якщо ні, то викликаємо тут, але краще, щоб це робила модель WorkRequestItem
-                        # Наприклад, просто перезберігаємо останній оновлений item, щоб спрацював його save()
-                        last_updated_item = work_request.items.order_by('-updated_at').first()
-                        if last_updated_item:
-                            last_updated_item.update_request_status() # Припускаючи, що цей метод існує і працює
-                        print(f"DEBUG: Attempted to update overall status for WorkRequest {work_request.id}")
+        
         return instance
      
 class TechnicalTaskCreateForm(forms.ModelForm):

@@ -439,19 +439,39 @@ class WorkRequestItem(models.Model):
         # Логіка повернення статусу (наприклад, якщо документ видалено) тут не розглядається.
 
    
+    # oids/models.py -> class WorkRequestItem
+
     def save(self, *args, **kwargs):
-        """
-        Викликає оновлення статусу батьківської заявки після збереження елемента.
-        """
-        # current_status = self.status # Можна зберегти для порівняння, якщо потрібно
+        # Виконуємо стандартне збереження
         super().save(*args, **kwargs)
-              
-        # if hasattr(self, 'request') and self.request is not None:
-           
-        # Викликаємо update_request_status тільки якщо це не створення,
-        # або якщо статус змінився (щоб уникнути зайвих викликів при масовому створенні).
-        # Однак, простіше викликати завжди, а update_request_status зробить перевірку.
-        self.update_request_status()
+        # ПІСЛЯ збереження викликаємо перевірку статусу батьківської заявки
+        self.update_parent_request_status()
+
+    def update_parent_request_status(self):
+        """
+        Перевіряє статуси всіх елементів батьківської заявки і, якщо всі
+        завершені, оновлює статус самої заявки.
+        """
+        parent_request = self.request
+        
+        # Отримуємо всі "братні" елементи, що належать тій самій заявці
+        all_items = parent_request.items.all()
+        
+        # Якщо елементів у заявці немає, нічого не робимо
+        if not all_items.exists():
+            return
+
+        # Перевіряємо, чи ВСІ елементи мають статус "Виконано" або "Скасовано"
+        all_completed = all(
+            item.status in [WorkRequestStatusChoices.COMPLETED, WorkRequestStatusChoices.CANCELED]
+            for item in all_items
+        )
+
+        # Якщо всі елементи завершені і статус самої заявки ще не "Виконано"
+        if all_completed and parent_request.status != WorkRequestStatusChoices.COMPLETED:
+            parent_request.status = WorkRequestStatusChoices.COMPLETED
+            parent_request.save(update_fields=['status'])
+            
     def update_request_status(self):
         """
         Оновлює статус батьківської заявки WorkRequest на основі статусів
@@ -773,69 +793,78 @@ class Document(models.Model):
             return f"№ {response.response_letter_number} від {date_str}"
         return "N/A"
     
-    def save(self, *args, **kwargs):
+    # oids/models.py -> class Document
+
+def save(self, *args, **kwargs):
+    # Отримуємо старий стан об'єкта, щоб знати, чи відбулися зміни
+    old_instance = Document.objects.filter(pk=self.pk).first()
+    
+    # Виконуємо стандартне збереження
+    super().save(*args, **kwargs)
+
+    # --- Початок блоку оновлення статусів ---
+
+    # 1. Перевіряємо, чи пов'язаний документ з елементом заявки
+    if not self.work_request_item:
+        return # Якщо ні, виходимо
+
+    wri = self.work_request_item
+    oid_to_update = wri.oid
+
+    # 2. Надійно визначаємо типи документів за їхніми назвами
+    try:
+        attestation_doc_type = DocumentType.objects.get(name='Акт атестації')
+        ik_conclusion_doc_type = DocumentType.objects.get(name='Висновок ІК') # Або точна назва з твоєї БД
+    except DocumentType.DoesNotExist:
+        # Якщо ключові типи документів не знайдено в базі, нічого не робимо
+        return 
+
+    is_attestation_act = self.document_type == attestation_doc_type
+    is_ik_conclusion = self.document_type == ik_conclusion_doc_type
+
+    # 3. Перевіряємо умови-тригери для кожного типу документа
+    
+    # -- УМОВА ДЛЯ АТЕСТАЦІЇ --
+    # Тригер: Акт атестації, який щойно отримав реєстраційний номер
+    is_registered = bool(self.dsszzi_registered_number and self.dsszzi_registered_date)
+    was_just_registered = not (old_instance and old_instance.dsszzi_registered_number) and is_registered
+
+    should_process_attestation = is_attestation_act and was_just_registered
+
+    # -- УМОВА ДЛЯ ІК --
+    # Тригер: Просто створення документу "Висновок ІК"
+    is_newly_created = old_instance is None
+    
+    should_process_ik = is_ik_conclusion and is_newly_created
+
+    # --- Застосування логіки ---
+
+    # 4. Якщо спрацював один із тригерів...
+    if should_process_attestation or should_process_ik:
         
-         # Логіка обчислення expiration_date
-        if self.document_type and self.document_type.has_expiration and self.document_type.duration_months > 0 and self.work_date:
-            from dateutil.relativedelta import relativedelta 
-            self.expiration_date = self.work_date + relativedelta(months=self.document_type.duration_months)
-        else:
-            # Якщо у документа немає терміну дії або не вказана дата робіт, дата завершення дії не встановлюється
-             if not (self.document_type and self.document_type.has_expiration and self.document_type.duration_months > 0):
-                self.expiration_date = None # Очищаємо, якщо умови не виконані
-        # статус ОІД зміна при АА
-        old_instance = Document.objects.filter(pk=self.pk).first()
-        super().save(*args, **kwargs)
-        if self.work_request_item:
-            wri = self.work_request_item
-            is_attestation_act = self.document_type.duration_months == 60
-            is_registered = bool(self.dsszzi_registered_number and self.dsszzi_registered_date)
-            was_just_registered = not (old_instance and old_instance.dsszzi_registered_number) and is_registered # Перевіряємо, чи був цей акт щойно зареєстрований
-             # Якщо це Акт атестації і він щойно був зареєстрований...
-        if is_attestation_act and was_just_registered:
-            # ...тоді ми оновлюємо статус пов'язаного елемента заявки
-            if wri.status != WorkRequestStatusChoices.COMPLETED:
-                wri.status = WorkRequestStatusChoices.COMPLETED
-                wri.docs_actually_processed_on = self.process_date or datetime.date.today()
-                wri.save(update_fields=['status', 'docs_actually_processed_on'])
+        # ...оновлюємо статус WorkRequestItem на "Виконано"
+        if wri.status != WorkRequestStatusChoices.COMPLETED:
+            wri.status = WorkRequestStatusChoices.COMPLETED
+            wri.docs_actually_processed_on = self.process_date or datetime.date.today()
+            # Зберігаємо WRI, що запустить його власний метод save() і перевірку батьківської заявки
+            wri.save(update_fields=['status', 'docs_actually_processed_on'])
 
-            # --- ПОЧАТОК НОВОЇ ЛОГІКИ ДЛЯ ОНОВЛЕННЯ СТАТУСУ OID ---
-            oid_to_update = wri.oid
-            if oid_to_update:
-                statuses_to_check_for_attestation = [
-					OIDStatusChoices.NEW,
-					OIDStatusChoices.RECEIVED_TZ,
-					OIDStatusChoices.RECEIVED_TZ_APPROVE,
-					OIDStatusChoices.RECEIVED_REQUEST
-				]
-                # 1. Якщо статус ОІДа "в переліку", змінюємо його на "Атестований"
-                if oid_to_update.status in statuses_to_check_for_attestation:
-                    oid_to_update.status = OIDStatusChoices.ATTESTED
-                    oid_to_update.note = f"Об'єкт атестовано {self.process_date.strftime('%d.%m.%Y') if self.process_date else 'невідомої дати'}."
-                    oid_to_update.save(update_fields=['status', 'note'])
-                    print(f"DEBUG: OID '{oid_to_update.cipher}' status changed to ATTESTED.") # Для відлагодження
-                
-                # 2. Якщо статус ОІДа "Активний", додаємо запис про чергову атестацію
-                elif oid_to_update.status == OIDStatusChoices.ACTIVE:
-                    attestation_note = f"Проведено чергову атестацію ({self.process_date.strftime('%d.%m.%Y') if self.process_date else 'дата не вказана'})."
-                    # Додаємо новий запис на початок існуючих приміток
-                    oid_to_update.note = f"{attestation_note}\n{oid_to_update.note or ''}".strip()
-                    oid_to_update.save(update_fields=['note'])
-                    print(f"DEBUG: OID '{oid_to_update.cipher}' note updated with new attestation info.") # Для відлагодження
-            
-            # Переконуємося, що work_request_item ще не COMPLETED або CANCELED,
-            # і що тип роботи work_request_item відповідає типу роботи документа (або документ "СПІЛЬНИЙ")
-            if self.work_request_item.status not in [WorkRequestStatusChoices.COMPLETED, WorkRequestStatusChoices.CANCELED] and \
-               (self.work_request_item.work_type == self.document_type.work_type or self.document_type.work_type == 'СПІЛЬНИЙ'):
-                self.work_request_item.check_and_update_status_based_on_documents()
-            if wri.docs_actually_processed_on is None or self.process_date > wri.docs_actually_processed_on:
-                wri.docs_actually_processed_on = self.process_date
-                wri.save(update_fields=['docs_actually_processed_on', 'updated_at'])
-                print(f"DOCUMENT_SAVE: Set docs_actually_processed_on for WRI ID {wri.id} to {self.process_date}")
-            # Тепер викликаємо перевірку, чи можна завершити WorkRequestItem
-            # Ця функція має бути методом моделі WorkRequestItem
-            wri.check_and_update_status_based_on_documents()
-
+        # ...і оновлюємо статус ОІДа, якщо це була атестація
+        if should_process_attestation and oid_to_update:
+            statuses_for_attestation = [
+                OIDStatusChoices.BEING_CREATED, OIDStatusChoices.NEW,
+                OIDStatusChoices.RECEIVED_TZ, OIDStatusChoices.RECEIVED_TZ_APPROVE,
+                OIDStatusChoices.RECEIVED_REQUEST
+            ]
+            if oid_to_update.status in statuses_for_attestation:
+                oid_to_update.status = OIDStatusChoices.ATTESTED
+                oid_to_update.note = f"Об'єкт атестовано {self.process_date.strftime('%d.%m.%Y') if self.process_date else ''}."
+                oid_to_update.save(update_fields=['status', 'note'])
+            elif oid_to_update.status == OIDStatusChoices.ACTIVE:
+                attestation_note = f"Проведено чергову атестацію ({self.process_date.strftime('%d.%m.%Y') if self.process_date else ''})."
+                oid_to_update.note = f"{attestation_note}\n{oid_to_update.note or ''}".strip()
+                oid_to_update.save(update_fields=['note'])
+                 
     def __str__(self):
         return f"{self.document_type.name} / {self.document_number} (ОІД: {self.oid.cipher})"
 
@@ -1022,7 +1051,7 @@ class TechnicalTask(models.Model):
     history = HistoricalRecords()
 
     def __str__(self):
-        return f"ТЗ\МЗ для ОІД: {self.oid.cipher} (статус: {self.get_review_result_display()}) від {self.input_date.strftime("%d.%m.%Y")} вх.№{self.input_number}"
+        return f"ТЗ/МЗ від в/ч {self.oid.unit.code} на ОІД: {self.oid.cipher} (статус : {self.get_review_result_display()}) від {self.input_date.strftime("%d.%m.%Y")} вх.№{self.input_number}"
 
     class Meta:
         verbose_name = "Технічне Завдання" # Змінено

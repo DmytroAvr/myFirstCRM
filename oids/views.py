@@ -2377,9 +2377,22 @@ def processing_control_view(request):
     Тепер тут тільки логіка для WorkRequestItem.
     """
     today_date = datetime.date.today()
+# --- ОНОВЛЕНА ЛОГІКА ---
 
-    # --- Блок: Опрацювання документів з відрядження (WorkRequestItem) ---
-    attestation_act_type = DocumentType.objects.filter(name__icontains="Акт атестації").first()
+    # 1. Створюємо підзапити, щоб "дістати" дати ОСТАННЬОГО відрядження,
+    #    пов'язаного з батьківською заявкою кожного елемента.
+    latest_trip_start_date = Subquery(
+        Trip.objects.filter(
+            work_requests=OuterRef('request')
+        ).order_by('-end_date').values('start_date')[:1]
+    )
+    latest_trip_end_date = Subquery(
+        Trip.objects.filter(
+            work_requests=OuterRef('request')
+        ).order_by('-end_date').values('end_date')[:1]
+    )
+
+    attestation_act_type = DocumentType.objects.filter(name__icontains="атестац").first()
     ik_conclusion_type = DocumentType.objects.filter(duration_months=20).first()
 
     attestation_date_subquery = Document.objects.filter(
@@ -2394,17 +2407,22 @@ def processing_control_view(request):
         document_type=ik_conclusion_type
     ).order_by('-process_date').values('process_date')[:1]
 
+    # 2. Змінюємо головний фільтр: тепер ми шукаємо всі елементи, у яких
+    #    батьківська заявка має хоча б одне відрядження.
     wri_queryset = WorkRequestItem.objects.filter(
-        deadline_trigger_trip__isnull=False
+        request__trips__isnull=False
     ).select_related(
-        'request__unit', 'oid__unit', 'deadline_trigger_trip'
-    ).prefetch_related(
-        Prefetch('request__trips', queryset=Trip.objects.order_by('-end_date'))
+        'request__unit', 'oid__unit'
     ).annotate(
+        # 3. Додаємо дати останнього відрядження як нові поля до кожного елемента
+        relevant_trip_start_date=latest_trip_start_date,
+        relevant_trip_end_date=latest_trip_end_date,
+        # Твої існуючі анотації
         final_attestation_date=Subquery(attestation_date_subquery),
         final_ik_date=Subquery(ik_date_subquery)
     ).distinct()
     
+  
     wri_filter_form = WorkRequestItemProcessingFilterForm(request.GET or None, prefix="wri")
     if wri_filter_form.is_valid():
         if wri_filter_form.cleaned_data.get('unit'):
@@ -2421,13 +2439,14 @@ def processing_control_view(request):
         if wri_filter_form.cleaned_data.get('deadline_to'):
             wri_queryset = wri_queryset.filter(doc_processing_deadline__lte=wri_filter_form.cleaned_data['deadline_to'])
         
+         # 4. Оновлюємо фільтри по датах відрядження, щоб вони використовували нові анотовані поля
         trip_date_from = wri_filter_form.cleaned_data.get('trip_date_from') 
         if trip_date_from:
-            wri_queryset = wri_queryset.filter(deadline_trigger_trip__end_date__gte=trip_date_from)
+            wri_queryset = wri_queryset.filter(relevant_trip_end_date__gte=trip_date_from)
             
         trip_date_to = wri_filter_form.cleaned_data.get('trip_date_to')
         if trip_date_to:
-            wri_queryset = wri_queryset.filter(deadline_trigger_trip__start_date__lte=trip_date_to)
+            wri_queryset = wri_queryset.filter(relevant_trip_start_date__lte=trip_date_to)
 
         processed_filter = wri_filter_form.cleaned_data.get('processed')
         if processed_filter == 'yes':
@@ -2437,16 +2456,15 @@ def processing_control_view(request):
 
     wri_sort_by = request.GET.get('wri_sort_by', 'doc_processing_deadline') 
     wri_sort_order = request.GET.get('wri_sort_order', 'asc')
-	
+    
     wri_valid_sorts = {
         'unit': 'request__unit__code', 
         'oid': 'oid__cipher', 
         'req_num': 'request__incoming_number', 
-        'req_date': 'request__incoming_date', 
-        'work_type': 'work_type', 
+        # ... (решта полів)
         'status': 'status',
-        # 'trip_dates': 'relevant_trip_end_date', # <--- Використовуємо ім'я анотованого поля
-        'trip_dates': 'deadline_trigger_trip', #замінив на щоб не ломалось
+        # 5. Вказуємо, що сортування по 'trip_dates' має використовувати наше нове анотоване поле
+        'trip_dates': 'relevant_trip_end_date', 
         'deadline': 'doc_processing_deadline', 
         'proc_date': 'docs_actually_processed_on'
     }
