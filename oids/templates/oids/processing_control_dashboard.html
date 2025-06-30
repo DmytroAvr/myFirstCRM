@@ -62,7 +62,75 @@
             
             {# ... (вся таблиця для work_request_items залишається тут) ... #}
              {% if work_request_items.object_list %}
-                {# ... код таблиці ... #}
+               <div class="table-responsive">
+                <table class="table table-sm table-striped table-bordered table-hover">
+                    <thead class="thead-light">
+                        <tr>
+                            <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=unit&wri_sort_order={% if current_wri_sort_by == 'unit' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">ВЧ / ОІД</a></th>
+                            <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=unit&wri_sort_order={% if current_wri_sort_by == 'unit' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Тип ЕОТ</a></th>
+                            <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=req_num&wri_sort_order={% if current_wri_sort_by == 'req_num' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Заявка (№, дата)</a></th>
+                            <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=work_type&wri_sort_order={% if current_wri_sort_by == 'work_type' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Тип робіт</a></th>
+                            <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=status&wri_sort_order={% if current_wri_sort_by == 'status' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Статус опрац. ОІД</a></th>
+                            <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=trip_dates&wri_sort_order={% if current_wri_sort_by == 'trip_dates' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Термін відрядження</a></th>
+                            <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=deadline&wri_sort_order={% if current_wri_sort_by == 'deadline' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}" style="text-wrap: wrap;">Кінцевий термін  опрац.</a></th>
+                            <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=proc_date&wri_sort_order={% if current_wri_sort_by == 'proc_date' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Дата факт. опрац.</a></th>
+                        </tr>
+                    </thead>
+             <tbody>
+                        {% for item in work_request_items %}
+                            {# --- Початок блоку для визначення кольору рядка --- #}
+
+							
+                            {% if item.work_type == 'Атестація' and item.final_attestation_date or item.work_type == 'ІК' and item.final_ik_date %}
+                                <tr class="table-success">
+                            {% elif item.doc_processing_deadline and item.doc_processing_deadline < today_date %}
+                                <tr class="table-danger">
+                            {% else %}
+                                <tr>
+                            {% endif %}
+                            {# --- Кінець блоку для визначення кольору рядка --- #}
+                            
+                                <td>
+                                    <small>{{ item.request.unit.code }}</small><br> 
+                                    <a href="{% url 'oids:oid_detail_view_name' item.oid.id %}">{{ item.oid.cipher }}</a>
+                                </td>
+                                <td>
+                                    {{ item.oid.pemin_sub_type|default:"-" }}
+                                </td>
+                                <td>
+                                    <a href="{% url 'oids:work_request_detail' pk=item.request.pk %}">
+                                        №{{ item.request.incoming_number }} від {{ item.request.incoming_date|date:"d.m.Y" }}
+                                    </a>
+                                </td>
+                                <td>{{ item.get_work_type_display }}</td>
+                                <td>{{ item.get_status_display }}</td>
+                               <td>
+                                    {% if item.deadline_trigger_trip %}
+                                        {{ item.deadline_trigger_trip.start_date|date:"d.m.Y" }} - {{ item.deadline_trigger_trip.end_date|date:"d.m.Y" }}
+                                    {% elif item.request.trips.all.0 %}
+                                        {% with last_trip=item.request.trips.all.0 %}
+                                            {{ last_trip.start_date|date:"d.m.Y" }} - {{ last_trip.end_date|date:"d.m.Y" }}
+                                        {% endwith %}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                               
+                                <td>{{ item.doc_processing_deadline|date:"d.m.Y"|default:"-" }}</td>
+                                <td>
+                                    {% if item.work_type == 'Атестація' and item.final_attestation_date %}
+                                        {{ item.final_attestation_date|date:"d.m.Y" }}
+                                    {% elif item.work_type == 'ІК' and item.final_ik_date %}
+                                        {{ item.final_ik_date|date:"d.m.Y" }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
              {% else %}
                 <p>Елементи заявок, що відповідають фільтрам, відсутні.</p>
              {% endif %}
