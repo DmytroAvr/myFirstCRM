@@ -617,14 +617,30 @@ def main_dashboard(request):
                     'status_display': oid_instance.get_status_display(),
                     'detail_url': reverse('oids:oid_detail_view_name', args=[oid_instance.id])
                 }
-                if oid_instance.status in [OIDStatusChoices.NEW, OIDStatusChoices.RECEIVED_TZ, OIDStatusChoices.RECEIVED_TZ_APPROVE, OIDStatusChoices.RECEIVED_REQUEST , OIDStatusChoices.RECEIVED_AZR , OIDStatusChoices.RECEIVED_DECLARATION]:
+                OID_to_show_main_dashboard_creating = [
+                    OIDStatusChoices.NEW,
+                    OIDStatusChoices.RECEIVED_TZ,
+                    OIDStatusChoices.RECEIVED_TZ_APPROVE,
+                    OIDStatusChoices.RECEIVED_REQUEST ,
+                    OIDStatusChoices.ATTESTED,
+                    OIDStatusChoices.RECEIVED_AZR , 
+                    OIDStatusChoices.RECEIVED_DECLARATION
+                    ]
+                OID_to_show_main_dashboard_active = [
+                    OIDStatusChoices.ACTIVE
+				]
+                OID_to_show_main_dashboard_cancel = [
+                    OIDStatusChoices.CANCELED,
+                    OIDStatusChoices.TERMINATED
+				]
+                if oid_instance.status in OID_to_show_main_dashboard_creating:
                     oids_creating_list.append(oid_item_data)
-                elif oid_instance.status == OIDStatusChoices.ACTIVE:
+                elif oid_instance.status in OID_to_show_main_dashboard_active:
                     oid_item_data['ik_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Висновок', WorkTypeChoices.IK)
                     oid_item_data['attestation_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Акт атестації', WorkTypeChoices.ATTESTATION)
                     oid_item_data['prescription_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Припис')
                     oids_active_list.append(oid_item_data)
-                elif oid_instance.status in [OIDStatusChoices.CANCELED, OIDStatusChoices.TERMINATED]:
+                elif oid_instance.status in OID_to_show_main_dashboard_cancel:
                     oids_cancelled_list.append(oid_item_data)
         except (ValueError, Unit.DoesNotExist):
             selected_unit_object = None 

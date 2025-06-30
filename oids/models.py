@@ -56,10 +56,10 @@ class OIDStatusChoices(models.TextChoices):
     CANCELED = 'скасований', 'Скасований'
 
 # перевіряй/оновлюй 
-#  statuses_to_check_for_attestation
-# 
-# 
-# 
+# statuses_to_check_for_attestation
+# OID_to_show_main_dashboard_creating
+# OID_to_show_main_dashboard_active
+# OID_to_show_main_dashboard_cancel
 
 class WorkRequestStatusChoices(models.TextChoices): 
     PENDING = 'очікує', 'Очікує' # очікує – тільки введена"
