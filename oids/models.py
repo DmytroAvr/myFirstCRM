@@ -702,8 +702,7 @@ class AttestationResponse(models.Model):
    
 class Document(models.Model):
     """
-    Опрацьовані документи
-    Залежить від типу ОІД та виду робіт.
+    Опрацьовані документи Залежить від типу ОІД та виду робіт.
     """
     oid = models.ForeignKey(
         OID, 
@@ -724,7 +723,7 @@ class Document(models.Model):
         on_delete=models.PROTECT,
         verbose_name="Тип документа"
     )
-    document_number = models.CharField(max_length=50, default='27/14-', verbose_name="Підготовлений № документа")
+    document_number = models.CharField(max_length=50, default='27/14-', verbose_name="Підг. № документа")
     process_date = models.DateField(verbose_name="Дата опрацювання") # Дата внесення документа
     work_date = models.DateField(verbose_name="Дата проведення робіт") # Дата, коли роботи фактично проводилися
     author = models.ForeignKey(
@@ -783,7 +782,7 @@ class Document(models.Model):
             date_str = reg.outgoing_letter_date.strftime('%d.%m.%Y')
             return f"№ {reg.outgoing_letter_number} від {date_str}"
         return "N/A"
-
+    
     @property
     def get_response_info_for_export(self):
         """Повертає рядок з інформацією про відповідь для експорту."""
@@ -792,79 +791,73 @@ class Document(models.Model):
             date_str = response.response_letter_date.strftime('%d.%m.%Y')
             return f"№ {response.response_letter_number} від {date_str}"
         return "N/A"
-    
-    # oids/models.py -> class Document
+                    
+    def save(self, *args, **kwargs):
+        old_instance = Document.objects.filter(pk=self.pk).first()
+		
+		# Виконуємо стандартне збереження
+        super().save(*args, **kwargs)
 
-def save(self, *args, **kwargs):
-    # Отримуємо старий стан об'єкта, щоб знати, чи відбулися зміни
-    old_instance = Document.objects.filter(pk=self.pk).first()
-    
-    # Виконуємо стандартне збереження
-    super().save(*args, **kwargs)
+		# --- Початок блоку оновлення статусів ---
 
-    # --- Початок блоку оновлення статусів ---
+		# 1. Перевіряємо, чи пов'язаний документ з елементом заявки
+        if not self.work_request_item:
+            return # Якщо ні, виходимо
 
-    # 1. Перевіряємо, чи пов'язаний документ з елементом заявки
-    if not self.work_request_item:
-        return # Якщо ні, виходимо
+        wri = self.work_request_item
+        oid_to_update = wri.oid
 
-    wri = self.work_request_item
-    oid_to_update = wri.oid
+		# 2. Надійно визначаємо типи документів за їхніми назвами
+        try:
+            attestation_doc_type = DocumentType.objects.get(name__icontains='Акт атестації')
+            ik_conclusion_doc_type = DocumentType.objects.get(name__icontains='Висновок ІК')
+        except DocumentType.DoesNotExist: # Якщо ключові типи документів не знайдено в базі, нічого не робимо
+            return 
 
-    # 2. Надійно визначаємо типи документів за їхніми назвами
-    try:
-        attestation_doc_type = DocumentType.objects.get(name='Акт атестації')
-        ik_conclusion_doc_type = DocumentType.objects.get(name='Висновок ІК') # Або точна назва з твоєї БД
-    except DocumentType.DoesNotExist:
-        # Якщо ключові типи документів не знайдено в базі, нічого не робимо
-        return 
+        is_attestation_act = self.document_type == attestation_doc_type
+        is_ik_conclusion = self.document_type == ik_conclusion_doc_type
 
-    is_attestation_act = self.document_type == attestation_doc_type
-    is_ik_conclusion = self.document_type == ik_conclusion_doc_type
+		# 3. Перевіряємо умови-тригери для кожного типу документа
+		
+		# -- УМОВА ДЛЯ АТЕСТАЦІЇ --
+		# Тригер: Акт атестації, який щойно отримав реєстраційний номер
+        is_registered = bool(self.dsszzi_registered_number and self.dsszzi_registered_date)
+        was_just_registered = not (old_instance and old_instance.dsszzi_registered_number) and is_registered
 
-    # 3. Перевіряємо умови-тригери для кожного типу документа
-    
-    # -- УМОВА ДЛЯ АТЕСТАЦІЇ --
-    # Тригер: Акт атестації, який щойно отримав реєстраційний номер
-    is_registered = bool(self.dsszzi_registered_number and self.dsszzi_registered_date)
-    was_just_registered = not (old_instance and old_instance.dsszzi_registered_number) and is_registered
+        should_process_attestation = is_attestation_act and was_just_registered
 
-    should_process_attestation = is_attestation_act and was_just_registered
+		# -- УМОВА ДЛЯ ІК --
+		# Тригер: Просто створення документу "Висновок ІК"
+        is_newly_created = old_instance is None
+		
+        should_process_ik = is_ik_conclusion and is_newly_created
 
-    # -- УМОВА ДЛЯ ІК --
-    # Тригер: Просто створення документу "Висновок ІК"
-    is_newly_created = old_instance is None
-    
-    should_process_ik = is_ik_conclusion and is_newly_created
+		# --- Застосування логіки ---
 
-    # --- Застосування логіки ---
+		# 4. Якщо спрацював один із тригерів...
+        if should_process_attestation or should_process_ik:
+			
+			# ...оновлюємо статус WorkRequestItem на "Виконано"
+            if wri.status != WorkRequestStatusChoices.COMPLETED:
+                wri.status = WorkRequestStatusChoices.COMPLETED
+                wri.docs_actually_processed_on = self.process_date or datetime.date.today() # Зберігаємо WRI, що запустить його власний метод save() і перевірку батьківської заявки
+                wri.save(update_fields=['status', 'docs_actually_processed_on'])
 
-    # 4. Якщо спрацював один із тригерів...
-    if should_process_attestation or should_process_ik:
-        
-        # ...оновлюємо статус WorkRequestItem на "Виконано"
-        if wri.status != WorkRequestStatusChoices.COMPLETED:
-            wri.status = WorkRequestStatusChoices.COMPLETED
-            wri.docs_actually_processed_on = self.process_date or datetime.date.today()
-            # Зберігаємо WRI, що запустить його власний метод save() і перевірку батьківської заявки
-            wri.save(update_fields=['status', 'docs_actually_processed_on'])
-
-        # ...і оновлюємо статус ОІДа, якщо це була атестація
-        if should_process_attestation and oid_to_update:
-            statuses_for_attestation = [
-                OIDStatusChoices.BEING_CREATED, OIDStatusChoices.NEW,
-                OIDStatusChoices.RECEIVED_TZ, OIDStatusChoices.RECEIVED_TZ_APPROVE,
-                OIDStatusChoices.RECEIVED_REQUEST
-            ]
-            if oid_to_update.status in statuses_for_attestation:
-                oid_to_update.status = OIDStatusChoices.ATTESTED
-                oid_to_update.note = f"Об'єкт атестовано {self.process_date.strftime('%d.%m.%Y') if self.process_date else ''}."
-                oid_to_update.save(update_fields=['status', 'note'])
-            elif oid_to_update.status == OIDStatusChoices.ACTIVE:
-                attestation_note = f"Проведено чергову атестацію ({self.process_date.strftime('%d.%m.%Y') if self.process_date else ''})."
-                oid_to_update.note = f"{attestation_note}\n{oid_to_update.note or ''}".strip()
-                oid_to_update.save(update_fields=['note'])
-                 
+			# ...і оновлюємо статус ОІДа, якщо це була атестація
+            if should_process_attestation and oid_to_update:
+                statuses_for_attestation = [
+					OIDStatusChoices.BEING_CREATED, OIDStatusChoices.NEW,
+					OIDStatusChoices.RECEIVED_TZ, OIDStatusChoices.RECEIVED_TZ_APPROVE,
+					OIDStatusChoices.RECEIVED_REQUEST
+                ]
+                if oid_to_update.status in statuses_for_attestation:
+                    oid_to_update.status = OIDStatusChoices.ATTESTED
+                    oid_to_update.note = f"Об'єкт атестовано {self.process_date.strftime('%d.%m.%Y') if self.process_date else ''}."
+                    oid_to_update.save(update_fields=['status', 'note'])
+                elif oid_to_update.status == OIDStatusChoices.ACTIVE:
+                    attestation_note = f"Проведено чергову атестацію ({self.process_date.strftime('%d.%m.%Y') if self.process_date else ''})."
+                    oid_to_update.note = f"{attestation_note}\n{oid_to_update.note or ''}".strip()
+                    oid_to_update.save(update_fields=['note'])
     def __str__(self):
         return f"{self.document_type.name} / {self.document_number} (ОІД: {self.oid.cipher})"
 
@@ -1049,7 +1042,21 @@ class TechnicalTask(models.Model):
     updated_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата опрацювання")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата внесення ТЗ\МЗ")
     history = HistoricalRecords()
+    
+    def save(self, *args, **kwargs):
+        is_new = self._state.adding
 
+        # Спочатку виконуємо стандартне збереження самого ТЗ
+        super().save(*args, **kwargs)
+
+        # Якщо це щойно створене ТЗ і в нього є пов'язаний ОІД...
+        if is_new and self.oid:
+            # ...тоді ми оновлюємо статус цього ОІДа.
+            oid_to_update = self.oid
+            if oid_to_update.status != OIDStatusChoices.RECEIVED_TZ:
+                oid_to_update.status = OIDStatusChoices.RECEIVED_TZ
+                oid_to_update.save(update_fields=['status'])
+                
     def __str__(self):
         return f"ТЗ/МЗ від в/ч {self.oid.unit.code} на ОІД: {self.oid.cipher} (статус : {self.get_review_result_display()}) від {self.input_date.strftime("%d.%m.%Y")} вх.№{self.input_number}"
 

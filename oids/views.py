@@ -34,99 +34,6 @@ from .forms_filters import (
 
 # def add_working_days(start_date, days_to_add): ... (якщо не в utils.py)
 
-@transaction.atomic
-def plan_trip_view(request):
-    if request.method == 'POST':
-        form = TripForm(request.POST)
-        if form.is_valid():
-            trip = form.save(commit=False) 
-            # Тут можна додати будь-яку логіку перед першим збереженням Trip, якщо потрібно
-            trip.save() # Перше збереження для отримання trip.id
-            form.save_m2m() # Зберігаємо ManyToMany зв'язки (units, oids, work_requests)
-
-            # --- Логіка встановлення дедлайнів ПІСЛЯ збереження M2M ---
-            if trip.end_date:
-                print(f"PLAN_TRIP_VIEW: Trip ID {trip.pk} saved with end_date: {trip.end_date}. Calculating deadlines.")
-                
-                linked_work_requests = trip.work_requests.all()
-                linked_oids_direct = trip.oids.all()
-                
-                print(f"PLAN_TRIP_VIEW: Trip linked to WorkRequest IDs: {[wr.id for wr in linked_work_requests]}")
-                print(f"PLAN_TRIP_VIEW: Trip directly linked to OID IDs: {[o.id for o in linked_oids_direct]}")
-
-                if linked_work_requests.exists():
-                    items_to_process = WorkRequestItem.objects.filter(
-                        request__in=linked_work_requests,
-                        oid__in=linked_oids_direct 
-                        # Можна додати: doc_processing_deadline__isnull=True
-                    ).select_related('oid', 'request__unit')
-
-                    print(f"PLAN_TRIP_VIEW: Found {items_to_process.count()} WRI to update for trip {trip.id}")
-                    
-                    start_counting_from_date = trip.end_date
-
-                    for item in items_to_process:
-                        days_for_processing = 0
-                        if item.work_type == WorkTypeChoices.IK: days_for_processing = 15 # налаштувати кількість днів для розрахунку часу на опрацювання   
-                        elif item.work_type == WorkTypeChoices.ATTESTATION: days_for_processing = 10 # налаштувати кількість днів для розрахунку часу на опрацювання 
-                        
-                        if days_for_processing > 0:
-                           new_deadline = add_working_days(start_counting_from_date, days_for_processing)
-                           if item.doc_processing_deadline != new_deadline or item.deadline_trigger_trip != trip: # Додано перевірку trip
-                               item.doc_processing_deadline = new_deadline
-                               item.deadline_trigger_trip = trip # <--- Встановлюємо зв'язок
-                               item.save(update_fields=['doc_processing_deadline', 'deadline_trigger_trip', 'updated_at'])
-                               print(f"PLAN_TRIP_VIEW: WRI ID {item.id} (OID: {item.oid.cipher}) deadline -> {item.doc_processing_deadline}")
-                else:
-                    print(f"PLAN_TRIP_VIEW: No WorkRequests linked to Trip ID {trip.pk} to calculate item deadlines.")
-            else:
-                print(f"PLAN_TRIP_VIEW: Trip ID {trip.pk} has no end_date. Deadline calculation skipped.")
-            # --- Кінець логіки дедлайнів ---
-
-
-            messages.success(request, f'Відрядження заплановано успішно (ID: {trip.id}).')
-            # Оновлюємо статус пов'язаних заявок на "В роботі" (ця логіка у вас вже була)
-            for work_request in linked_work_requests: # Використовуємо вже отриманий queryset
-                if work_request.status == WorkRequestStatusChoices.PENDING:
-                    work_request.status = WorkRequestStatusChoices.IN_PROGRESS
-                    work_request.save(update_fields=['status', 'updated_at'])
-                    WorkRequestItem.objects.filter(request=work_request, status=WorkRequestStatusChoices.PENDING)\
-                                           .update(status=WorkRequestStatusChoices.IN_PROGRESS)
-
-            return redirect('oids:list_trips') # Або main_dashboard
-        else:
-            messages.error(request, 'Будь ласка, виправте помилки у формі.')
-            print(f"PLAN_TRIP_VIEW: Form errors: {form.errors.as_json()}")
-    else: # GET request
-        form = TripForm()
-    
-    context = {
-        'form': form, 
-        'page_title': 'Запланувати відрядження'
-    }
-    return render(request, 'oids/forms/plan_trip_form.html', context)
-
-def get_last_document_expiration_date(oid_instance, document_name_keyword, work_type_choice=None):
-    try:
-        doc_type_filters = Q(name__icontains=document_name_keyword)
-        if work_type_choice:
-            doc_type_filters &= Q(work_type=work_type_choice)
-        
-        relevant_doc_type_qs = DocumentType.objects.filter(doc_type_filters)
-        if not relevant_doc_type_qs.exists():
-            return None
-        relevant_doc_type = relevant_doc_type_qs.first()
-
-        last_document = Document.objects.filter(
-            oid=oid_instance, # Використовуємо переданий екземпляр OID
-            document_type=relevant_doc_type,
-            expiration_date__isnull=False
-        ).order_by('-work_date', '-process_date').first()
-        
-        return last_document.expiration_date if last_document else None
-    except Exception as e:
-        print(f"Помилка get_last_document_expiration_date для ОІД {oid_instance.cipher if oid_instance else 'N/A'} ({document_name_keyword}): {e}")
-        return None
  
 def ajax_get_oid_current_status(request):
     oid_id_str = request.GET.get('oid_id')
@@ -915,6 +822,100 @@ def work_request_detail_view(request, pk):
     }
     return render(request, 'oids/lists/work_request_detail.html', context)
 
+@transaction.atomic
+def plan_trip_view(request):
+    if request.method == 'POST':
+        form = TripForm(request.POST)
+        if form.is_valid():
+            trip = form.save(commit=False) 
+            # Тут можна додати будь-яку логіку перед першим збереженням Trip, якщо потрібно
+            trip.save() # Перше збереження для отримання trip.id
+            form.save_m2m() # Зберігаємо ManyToMany зв'язки (units, oids, work_requests)
+
+            # --- Логіка встановлення дедлайнів ПІСЛЯ збереження M2M ---
+            if trip.end_date:
+                print(f"PLAN_TRIP_VIEW: Trip ID {trip.pk} saved with end_date: {trip.end_date}. Calculating deadlines.")
+                
+                linked_work_requests = trip.work_requests.all()
+                linked_oids_direct = trip.oids.all()
+                
+                print(f"PLAN_TRIP_VIEW: Trip linked to WorkRequest IDs: {[wr.id for wr in linked_work_requests]}")
+                print(f"PLAN_TRIP_VIEW: Trip directly linked to OID IDs: {[o.id for o in linked_oids_direct]}")
+
+                if linked_work_requests.exists():
+                    items_to_process = WorkRequestItem.objects.filter(
+                        request__in=linked_work_requests,
+                        oid__in=linked_oids_direct 
+                        # Можна додати: doc_processing_deadline__isnull=True
+                    ).select_related('oid', 'request__unit')
+
+                    print(f"PLAN_TRIP_VIEW: Found {items_to_process.count()} WRI to update for trip {trip.id}")
+                    
+                    start_counting_from_date = trip.end_date
+
+                    for item in items_to_process:
+                        days_for_processing = 0
+                        if item.work_type == WorkTypeChoices.IK: days_for_processing = 15 # налаштувати кількість днів для розрахунку часу на опрацювання   
+                        elif item.work_type == WorkTypeChoices.ATTESTATION: days_for_processing = 10 # налаштувати кількість днів для розрахунку часу на опрацювання 
+                        
+                        if days_for_processing > 0:
+                           new_deadline = add_working_days(start_counting_from_date, days_for_processing)
+                           if item.doc_processing_deadline != new_deadline or item.deadline_trigger_trip != trip: # Додано перевірку trip
+                               item.doc_processing_deadline = new_deadline
+                               item.deadline_trigger_trip = trip # <--- Встановлюємо зв'язок
+                               item.save(update_fields=['doc_processing_deadline', 'deadline_trigger_trip', 'updated_at'])
+                               print(f"PLAN_TRIP_VIEW: WRI ID {item.id} (OID: {item.oid.cipher}) deadline -> {item.doc_processing_deadline}")
+                else:
+                    print(f"PLAN_TRIP_VIEW: No WorkRequests linked to Trip ID {trip.pk} to calculate item deadlines.")
+            else:
+                print(f"PLAN_TRIP_VIEW: Trip ID {trip.pk} has no end_date. Deadline calculation skipped.")
+            # --- Кінець логіки дедлайнів ---
+
+
+            messages.success(request, f'Відрядження заплановано успішно (ID: {trip.id}).')
+            # Оновлюємо статус пов'язаних заявок на "В роботі" (ця логіка у вас вже була)
+            for work_request in linked_work_requests: # Використовуємо вже отриманий queryset
+                if work_request.status == WorkRequestStatusChoices.PENDING:
+                    work_request.status = WorkRequestStatusChoices.IN_PROGRESS
+                    work_request.save(update_fields=['status', 'updated_at'])
+                    WorkRequestItem.objects.filter(request=work_request, status=WorkRequestStatusChoices.PENDING)\
+                                           .update(status=WorkRequestStatusChoices.IN_PROGRESS)
+
+            return redirect('oids:list_trips') # Або main_dashboard
+        else:
+            messages.error(request, 'Будь ласка, виправте помилки у формі.')
+            print(f"PLAN_TRIP_VIEW: Form errors: {form.errors.as_json()}")
+    else: # GET request
+        form = TripForm()
+    
+    context = {
+        'form': form, 
+        'page_title': 'Запланувати відрядження'
+    }
+    return render(request, 'oids/forms/plan_trip_form.html', context)
+
+def get_last_document_expiration_date(oid_instance, document_name_keyword, work_type_choice=None):
+    try:
+        doc_type_filters = Q(name__icontains=document_name_keyword)
+        if work_type_choice:
+            doc_type_filters &= Q(work_type=work_type_choice)
+        
+        relevant_doc_type_qs = DocumentType.objects.filter(doc_type_filters)
+        if not relevant_doc_type_qs.exists():
+            return None
+        relevant_doc_type = relevant_doc_type_qs.first()
+
+        last_document = Document.objects.filter(
+            oid=oid_instance, # Використовуємо переданий екземпляр OID
+            document_type=relevant_doc_type,
+            expiration_date__isnull=False
+        ).order_by('-work_date', '-process_date').first()
+        
+        return last_document.expiration_date if last_document else None
+    except Exception as e:
+        print(f"Помилка get_last_document_expiration_date для ОІД {oid_instance.cipher if oid_instance else 'N/A'} ({document_name_keyword}): {e}")
+        return None
+
 @login_required 
 def add_document_processing_view(request, oid_id=None, work_request_item_id=None):
     selected_oid_instance = None
@@ -1091,6 +1092,36 @@ def send_attestation_for_registration_view(request):
     }
     return render(request, 'oids/forms/send_attestation_form.html', context)
 
+def send_document_for_registration_view(request, pk):
+    document = get_object_or_404(Document, pk=pk)
+    
+    # Перевірка, чи можна виконати цю дію
+    if document.processing_status != DocumentProcessingStatusChoices.DRAFT:
+        messages.warning(request, "Цей документ вже було відправлено або опрацьовано.")
+        return redirect('oids:oid_detail', pk=document.oid.pk)
+
+    if request.method == 'POST':
+        form = SendForRegistrationForm(request.POST)
+        if form.is_valid():
+            # Основна логіка: змінюємо статус і зберігаємо
+            document.processing_status = DocumentProcessingStatusChoices.SENT_FOR_REGISTRATION
+            document.save(update_fields=['processing_status', 'updated_at'])
+            
+            # Сигнал `post_save` автоматично оновить крок процесу в цей момент
+            
+            messages.success(request, f"Документ '{document}' було успішно відправлено на реєстрацію.")
+            return redirect('oids:oid_detail', pk=document.oid.pk)
+    else:
+        form = SendForRegistrationForm()
+        
+    context = {
+        'form': form,
+        'document': document,
+        'page_title': f'Підтвердження: Відправити на реєстрацію {document}'
+    }
+    return render(request, 'oids/action_confirm_form.html', context)
+
+
 
 @login_required 
 def technical_task_create_view(request):
@@ -1202,7 +1233,6 @@ def technical_task_process_view(request, task_id=None): # Може прийма�
 
 
 # list info 
-
 @login_required 
 def summary_information_hub_view(request):
     """
@@ -2245,6 +2275,8 @@ def attestation_registered_acts_list_view(request):
         'form': form,
     }
     return render(request, 'oids/lists/attestation_registered_num_list.html', context)
+
+
 # View для внесення "Відповіді від ДССЗЗІ"
 
 @login_required 
@@ -2635,34 +2667,5 @@ def start_declaration_process_view(request):
     }
     return render(request, 'oids/generic_form.html', context)
 
-
-def send_document_for_registration_view(request, pk):
-    document = get_object_or_404(Document, pk=pk)
-    
-    # Перевірка, чи можна виконати цю дію
-    if document.processing_status != DocumentProcessingStatusChoices.DRAFT:
-        messages.warning(request, "Цей документ вже було відправлено або опрацьовано.")
-        return redirect('oids:oid_detail', pk=document.oid.pk)
-
-    if request.method == 'POST':
-        form = SendForRegistrationForm(request.POST)
-        if form.is_valid():
-            # Основна логіка: змінюємо статус і зберігаємо
-            document.processing_status = DocumentProcessingStatusChoices.SENT_FOR_REGISTRATION
-            document.save(update_fields=['processing_status', 'updated_at'])
-            
-            # Сигнал `post_save` автоматично оновить крок процесу в цей момент
-            
-            messages.success(request, f"Документ '{document}' було успішно відправлено на реєстрацію.")
-            return redirect('oids:oid_detail', pk=document.oid.pk)
-    else:
-        form = SendForRegistrationForm()
-        
-    context = {
-        'form': form,
-        'document': document,
-        'page_title': f'Підтвердження: Відправити на реєстрацію {document}'
-    }
-    return render(request, 'oids/action_confirm_form.html', context)
 
 
