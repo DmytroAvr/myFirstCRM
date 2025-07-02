@@ -125,7 +125,7 @@
                     <td>{{ change.old_status }}</td>
                     <td>{{ change.new_status }}</td>
                     <td>{{ change.reason|default:"-" }}</td>
-                    <td>{{ change.changed_by.full_name|default:"Невідомо" }}</td>
+                    <td>{{ change.changed_by.full_name|default:"-" }}</td>
                     <td>
                         {% if change.initiating_document %}
                             <a href="{% url 'oids:oid_detail_view_name' oid.id %}#req-{{ doc.work_request_item.request.id }}">

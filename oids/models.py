@@ -45,7 +45,8 @@ class SecLevelChoices(models.TextChoices):
  
 class OIDStatusChoices(models.TextChoices):
     NEW = 'створюється', 'Створюється'
-    RECEIVED_TZ = 'отримано ТЗ/МЗ', 'Отримано ТЗ/МЗ' 
+    RECEIVED_TZ = 'отримано ТЗ/МЗ', 'Отримано ТЗ/МЗ'
+    RECEIVED_TZ_REPEAT = 'очікуємо ТЗ/МЗ(повторно)', 'Очікуємо ТЗ/МЗ(повторно)'
     RECEIVED_TZ_APPROVE = 'ТЗ/МЗ погоджено', 'ТЗ/МЗ Погоджено' 
     RECEIVED_REQUEST = 'отримано заявку', 'Отримано Заявку' 
     ATTESTED = 'атестовано', 'атестовано'
@@ -57,6 +58,8 @@ class OIDStatusChoices(models.TextChoices):
 
 # перевіряй/оновлюй 
 # statuses_to_check_for_attestation
+# statuses_for_first_attestation
+
 # OID_to_show_main_dashboard_creating
 # OID_to_show_main_dashboard_active
 # OID_to_show_main_dashboard_cancel
@@ -64,6 +67,8 @@ class OIDStatusChoices(models.TextChoices):
 class WorkRequestStatusChoices(models.TextChoices): 
     PENDING = 'очікує', 'Очікує' # очікує – тільки введена"
     IN_PROGRESS = 'в роботі', 'В роботі' # в роботі – заплановано відрядження"
+    TO_SEND = 'відправити в ДССЗЗІ', 'відправити в ДССЗЗІ' # в роботі – заплановано відрядження"
+    ON_REGISTRATION = 'на реєстрації в ДССЗЗІ', 'на реєстрації в ДССЗЗІ' # в роботі – заплановано відрядження"
     COMPLETED = 'виконано', 'Виконано' # виконано – внесена інформацію по опрацьованих документах"
     CANCELED = 'скасовано', 'Скасовано' # скасовано – заявка втратила чинність"
 
@@ -277,23 +282,6 @@ class WorkRequest(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
     history = HistoricalRecords()
     
-    class Meta:
-        verbose_name = "Заявка на проведення робіт"
-        verbose_name_plural = "Заявки на проведення робіт"
-        unique_together = ('unit', 'incoming_number') # Заявка унікальна в межах частини
-
-    def __str__(self):
-        # Безпечно отримуємо дані, щоб уникнути помилок, якщо щось None
-        unit_code = self.unit.code if self.unit else 'N/A'
-        date_str = self.incoming_date.strftime('%d.%m.%Y') if self.incoming_date else 'N/A'
-        number_str = self.incoming_number or 'б/н' # 'б/н' - без номера
-        status_str = self.get_status_display() or 'N/A'
-        
-        # Форматуємо рядок у бажаному вигляді
-        return f"Заявка №{number_str} від {date_str} (ВЧ: {unit_code}, Статус: {status_str})"
-						# раніше форматував вигляд тут
-						# def ajax_load_work_requests_for_oids(request): 
-    					# 'text': f"заявка вх.№ {wr.incoming_number} від {wr.incoming_date.strftime('%d.%m.%Y')} (ВЧ: {wr.unit.code}) - {wr.get_status_display()}"
     @property
     def get_items_for_export(self):
         """
@@ -315,6 +303,23 @@ class WorkRequest(models.Model):
         # Повертаємо всі записи, розділені символом нового рядка
         return "\n".join(item_strings)
     
+    def __str__(self):
+        # Безпечно отримуємо дані, щоб уникнути помилок, якщо щось None
+        unit_code = self.unit.code if self.unit else 'N/A'
+        date_str = self.incoming_date.strftime('%d.%m.%Y') if self.incoming_date else 'N/A'
+        number_str = self.incoming_number or 'б/н' # 'б/н' - без номера
+        status_str = self.get_status_display() or 'N/A'
+        
+        # Форматуємо рядок у бажаному вигляді
+        return f"Заявка №{number_str} від {date_str} (ВЧ: {unit_code}, Статус: {status_str})"
+						# раніше форматував вигляд тут
+						# def ajax_load_work_requests_for_oids(request): 
+    					# 'text': f"заявка вх.№ {wr.incoming_number} від {wr.incoming_date.strftime('%d.%m.%Y')} (ВЧ: {wr.unit.code}) - {wr.get_status_display()}"
+    class Meta:
+        verbose_name = "Заявка на проведення робіт"
+        verbose_name_plural = "Заявки на проведення робіт"
+        unique_together = ('unit', 'incoming_number') # Заявка унікальна в межах частини
+
 class WorkRequestItem(models.Model):
     """
     Елемент заявки на проведення робіт.
@@ -361,17 +366,7 @@ class WorkRequestItem(models.Model):
         related_name="triggered_work_items" 
     )
     history = HistoricalRecords()
-    class Meta:
-        unique_together = ('request', 'oid', 'work_type') # Один ОІД не може мати двічі одну і ту ж роботу в одній заявці
-        verbose_name = "Елемент заявки"
-        verbose_name_plural = "Елементи заявки"
-        # ordering = ['request', 'oid'] # Додано сортування
-        ordering = ['request', 'request__incoming_date' ] # Додав сортування за замовчуванням
 
-    def __str__(self):
-        # return f"{self.oid.cipher} - {self.get_work_type_display()} ({self.get_status_display()})"
-        return f"ОІД: {self.oid.cipher} ({self.oid.oid_type}) - Робота: {self.get_work_type_display()} (Статус: {self.status})"
-    
 	#  логіка оновлення статусу заявки:
     def check_and_update_status_based_on_documents(self):
         """
@@ -438,15 +433,33 @@ class WorkRequestItem(models.Model):
         # Якщо ключовий документ не виконано, статус WorkRequestItem не змінюється цим методом.
         # Логіка повернення статусу (наприклад, якщо документ видалено) тут не розглядається.
 
-   
-    # oids/models.py -> class WorkRequestItem
-
     def save(self, *args, **kwargs):
-        # Виконуємо стандартне збереження
-        super().save(*args, **kwargs)
-        # ПІСЛЯ збереження викликаємо перевірку статусу батьківської заявки
-        self.update_parent_request_status()
+        is_new = self._state.adding
 
+        # Спочатку зберігаємо сам елемент заявки
+        super().save(*args, **kwargs)
+
+        # Якщо це новий елемент заявки...
+        if is_new and self.oid:
+            oid_to_update = self.oid
+            old_status = oid_to_update.get_status_display()
+            new_status_enum = OIDStatusChoices.RECEIVED_REQUEST
+
+            if oid_to_update.status != new_status_enum:
+                oid_to_update.status = new_status_enum
+                oid_to_update.save(update_fields=['status'])
+
+                # Створюємо запис в історії
+                OIDStatusChange.objects.create(
+                    oid=oid_to_update,
+                    old_status=old_status,
+                    new_status=new_status_enum.label,
+                    reason=f"ОІД додано до заявки №{self.request.incoming_number}"
+                )
+       
+        # Викликаємо існуючу логіку для оновлення статусу батьківської заявки
+        self.update_parent_request_status()
+        
     def update_parent_request_status(self):
         """
         Перевіряє статуси всіх елементів батьківської заявки і, якщо всі
@@ -529,7 +542,19 @@ class WorkRequestItem(models.Model):
         else:
             print(f"[DEBUG] WorkRequest ID {work_request.id} status '{work_request.get_status_display()}' remains unchanged.")
         print(f"--- [DEBUG] WRI.update_request_status() FINISHED for WRI ID: {self.id} ---")
-#
+
+    def __str__(self):
+        # return f"{self.oid.cipher} - {self.get_work_type_display()} ({self.get_status_display()})"
+        return f"ОІД: {self.oid.cipher} ({self.oid.oid_type}) - Робота: {self.get_work_type_display()} (Статус: {self.status})"
+    
+    class Meta:
+        unique_together = ('request', 'oid', 'work_type') # Один ОІД не може мати двічі одну і ту ж роботу в одній заявці
+        verbose_name = "Елемент заявки"
+        verbose_name_plural = "Елементи заявки"
+        # ordering = ['request', 'oid'] # Додано сортування
+        ordering = ['request', 'request__incoming_date' ] # Додав сортування за замовчуванням
+
+
 class DocumentType(models.Model):
     """
     Тип документа
@@ -791,81 +816,160 @@ class Document(models.Model):
             date_str = response.response_letter_date.strftime('%d.%m.%Y')
             return f"№ {response.response_letter_number} від {date_str}"
         return "N/A"
-                    
+    
     def save(self, *args, **kwargs):
         old_instance = Document.objects.filter(pk=self.pk).first()
-		
-		# Виконуємо стандартне збереження
+    
+    # Виконуємо стандартне збереження
         super().save(*args, **kwargs)
 
-		# --- Початок блоку оновлення статусів ---
+        # --- Початок блоку оновлення статусів ---
 
-		# 1. Перевіряємо, чи пов'язаний документ з елементом заявки
-        if not self.work_request_item:
-            return # Якщо ні, виходимо
-
-        wri = self.work_request_item
-        oid_to_update = wri.oid
-
-		# 2. Надійно визначаємо типи документів за їхніми назвами
+        # 1. Надійно визначаємо типи документів за їхніми назвами
         try:
-            attestation_doc_type = DocumentType.objects.get(name__icontains='Акт атестації')
-            ik_conclusion_doc_type = DocumentType.objects.get(name__icontains='Висновок ІК')
-        except DocumentType.DoesNotExist: # Якщо ключові типи документів не знайдено в базі, нічого не робимо
-            return 
+                attestation_doc_type = DocumentType.objects.get(name__icontains='Акт атестації')
+                ik_conclusion_doc_type = DocumentType.objects.get(name__icontains='Висновок ІК')
+        except DocumentType.DoesNotExist:
+                # Якщо ключові типи документів не знайдено в базі, нічого не робимо
+                return 
 
         is_attestation_act = self.document_type == attestation_doc_type
         is_ik_conclusion = self.document_type == ik_conclusion_doc_type
 
-		# 3. Перевіряємо умови-тригери для кожного типу документа
-		
-		# -- УМОВА ДЛЯ АТЕСТАЦІЇ --
-		# Тригер: Акт атестації, який щойно отримав реєстраційний номер
+        # 2. Перевіряємо умови-тригери для кожного типу документа
+        
+        # -- УМОВА ДЛЯ АТЕСТАЦІЇ --
+        # Тригер: Акт атестації, який щойно отримав реєстраційний номер
         is_registered = bool(self.dsszzi_registered_number and self.dsszzi_registered_date)
         was_just_registered = not (old_instance and old_instance.dsszzi_registered_number) and is_registered
 
         should_process_attestation = is_attestation_act and was_just_registered
-
-		# -- УМОВА ДЛЯ ІК --
-		# Тригер: Просто створення документу "Висновок ІК"
+        
+        # -- УМОВА ДЛЯ ІК --
+        # Тригер: Просто створення документу "Висновок ІК"
         is_newly_created = old_instance is None
-		
+        
         should_process_ik = is_ik_conclusion and is_newly_created
 
-		# --- Застосування логіки ---
+        # --- Застосування логіки ---
 
-		# 4. Якщо спрацював один із тригерів...
-        if should_process_attestation or should_process_ik:
-			
-			# ...оновлюємо статус WorkRequestItem на "Виконано"
-            if wri.status != WorkRequestStatusChoices.COMPLETED:
-                wri.status = WorkRequestStatusChoices.COMPLETED
-                wri.docs_actually_processed_on = self.process_date or datetime.date.today() # Зберігаємо WRI, що запустить його власний метод save() і перевірку батьківської заявки
-                wri.save(update_fields=['status', 'docs_actually_processed_on'])
+        # 3. Обробляємо Work Request Item (якщо є)
+        if self.work_request_item and (should_process_attestation or should_process_ik):
+                wri = self.work_request_item
+                
+                if should_process_attestation:
+                        # Для атестації встановлюємо статус "До відправки"
+                        if wri.status != WorkRequestStatusChoices.TO_SEND:
+                                wri.status = WorkRequestStatusChoices.TO_SEND
+                                wri.docs_actually_processed_on = self.process_date or datetime.date.today()
+                                wri.save(update_fields=['status', 'docs_actually_processed_on'])
+                
+                elif should_process_ik:
+                        # Для ІК встановлюємо статус "Виконано"
+                        if wri.status != WorkRequestStatusChoices.COMPLETED:
+                                wri.status = WorkRequestStatusChoices.COMPLETED
+                                wri.docs_actually_processed_on = self.process_date or datetime.date.today()
+                                wri.save(update_fields=['status', 'docs_actually_processed_on'])
 
-			# ...і оновлюємо статус ОІДа, якщо це була атестація
-            if should_process_attestation and oid_to_update:
-                statuses_for_attestation = [
-					OIDStatusChoices.BEING_CREATED, OIDStatusChoices.NEW,
-					OIDStatusChoices.RECEIVED_TZ, OIDStatusChoices.RECEIVED_TZ_APPROVE,
-					OIDStatusChoices.RECEIVED_REQUEST
-                ]
-                if oid_to_update.status in statuses_for_attestation:
-                    oid_to_update.status = OIDStatusChoices.ATTESTED
-                    oid_to_update.note = f"Об'єкт атестовано {self.process_date.strftime('%d.%m.%Y') if self.process_date else ''}."
-                    oid_to_update.save(update_fields=['status', 'note'])
-                elif oid_to_update.status == OIDStatusChoices.ACTIVE:
-                    attestation_note = f"Проведено чергову атестацію ({self.process_date.strftime('%d.%m.%Y') if self.process_date else ''})."
-                    oid_to_update.note = f"{attestation_note}\n{oid_to_update.note or ''}".strip()
-                    oid_to_update.save(update_fields=['note'])
+        # 4. Обробляємо ОІД незалежно від наявності work_request_item
+        if should_process_attestation:
+                # Знаходимо ОІД для оновлення
+                oid_to_update = None
+                
+                if self.work_request_item:
+                        # Якщо є пов'язаний work_request_item
+                        oid_to_update = self.work_request_item.oid
+                elif hasattr(self, 'oid') and self.oid:
+                        # Якщо документ прямо пов'язаний з ОІД
+                        oid_to_update = self.oid
+                elif hasattr(self, 'get_related_oid'):
+                        # Якщо є спеціальний метод для знаходження ОІД
+                        oid_to_update = self.get_related_oid()
+                
+                if oid_to_update:
+                        old_status = oid_to_update.get_status_display()
+                        
+                        # Логіка для першої атестації
+                        statuses_for_first_attestation = [
+                                OIDStatusChoices.NEW,
+                                OIDStatusChoices.RECEIVED_TZ, 
+                                OIDStatusChoices.RECEIVED_TZ_REPEAT,
+                                OIDStatusChoices.RECEIVED_TZ_APPROVE,
+                                OIDStatusChoices.RECEIVED_REQUEST,
+                                OIDStatusChoices.TERMINATED
+                        ]
+                        
+                        if oid_to_update and oid_to_update.status in statuses_for_first_attestation:
+                                new_status_enum = OIDStatusChoices.ATTESTED
+                                oid_to_update.status = new_status_enum
+                                oid_to_update.note = f"Об'єкт атестовано {self.process_date.strftime('%d.%m.%Y') if self.process_date else ''}."
+                                oid_to_update.save(update_fields=['status', 'note'])
+                                
+                                # Створюємо запис в історії
+                                OIDStatusChange.objects.create(
+                                        oid=oid_to_update,
+                                        old_status=old_status,
+                                        new_status=new_status_enum.label,
+                                        reason=f"Атестацію завершено. Зареєстровано Акт атестації №{self.dsszzi_registered_number}",
+                                        initiating_document=self
+                                )
+                        
+                        # Логіка для повторної атестації
+                        elif oid_to_update and oid_to_update.status == OIDStatusChoices.ACTIVE:
+                                attestation_note = f"Проведено чергову атестацію ({self.process_date.strftime('%d.%m.%Y') if self.process_date else ''})."
+                                oid_to_update.note = f"{attestation_note}\n{oid_to_update.note or ''}".strip()
+                                oid_to_update.save(update_fields=['note'])
+                                
+                                # Створюємо запис в історії, але статус не змінюється
+                                OIDStatusChange.objects.create(
+                                        oid=oid_to_update,
+                                        old_status=old_status,
+                                        new_status=old_status,  # Статус залишається ACTIVE
+                                        reason=f"Проведено чергову атестацію (Акт №{self.dsszzi_registered_number})",
+                                        initiating_document=self
+                                )
+
+        # 5. Обробляємо ІК незалежно від наявності work_request_item
+        if should_process_ik:
+                # Знаходимо ОІД для оновлення
+                oid_to_update = None
+                
+                if self.work_request_item:
+                        # Якщо є пов'язаний work_request_item
+                        oid_to_update = self.work_request_item.oid
+                elif hasattr(self, 'oid') and self.oid:
+                        # Якщо документ прямо пов'язаний з ОІД
+                        oid_to_update = self.oid
+                elif hasattr(self, 'get_related_oid'):
+                        # Якщо є спеціальний метод для знаходження ОІД
+                        oid_to_update = self.get_related_oid()
+                
+                if oid_to_update and oid_to_update.status == OIDStatusChoices.ACTIVE:
+                        old_status = oid_to_update.get_status_display()
+                        
+                        # Додаємо нотатку про ІК
+                        ik_note = f"Проведено інструментальний контроль ({self.process_date.strftime('%d.%m.%Y') if self.process_date else ''})."
+                        oid_to_update.note = f"{ik_note}\n{oid_to_update.note or ''}".strip()
+                        oid_to_update.save(update_fields=['note'])
+                        
+                        # Створюємо запис в історії, але статус не змінюється (OIDStatusChoices.ACTIVE)
+                        OIDStatusChange.objects.create(
+                                oid=oid_to_update,
+                                old_status=old_status,
+                                new_status=old_status,  # Статус залишається ACTIVE
+                                reason=f"Проведено інструментальний контроль (Висновок №{self.dsszzi_registered_number})",
+                                initiating_document=self
+                        )
+                
     def __str__(self):
         return f"{self.document_type.name} / {self.document_number} (ОІД: {self.oid.cipher})"
-
+    
     class Meta:
         verbose_name = "Опрацьований документ"
         verbose_name_plural = "Опрацьовані документи"
         ordering = ['-process_date', '-work_date']
-        
+            
+			
 class Trip(models.Model):
     """
     Відрядження
@@ -1045,18 +1149,68 @@ class TechnicalTask(models.Model):
     
     def save(self, *args, **kwargs):
         is_new = self._state.adding
+        # Отримуємо старий стан об'єкта з бази даних ДО збереження
+        old_instance = TechnicalTask.objects.filter(pk=self.pk).first()
 
-        # Спочатку виконуємо стандартне збереження самого ТЗ
+        # Виконуємо збереження
         super().save(*args, **kwargs)
+        
+        oid_to_update = self.oid
+        if not oid_to_update:
+            return # Якщо ОІД не вказано, нічого не робимо
 
-        # Якщо це щойно створене ТЗ і в нього є пов'язаний ОІД...
-        if is_new and self.oid:
-            # ...тоді ми оновлюємо статус цього ОІДа.
-            oid_to_update = self.oid
-            if oid_to_update.status != OIDStatusChoices.RECEIVED_TZ:
-                oid_to_update.status = OIDStatusChoices.RECEIVED_TZ
+        # --- Логіка для створення ---
+        if is_new:
+            old_status = oid_to_update.get_status_display()
+            new_status_enum = OIDStatusChoices.RECEIVED_TZ
+            
+            if oid_to_update.status != new_status_enum:
+                oid_to_update.status = new_status_enum
                 oid_to_update.save(update_fields=['status'])
+
+        # --- Логіка для погодження ---
+        # Перевіряємо, чи змінився статус на "Погоджено"
+        elif old_instance and old_instance.review_result != self.review_result:
+            old_status = oid_to_update.get_status_display()
+            if self.review_result == DocumentReviewResultChoices.FOR_REVISION:
+                new_status_enum = OIDStatusChoices.RECEIVED_TZ_REPEAT
+                reason = f"ТЗ №{self.input_number} відправлено на доопрацювання"
                 
+                if oid_to_update.status != new_status_enum:
+                    oid_to_update.status = new_status_enum
+                    oid_to_update.save(update_fields=['status'])
+                    
+                    OIDStatusChange.objects.create(
+						oid=oid_to_update,
+						old_status=old_status,
+						new_status=new_status_enum.label,
+						reason=reason
+					)
+					
+            elif self.review_result == DocumentReviewResultChoices.AWAITING_DOCS:
+                new_status_enum = OIDStatusChoices.RECEIVED_TZ_REPEAT
+                reason = f"ТЗ №{self.input_number} очікує додаткові документи"
+                if oid_to_update.status != new_status_enum:
+                    oid_to_update.status = new_status_enum
+                    oid_to_update.save(update_fields=['status'])
+                    OIDStatusChange.objects.create(
+						oid=oid_to_update,
+						old_status=old_status,
+						new_status=new_status_enum.label,
+						reason=reason
+					)
+            elif self.review_result == DocumentReviewResultChoices.APPROVED:
+                new_status_enum = OIDStatusChoices.RECEIVED_TZ_APPROVE
+                reason = f"ТЗ №{self.input_number} погоджено"
+                if oid_to_update.status != new_status_enum:
+                    oid_to_update.status = new_status_enum
+                    oid_to_update.save(update_fields=['status'])
+                    OIDStatusChange.objects.create(
+						oid=oid_to_update,
+						old_status=old_status,
+						new_status=new_status_enum.label,
+						reason=reason
+					)
     def __str__(self):
         return f"ТЗ/МЗ від в/ч {self.oid.unit.code} на ОІД: {self.oid.cipher} (статус : {self.get_review_result_display()}) від {self.input_date.strftime("%d.%m.%Y")} вх.№{self.input_number}"
 

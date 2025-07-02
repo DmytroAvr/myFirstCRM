@@ -527,8 +527,9 @@ def main_dashboard(request):
                 OID_to_show_main_dashboard_creating = [
                     OIDStatusChoices.NEW,
                     OIDStatusChoices.RECEIVED_TZ,
+                    OIDStatusChoices.RECEIVED_TZ_REPEAT,
                     OIDStatusChoices.RECEIVED_TZ_APPROVE,
-                    OIDStatusChoices.RECEIVED_REQUEST ,
+                    OIDStatusChoices.RECEIVED_REQUEST,
                     OIDStatusChoices.ATTESTED,
                     OIDStatusChoices.RECEIVED_AZR , 
                     OIDStatusChoices.RECEIVED_DECLARATION
