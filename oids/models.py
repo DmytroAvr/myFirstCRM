@@ -828,7 +828,7 @@ class Document(models.Model):
         # 1. Надійно визначаємо типи документів за їхніми назвами
         try:
                 attestation_doc_type = DocumentType.objects.get(name__icontains='Акт атестації')
-                ik_conclusion_doc_type = DocumentType.objects.get(name__icontains='Висновок ІК')
+                ik_conclusion_doc_type = DocumentType.objects.get(name__icontains='Висновок')
         except DocumentType.DoesNotExist:
                 # Якщо ключові типи документів не знайдено в базі, нічого не робимо
                 return 
