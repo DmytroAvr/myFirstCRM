@@ -821,7 +821,7 @@ class Document(models.Model):
     def save(self, *args, **kwargs):
         old_instance = Document.objects.filter(pk=self.pk).first()
         # old_instance = self.__class__.objects.filter(pk=self.pk).first()
-    # Виконуємо стандартне збереження
+        # Виконуємо стандартне збереження
         super().save(*args, **kwargs)
 
         # --- Початок блоку оновлення статусів ---
@@ -830,22 +830,25 @@ class Document(models.Model):
         try:
                 attestation_doc_type = DocumentType.objects.get(name__icontains='Акт атестації')
                 ik_conclusion_doc_type = DocumentType.objects.get(name__icontains='Висновок')
-                is_azr_act = DocumentType.objects.get(name__icontains='АЗР')
+                azr_act_doc_type = DocumentType.objects.get(name__icontains='АЗР')
+                declaration_doc_type = DocumentType.objects.get(name__icontains='Декларація відповідності')  # НОВИЙ ТИП
         except DocumentType.DoesNotExist:
                 # Якщо ключові типи документів не знайдено в базі, нічого не робимо
                 return 
 
         is_attestation_act = self.document_type == attestation_doc_type
         is_ik_conclusion = self.document_type == ik_conclusion_doc_type
+        is_azr_act = self.document_type == azr_act_doc_type
+        is_declaration = self.document_type == declaration_doc_type  # НОВИЙ ТИП
 
         # 2. Перевіряємо умови-тригери для кожного типу документа
         
-        # -- УМОВА ДЛЯ АТЕСТАЦІЇ --
-        # Тригер: Акт атестації, який щойно отримав реєстраційний номер
+        # -- УМОВА ДЛЯ АТЕСТАЦІЇ, АЗР ТА ДЕКЛАРАЦІЇ --
+        # Тригер: документи, які щойно отримали реєстраційний номер
         is_registered = bool(self.dsszzi_registered_number and self.dsszzi_registered_date)
         was_just_registered = not (old_instance and old_instance.dsszzi_registered_number) and is_registered
 
-        should_process_attestation = is_attestation_act and was_just_registered
+        should_process_registration = (is_attestation_act or is_azr_act or is_declaration) and was_just_registered
         
         # -- УМОВА ДЛЯ ІК --
         # Тригер: Просто створення документу "Висновок ІК"
@@ -856,15 +859,23 @@ class Document(models.Model):
         # --- Застосування логіки ---
 
         # 3. Обробляємо Work Request Item (якщо є)
-        if self.work_request_item and (should_process_attestation or should_process_ik):
+        if self.work_request_item and (should_process_registration or should_process_ik):
                 wri = self.work_request_item
                 
-                if should_process_attestation:
-                        # Для атестації встановлюємо статус "До відправки"
-                        if wri.status != WorkRequestStatusChoices.TO_SEND:
-                                wri.status = WorkRequestStatusChoices.TO_SEND
-                                wri.docs_actually_processed_on = self.process_date or datetime.date.today()
-                                wri.save(update_fields=['status', 'docs_actually_processed_on'])
+                if should_process_registration:
+                        # Для атестації, АЗР та декларації встановлюємо різні статуси залежно від типу
+                        if is_attestation_act:
+                                # Для атестації встановлюємо статус "До відправки"
+                                if wri.status != WorkRequestStatusChoices.TO_SEND:
+                                        wri.status = WorkRequestStatusChoices.TO_SEND
+                                        wri.docs_actually_processed_on = self.process_date or datetime.date.today()
+                                        wri.save(update_fields=['status', 'docs_actually_processed_on'])
+                        else:  # АЗР або Декларація
+                                # Для АЗР та декларації встановлюємо статус "Виконано"
+                                if wri.status != WorkRequestStatusChoices.COMPLETED:
+                                        wri.status = WorkRequestStatusChoices.COMPLETED
+                                        wri.docs_actually_processed_on = self.process_date or datetime.date.today()
+                                        wri.save(update_fields=['status', 'docs_actually_processed_on'])
                 
                 elif should_process_ik:
                         # Для ІК встановлюємо статус "Виконано"
@@ -874,7 +885,7 @@ class Document(models.Model):
                                 wri.save(update_fields=['status', 'docs_actually_processed_on'])
 
         # 4. Обробляємо ОІД незалежно від наявності work_request_item
-        if should_process_attestation:
+        if should_process_registration:
                 # Знаходимо ОІД для оновлення
                 oid_to_update = None
                 
@@ -891,47 +902,66 @@ class Document(models.Model):
                 if oid_to_update:
                         old_status = oid_to_update.get_status_display()
                         
-                        # Логіка для першої атестації
-                        statuses_for_first_attestation = [
-                                OIDStatusChoices.NEW,
-                                OIDStatusChoices.RECEIVED_TZ, 
-                                OIDStatusChoices.RECEIVED_TZ_REPEAT,
-                                OIDStatusChoices.RECEIVED_TZ_APPROVE,
-                                OIDStatusChoices.RECEIVED_REQUEST,
-                                OIDStatusChoices.TERMINATED
-                        ]
-                        
-                        if oid_to_update and oid_to_update.status in statuses_for_first_attestation:
-                                new_status_enum = OIDStatusChoices.ATTESTED
-                                oid_to_update.status = new_status_enum
-                                oid_to_update.note = f"Об'єкт атестовано {self.process_date.strftime('%d.%m.%Y') if self.process_date else ''}."
-                                oid_to_update.save(update_fields=['status', 'note'])
+                        if is_attestation_act:
+                                # Логіка для атестації (як було раніше)
+                                statuses_for_first_attestation = [
+                                        OIDStatusChoices.NEW,
+                                        OIDStatusChoices.RECEIVED_TZ, 
+                                        OIDStatusChoices.RECEIVED_TZ_REPEAT,
+                                        OIDStatusChoices.RECEIVED_TZ_APPROVE,
+                                        OIDStatusChoices.RECEIVED_REQUEST,
+                                        OIDStatusChoices.TERMINATED
+                                ]
                                 
-                                # Створюємо запис в історії
-                                OIDStatusChange.objects.create(
-                                        oid=oid_to_update,
-                                        old_status=old_status,
-                                        new_status=new_status_enum.label,
-                                        reason=f"Атестацію завершено. Зареєстровано Акт атестації №{self.dsszzi_registered_number}",
-                                        initiating_document=self
-                                )
-                        
-                        # Логіка для повторної атестації
-                        elif oid_to_update and oid_to_update.status == OIDStatusChoices.ACTIVE:
-                                attestation_note = f"Проведено чергову атестацію ({self.process_date.strftime('%d.%m.%Y') if self.process_date else ''})."
-                                oid_to_update.note = f"{attestation_note}\n{oid_to_update.note or ''}".strip()
-                                oid_to_update.save(update_fields=['note'])
+                                if oid_to_update.status in statuses_for_first_attestation:
+                                        new_status_enum = OIDStatusChoices.ATTESTED
+                                        oid_to_update.status = new_status_enum
+                                        oid_to_update.note = f"Об'єкт атестовано {self.process_date.strftime('%d.%m.%Y') if self.process_date else ''}."
+                                        oid_to_update.save(update_fields=['status', 'note'])
+                                        
+                                        # Створюємо запис в історії
+                                        OIDStatusChange.objects.create(
+                                                oid=oid_to_update,
+                                                old_status=old_status,
+                                                new_status=new_status_enum.label,
+                                                reason=f"Атестацію завершено. Зареєстровано Акт атестації №{self.dsszzi_registered_number}",
+                                                initiating_document=self
+                                        )
                                 
-                                # Створюємо запис в історії, але статус не змінюється
-                                OIDStatusChange.objects.create(
-                                        oid=oid_to_update,
-                                        old_status=old_status,
-                                        new_status=old_status,  # Статус залишається ACTIVE
-                                        reason=f"Проведено чергову атестацію (Акт №{self.dsszzi_registered_number})",
-                                        initiating_document=self
-                                )
+                                elif oid_to_update.status == OIDStatusChoices.ACTIVE:
+                                        # Повторна атестація
+                                        attestation_note = f"Проведено чергову атестацію ({self.process_date.strftime('%d.%m.%Y') if self.process_date else ''})."
+                                        oid_to_update.note = f"{attestation_note}\n{oid_to_update.note or ''}".strip()
+                                        oid_to_update.save(update_fields=['note'])
+                                        
+                                        OIDStatusChange.objects.create(
+                                                oid=oid_to_update,
+                                                old_status=old_status,
+                                                new_status=old_status,
+                                                reason=f"Проведено чергову атестацію (Акт №{self.dsszzi_registered_number})",
+                                                initiating_document=self
+                                        )
+                        
+                        elif is_azr_act or is_declaration:
+                                # Логіка для АЗР та Декларації - статус стає ACTIVE
+                                new_status_enum = OIDStatusChoices.ACTIVE
+                                if oid_to_update.status != new_status_enum:
+                                        oid_to_update.status = new_status_enum
+                                        oid_to_update.save(update_fields=['status'])
+                                        
+                                        # Формуємо причину для запису в історію
+                                        doc_type_name = "АЗР" if is_azr_act else "Декларація відповідності"
+                                        reason_text = f"Зареєстровано {doc_type_name} №{self.dsszzi_registered_number}"
+                                        
+                                        OIDStatusChange.objects.create(
+                                                oid=oid_to_update,
+                                                old_status=old_status,
+                                                new_status=new_status_enum.label,
+                                                reason=reason_text,
+                                                initiating_document=self
+                                        )
 
-        # 5. Обробляємо ІК незалежно від наявності work_request_item
+        # 5. Обробляємо ІК незалежно від наявності work_request_item (як було раніше)
         if should_process_ik:
                 # Знаходимо ОІД для оновлення
                 oid_to_update = None
@@ -962,7 +992,7 @@ class Document(models.Model):
                                 reason=f"Проведено інструментальний контроль (Висновок №{self.dsszzi_registered_number})",
                                 initiating_document=self
                         )
-                
+
     def __str__(self):
         return f"{self.document_type.name} / {self.document_number} (ОІД: {self.oid.cipher})"
     
