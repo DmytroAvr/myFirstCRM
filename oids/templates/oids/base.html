@@ -87,8 +87,12 @@
 							</button>
 							<div class="menu__content">
 								<a href="{% url 'oids:send_attestation_for_registration' %}" class="nav-link">Відправка на реєстрацію АА (до ДССЗЗІ) </a>
-								<a href="{% url 'oids:record_attestation_response' %}" class="nav-link">Реєстрація АА (відповідь ДССЗЗІ)</a>
+								<a href="{% url 'oids:record_attestation_response' %}" class="nav-link">Зареєстрований № АА (відповідь ДССЗЗІ)</a>
 								<a href="{% url 'oids:update_oid_status' %}" class="nav-link">Змінити статус ОІД</a>
+								<a href="{% url 'oids:send_azr_for_registration' %}" class="nav-link">Відправка на реєстрацію АЗР (до ДССЗЗІ) </a>
+								<a href="{% url 'oids:record_azr_response' %}" class="nav-link">Зареєстрований № АЗР (відповідь ДССЗЗІ)</a>
+								<a href="{% url 'oids:send_declaration_for_registration' %}" class="nav-link">Відправка на реєстрацію Декларації (до ДССЗЗІ) </a>
+								<a href="{% url 'oids:record_declaration_response' %}" class="nav-link">Зареєстрований № Декларації (відповідь ДССЗЗІ)</a>
 							</div>
 						</div></li>
 

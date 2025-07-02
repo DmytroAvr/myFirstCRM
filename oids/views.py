@@ -15,13 +15,13 @@ from .models import (OIDTypeChoices, OIDStatusChoices, SecLevelChoices, WorkRequ
 )
 from .models import (Unit, UnitGroup, OID, OIDStatusChange, TerritorialManagement, 
 	Document, DocumentType, WorkRequest, WorkRequestItem, Trip,TripResultForUnit, 
-    Person, TechnicalTask, AttestationRegistration, AttestationResponse, 
-    ProcessTemplate, OIDProcess, 
-    OIDProcessStepInstance, 
+    Person, TechnicalTask, AttestationRegistration, AttestationResponse, WorkCompletionRegistration,
+    ProcessTemplate, OIDProcess, OIDProcessStepInstance, DeclarationRegistration
 )
 from .forms import ( TripForm, TripResultSendForm, DocumentProcessingMainForm, DocumentItemFormSet, DocumentForm, 
 	WorkRequestForm, WorkRequestItemFormSet,  OIDCreateForm, OIDStatusUpdateForm,  TechnicalTaskCreateForm, TechnicalTaskProcessForm,
-	AttestationRegistrationSendForm, AttestationResponseMainForm, AttestationActUpdateFormSet   
+	AttestationRegistrationSendForm, AttestationResponseMainForm, AttestationActUpdateFormSet, WorkCompletionSendForm, WorkCompletionResponseForm,
+    AzrUpdateForm, DeclarationSendForm, DeclarationUpdateFormSet, DeclarationResponseForm
 )
 from .forms_process import ( DeclarationProcessStartForm, SendForRegistrationForm    
 )
@@ -531,7 +531,7 @@ def main_dashboard(request):
                     OIDStatusChoices.RECEIVED_TZ_APPROVE,
                     OIDStatusChoices.RECEIVED_REQUEST,
                     OIDStatusChoices.ATTESTED,
-                    OIDStatusChoices.RECEIVED_AZR , 
+                    OIDStatusChoices.AZR_SEND , 
                     OIDStatusChoices.RECEIVED_DECLARATION
                     ]
                 OID_to_show_main_dashboard_active = [
@@ -1093,6 +1093,7 @@ def send_attestation_for_registration_view(request):
     }
     return render(request, 'oids/forms/send_attestation_form.html', context)
 
+@login_required
 def send_document_for_registration_view(request, pk):
     document = get_object_or_404(Document, pk=pk)
     
@@ -1123,6 +1124,111 @@ def send_document_for_registration_view(request, pk):
     return render(request, 'oids/action_confirm_form.html', context)
 
 
+@login_required
+def send_azr_for_registration_view(request):
+    if request.method == 'POST':
+        form = WorkCompletionSendForm(request.POST)
+        if form.is_valid():
+            # Метод save() моделі сам оновить статуси ОІДів
+            send_instance = form.save(commit=False)
+            send_instance.created_by = request.user.person # Якщо у вас є зв'язок User-Person
+            send_instance.save()
+            form.save_m2m() # Важливо для збереження ManyToMany зв'язку з документами
+            
+            messages.success(request, f"Запис про відправку АЗР (лист №{send_instance.outgoing_letter_number}) успішно створено.")
+            return redirect('some_list_view_name') # Перенаправлення на список відправок
+    else:
+        form = WorkCompletionSendForm()
+
+    context = {
+        'form': form,
+        'page_title': 'Відправка Актів завершення робіт на реєстрацію'
+    }
+    return render(request, 'oids/send_azr_form.html', context)
+
+@login_required
+def record_azr_response_view(request, registration_id):
+    registration_request = get_object_or_404(WorkCompletionRegistration, pk=registration_id)
+    # Отримуємо queryset тільки тих АЗР, які були в цій відправці
+    queryset_for_formset = registration_request.documents.all()
+
+    if request.method == 'POST':
+        response_form = WorkCompletionResponseForm(request.POST)
+        formset = AzrUpdateFormSet(request.POST, queryset=queryset_for_formset)
+
+        if response_form.is_valid() and formset.is_valid():
+            # Створюємо запис про відповідь
+            response_instance = response_form.save(commit=False)
+            response_instance.registration_request = registration_request
+            response_instance.created_by = request.user.person
+            response_instance.save()
+            
+            # Зберігаємо оновлені дані для кожного АЗР.
+            # Метод .save() кожного документа запустить нашу логіку оновлення статусів OID.
+            formset.save()
+
+            messages.success(request, "Відповідь по АЗР успішно внесено. Статуси ОІД оновлено.")
+            return redirect('some_list_view_name')
+    else:
+        response_form = WorkCompletionResponseForm()
+        formset = AzrUpdateFormSet(queryset=queryset_for_formset)
+
+    context = {
+        'response_form': response_form,
+        'formset': formset,
+        'registration_request': registration_request,
+        'page_title': f'Внесення відповіді на лист №{registration_request.outgoing_letter_number}'
+    }
+    return render(request, 'oids/record_azr_response.html', context)
+
+@login_required
+def send_declaration_for_registration_view(request):
+    if request.method == 'POST':
+        form = DeclarationSendForm(request.POST)
+        if form.is_valid():
+            send_instance = form.save() # Метод .save() моделі зробить всю роботу
+            messages.success(request, f"Запис про відправку Декларацій (лист №{send_instance.outgoing_letter_number}) успішно створено.")
+            return redirect('oids:list_declaration_registrations')
+    else:
+        form = DeclarationSendForm()
+
+    context = {
+        'form': form,
+        'page_title': 'Відправка Декларацій відповідності на реєстрацію'
+    }
+    return render(request, 'oids/generic_send_form.html', context)
+
+@login_required
+def record_declaration_response_view(request, registration_id):
+    registration_request = get_object_or_404(DeclarationRegistration, pk=registration_id)
+    queryset_for_formset = registration_request.documents.all()
+
+    if request.method == 'POST':
+        response_form = DeclarationResponseForm(request.POST)
+        formset = DeclarationUpdateFormSet(request.POST, queryset=queryset_for_formset)
+
+        if response_form.is_valid() and formset.is_valid():
+            response_instance = response_form.save(commit=False)
+            response_instance.registration_request = registration_request
+            response_instance.save()
+            
+            # .save() для формсету викличе .save() для кожної моделі Document,
+            # що запустить нашу логіку оновлення статусу OID на ACTIVE.
+            formset.save()
+
+            messages.success(request, "Відповідь по Деклараціях успішно внесено.")
+            return redirect('oids:list_declaration_registrations')
+    else:
+        response_form = DeclarationResponseForm()
+        formset = DeclarationUpdateFormSet(queryset=queryset_for_formset)
+
+    context = {
+        'response_form': response_form,
+        'formset': formset,
+        'registration_request': registration_request,
+        'page_title': f'Внесення відповіді на лист по Деклараціях №{registration_request.outgoing_letter_number}'
+    }
+    return render(request, 'oids/generic_record_response.html', context)
 
 @login_required 
 def technical_task_create_view(request):

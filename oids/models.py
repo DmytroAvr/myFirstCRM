@@ -50,7 +50,7 @@ class OIDStatusChoices(models.TextChoices):
     RECEIVED_TZ_APPROVE = 'ТЗ/МЗ погоджено', 'ТЗ/МЗ Погоджено' 
     RECEIVED_REQUEST = 'отримано заявку', 'Отримано Заявку' 
     ATTESTED = 'атестовано', 'атестовано'
-    RECEIVED_AZR = 'отримано АЗР', 'Отримано АЗР' 
+    AZR_SEND = 'АЗР відправлено до ДССЗЗІ', 'АЗР відправлено до ДССЗЗІ' 
     RECEIVED_DECLARATION = 'отримано Декларацію', 'Отримано Декларацію' 
     ACTIVE = 'активний', 'Активний (В дії)'
     TERMINATED = 'призупинено', 'Призупинено'
@@ -655,8 +655,8 @@ class AttestationRegistration(models.Model):
 
    
     class Meta:
-        verbose_name = "Відправка актів на реєстрацію (ДССЗЗІ)"
-        verbose_name_plural = "Відправки актів на реєстрацію (ДССЗЗІ)"
+        verbose_name = "АА відправка на реєстрацію (ДССЗЗІ)"
+        verbose_name_plural = "АА відправки на реєстрацію (ДССЗЗІ)"
         ordering = ['-outgoing_letter_date', '-id']     
 
 class AttestationResponse(models.Model):
@@ -721,10 +721,11 @@ class AttestationResponse(models.Model):
 
 
     class Meta:
-        verbose_name = "Відповідь на реєстрацію (ДССЗЗІ)"
-        verbose_name_plural = "Відповіді на реєстрацію (ДССЗЗІ)"
+        verbose_name = "АА відповідь ДССЗЗІ"
+        verbose_name_plural = "АА відповіді ДССЗЗІ"
         ordering = ['-response_letter_date', '-id']
-   
+
+
 class Document(models.Model):
     """
     Опрацьовані документи Залежить від типу ОІД та виду робіт.
@@ -819,7 +820,7 @@ class Document(models.Model):
     
     def save(self, *args, **kwargs):
         old_instance = Document.objects.filter(pk=self.pk).first()
-    
+        # old_instance = self.__class__.objects.filter(pk=self.pk).first()
     # Виконуємо стандартне збереження
         super().save(*args, **kwargs)
 
@@ -829,6 +830,7 @@ class Document(models.Model):
         try:
                 attestation_doc_type = DocumentType.objects.get(name__icontains='Акт атестації')
                 ik_conclusion_doc_type = DocumentType.objects.get(name__icontains='Висновок')
+                is_azr_act = DocumentType.objects.get(name__icontains='АЗР')
         except DocumentType.DoesNotExist:
                 # Якщо ключові типи документів не знайдено в базі, нічого не робимо
                 return 
@@ -969,7 +971,179 @@ class Document(models.Model):
         verbose_name_plural = "Опрацьовані документи"
         ordering = ['-process_date', '-work_date']
             
-			
+
+class WorkCompletionRegistration(models.Model):
+    """
+    Модель для фіксації відправки Актів Завершення Робіт (АЗР) на реєстрацію.
+    Один запис = один вихідний лист, що може містити декілька АЗР.
+    """
+    outgoing_letter_number = models.CharField(
+        max_length=50,
+        verbose_name="Вихідний номер супровідного листа"
+    )
+    outgoing_letter_date = models.DateField(
+        verbose_name="Дата вихідного супровідного листа"
+    )
+    # Ключовий зв'язок: один лист може містити багато документів (АЗР)
+    # documents = models.ManyToManyField(
+    #     Document,
+    #     verbose_name="Документи (АЗР), відправлені на реєстрацію",
+    #     related_name="completion_registrations"
+    # )
+    note = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Примітки до відправки"
+    )
+    send_by = models.ForeignKey(
+        Person,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        verbose_name="Хто створив запис"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    history = HistoricalRecords()
+    
+    def save(self, *args, **kwargs):
+        # Спочатку зберігаємо сам об'єкт, щоб він отримав ID
+        super().save(*args, **kwargs)
+        
+        # Використовуємо .all() після збереження, щоб отримати доступ до M2M
+        # Цей цикл пройде по всіх документах (АЗР), які були додані до цієї відправки
+        for doc in self.documents.all():
+            oid_to_update = doc.oid
+            if oid_to_update:
+                old_status = oid_to_update.get_status_display()
+                new_status_enum = OIDStatusChoices.AZR_SEND
+
+                if oid_to_update.status != new_status_enum:
+                    oid_to_update.status = new_status_enum
+                    oid_to_update.save(update_fields=['status'])
+                    
+                    # Створюємо запис в історії
+                    OIDStatusChange.objects.create(
+                        oid=oid_to_update,
+                        old_status=old_status,
+                        new_status=new_status_enum.label,
+                        reason=f"АЗР (документ №{doc.document_number}) відправлено на реєстрацію в складі листа №{self.outgoing_letter_number}",
+                        initiating_document=doc
+                    )
+
+    def __str__(self):
+        return f"Відправка АЗР (лист №{self.outgoing_letter_number} від {self.outgoing_letter_date.strftime('%d.%m.%Y')})"
+
+    class Meta:
+        verbose_name = "АЗР відправка на реєстрацію"
+        verbose_name_plural = "АЗР відправки на реєстрацію"
+        ordering = ['-outgoing_letter_date']
+
+class WorkCompletionResponse(models.Model):
+    """
+    Модель для фіксації отримання відповіді від ДССЗЗІ
+    щодо реєстрації Актів Завершення Робіт.
+    """
+    # Зв'язок "один-до-одного" з відправкою
+    registration_request = models.OneToOneField(
+        WorkCompletionRegistration,
+        on_delete=models.CASCADE,
+        verbose_name="Запит на реєстрацію (відправлений лист)",
+        related_name="response_received"
+    )
+    response_letter_number = models.CharField(
+        max_length=50,
+        verbose_name="Номер листа-відповіді від ДССЗЗІ"
+    )
+    response_letter_date = models.DateField(
+        verbose_name="Дата листа-відповіді"
+    )
+    note = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Примітки до відповіді"
+    )
+    received_by = models.ForeignKey(
+        Person,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        verbose_name="Хто вніс відповідь"
+    )
+    received_at = models.DateTimeField(auto_now_add=True)
+    history = HistoricalRecords()
+
+    def __str__(self):
+        return f"Відповідь на лист №{self.registration_request.outgoing_letter_number}"
+
+    class Meta:
+        verbose_name = "АЗР відповідь ДССЗЗІ"
+        verbose_name_plural = "АЗР відповіді ДССЗЗІ"
+
+class DeclarationRegistration(models.Model):
+    """Модель для фіксації відправки Декларацій відповідності на реєстрацію."""
+    outgoing_letter_number = models.CharField(max_length=50, verbose_name="Вихідний номер супровідного листа")
+    outgoing_letter_date = models.DateField(verbose_name="Дата вихідного супровідного листа")
+    documents = models.ManyToManyField(
+        Document,
+        verbose_name="Документи (Декларації), відправлені на реєстрацію",
+        related_name="declaration_registrations"
+    )
+    note = models.TextField(blank=True, null=True, verbose_name="Примітки")
+    created_by = models.ForeignKey(Person, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Хто створив запис")
+    created_at = models.DateTimeField(auto_now_add=True)
+    history = HistoricalRecords()
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Після збереження проходимося по всіх доданих документах
+        for doc in self.documents.all():
+            oid_to_update = doc.oid
+            if oid_to_update:
+                old_status = oid_to_update.get_status_display()
+                new_status_enum = OIDStatusChoices.RECEIVED_DECLARATION
+
+                if oid_to_update.status != new_status_enum:
+                    oid_to_update.status = new_status_enum
+                    oid_to_update.save(update_fields=['status'])
+                    
+                    OIDStatusChange.objects.create(
+                        oid=oid_to_update,
+                        old_status=old_status,
+                        new_status=new_status_enum.label,
+                        reason=f"Декларацію (документ №{doc.document_number}) відправлено на реєстрацію листом №{self.outgoing_letter_number}",
+                        initiating_document=doc
+                    )
+
+    def __str__(self):
+        return f"Відправка Декларацій (лист №{self.outgoing_letter_number})"
+
+    class Meta:
+        verbose_name = "Декларація відправка на реєстрацію"
+        verbose_name_plural = "Декларації відправки на реєстрацію"
+        ordering = ['-outgoing_letter_date']
+
+
+class DeclarationResponse(models.Model):
+    """Модель для фіксації отримання відповіді по Деклараціях."""
+    registration_request = models.OneToOneField(
+        DeclarationRegistration,
+        on_delete=models.CASCADE,
+        verbose_name="Запит на реєстрацію (відправлений лист)",
+        related_name="response_received"
+    )
+    response_letter_number = models.CharField(max_length=50, verbose_name="Номер листа-відповіді")
+    response_letter_date = models.DateField(verbose_name="Дата листа-відповіді")
+    note = models.TextField(blank=True, null=True, verbose_name="Примітки")
+    created_by = models.ForeignKey(Person, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Хто вніс відповідь")
+    created_at = models.DateTimeField(auto_now_add=True)
+    history = HistoricalRecords()
+
+    def __str__(self):
+        return f"Відповідь на лист по Деклараціях №{self.registration_request.outgoing_letter_number}"
+
+    class Meta:
+        verbose_name = "Декларація відповідь ДССЗЗІ"
+        verbose_name_plural = "Декларації відповіді ДССЗЗІ"
+
 class Trip(models.Model):
     """
     Відрядження

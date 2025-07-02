@@ -6,7 +6,8 @@ from .models import (OIDTypeChoices, OIDStatusChoices, SecLevelChoices, WorkRequ
 )
 from .models import (
     WorkRequest, WorkRequestItem, OID, Unit, Person, Trip, TripResultForUnit, Document, DocumentType,
-    AttestationRegistration, AttestationResponse,  TechnicalTask
+    AttestationRegistration, AttestationResponse, WorkCompletionRegistration, WorkCompletionResponse, 
+    DeclarationRegistration, DeclarationResponse, TechnicalTask,
 )
 from django_tomselect.forms import TomSelectModelChoiceField, TomSelectConfig
 from django.utils import timezone
@@ -580,6 +581,99 @@ AttestationActUpdateFormSet = modelformset_factory(
     edit_only=True                                # Тільки редагування, не створення нових
 )
 
+
+class WorkCompletionSendForm(forms.ModelForm):
+    documents = forms.ModelMultipleChoiceField(
+        queryset=Document.objects.filter(
+            document_type__name__icontains='акт завершення робіт', 
+            dsszzi_registered_number__isnull=True
+        ).order_by('oid__unit__code', 'oid__cipher'),
+        widget=forms.SelectMultiple(attrs={'class': 'tomselect-field', 'size': '15'}),
+        label="Оберіть Акти завершення робіт для відправки",
+        required=True
+    )
+    
+    class Meta:
+        model = WorkCompletionRegistration
+        fields = ['documents', 'outgoing_letter_number', 'outgoing_letter_date', 'note']
+        widgets = {
+            'outgoing_letter_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'outgoing_letter_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'note': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+        }
+        
+class WorkCompletionResponseForm(forms.ModelForm):
+    class Meta:
+        model = WorkCompletionResponse
+        fields = ['response_letter_number', 'response_letter_date', 'note']
+        widgets = {
+            'outgoing_letter_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'outgoing_letter_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'note': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+        }
+        
+class AzrUpdateForm(forms.ModelForm):
+    """Форма для оновлення одного АЗР в формсеті."""
+    class Meta:
+        model = Document
+        fields = ['dsszzi_registered_number', 'dsszzi_registered_date']
+        labels = {
+            'dsszzi_registered_number': 'Реєстр. номер',
+            'dsszzi_registered_date': 'Дата реєстр.',
+        }
+        widgets = {
+            'dsszzi_registered_date': forms.DateInput(attrs={'type': 'date'}),
+        }
+
+# Створюємо формсет
+AzrUpdateFormSet = modelformset_factory(
+    Document,
+    form=AzrUpdateForm,
+    extra=0 # Не створюємо порожніх форм
+)
+
+class DeclarationSendForm(forms.ModelForm):
+    documents = forms.ModelMultipleChoiceField(
+        queryset=Document.objects.filter(
+            document_type__name__icontains='декларація відповідності', 
+            dsszzi_registered_number__isnull=True
+        ).order_by('oid__unit__code', 'oid__cipher'),
+        widget=forms.SelectMultiple(attrs={'class': 'tomselect-field', 'size': '15'}),
+        label="Оберіть Декларації для відправки",
+        required=True
+    )
+    
+    class Meta:
+        model = DeclarationRegistration
+        fields = ['documents', 'outgoing_letter_number', 'outgoing_letter_date', 'note']
+        widgets = {
+            'outgoing_letter_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'outgoing_letter_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'note': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+        }
+
+class DeclarationResponseForm(forms.ModelForm):
+    class Meta:
+        model = DeclarationResponse
+        fields = ['response_letter_number', 'response_letter_date', 'note']
+        widgets = {
+            'outgoing_letter_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'outgoing_letter_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'note': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+        }
+# Ми можемо перевикористовувати AzrUpdateForm, оскільки поля ті ж самі,
+# але для чистоти коду краще створити окрему.
+class DeclarationUpdateForm(forms.ModelForm):
+    class Meta:
+        model = Document
+        fields = ['dsszzi_registered_number', 'dsszzi_registered_date']
+        # ... (labels та widgets)
+
+DeclarationUpdateFormSet = modelformset_factory(
+    Document,
+    form=DeclarationUpdateForm,
+    extra=0
+)        
 
 
 ALLOWED_STATUS_CHOICES = [

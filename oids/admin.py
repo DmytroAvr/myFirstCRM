@@ -7,6 +7,7 @@ from .models import (
     AttestationRegistration, AttestationResponse,
     TripResultForUnit, TechnicalTask, ProcessTemplate,
     ProcessStep, OIDProcess, OIDProcessStepInstance,
+    WorkCompletionRegistration, WorkCompletionResponse
 )
 
 @admin.register(TerritorialManagement)
@@ -129,6 +130,23 @@ class AttestationResponseAdmin(SimpleHistoryAdmin):
     list_display = ('attestation_registration_sent', 'response_letter_number', 'response_letter_date', 'received_by', 'created_at')
     list_filter = ('response_letter_date', 'received_by', 'attestation_registration_sent__status')
     search_fields = ('response_letter_number', 'attestation_registration_sent__outgoing_letter_number', 'received_by__full_name')
+    date_hierarchy = 'response_letter_date'
+    
+@admin.register(WorkCompletionRegistration)
+class WorkCompletionRegistration(SimpleHistoryAdmin):
+    # Оновлюємо поля згідно з новими назвами в моделі WorkCompletionRegistration
+    list_display = ('outgoing_letter_number', 'outgoing_letter_date', 'send_by', 'created_at', 'updated_at')
+    list_filter = ('outgoing_letter_number', 'outgoing_letter_date', 'send_by', 'created_at', 'updated_at')
+    search_fields = ('outgoing_letter_number', 'send_by__full_name', 'units__code')
+    date_hierarchy = 'outgoing_letter_date'
+
+@admin.register(WorkCompletionResponse)
+class WorkCompletionResponseAdmin(SimpleHistoryAdmin):
+    # Оновлюємо поля згідно з новими назвами в моделі WorkCompletionResponse
+    list_display = ('registration_request', 'response_letter_number', 'response_letter_date', 'note', 'received_at', 'received_by')
+    list_display = ('registration_request', 'response_letter_number', 'response_letter_date', 'received_at', 'received_by')
+    list_filter = ('response_letter_date', 'received_at', 'registration_request')
+    search_fields = ('response_letter_number', 'registration_request__outgoing_letter_number', 'received_by__full_name')
     date_hierarchy = 'response_letter_date'
 
 
