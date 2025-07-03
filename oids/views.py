@@ -1196,7 +1196,7 @@ def send_declaration_for_registration_view(request):
         'form': form,
         'page_title': 'Відправка Декларацій відповідності на реєстрацію'
     }
-    return render(request, 'oids/generic_send_form.html', context)
+    return render(request, 'oids/declaration_send_form.html', context)
 
 @login_required
 def record_declaration_response_view(request, registration_id):
@@ -2508,7 +2508,6 @@ def record_attestation_response_view(request, att_reg_sent_id=None): # Може 
     }
     return render(request, 'oids/forms/record_attestation_response_form.html', context)
 
-
 @login_required 
 def processing_control_view(request):
     """
@@ -2773,6 +2772,4 @@ def start_declaration_process_view(request):
         'page_title': f'Ініціація процесу: {template_name}'
     }
     return render(request, 'oids/generic_form.html', context)
-
-
 

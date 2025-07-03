@@ -76,6 +76,7 @@
             opacity: 0;
             transition: var(--transition);
 			background-color: #ffffffce;
+			z-index: 99;
 		}
 
         .menu:hover .menu__content {

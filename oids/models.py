@@ -831,7 +831,7 @@ class Document(models.Model):
                 attestation_doc_type = DocumentType.objects.get(name__icontains='Акт атестації')
                 ik_conclusion_doc_type = DocumentType.objects.get(name__icontains='Висновок')
                 azr_act_doc_type = DocumentType.objects.get(name__icontains='АЗР')
-                declaration_doc_type = DocumentType.objects.get(name__icontains='Декларація відповідності')  # НОВИЙ ТИП
+                declaration_doc_type = DocumentType.objects.get(name__icontains='Декларація')  # НОВИЙ ТИП
         except DocumentType.DoesNotExist:
                 # Якщо ключові типи документів не знайдено в базі, нічого не робимо
                 return 
@@ -1518,3 +1518,5 @@ class OIDProcessStepInstance(models.Model):
         verbose_name = "Конкретні екземпляри кроків для процесу ОІД."
         verbose_name_plural = "БізнесПроцес: 4. Екземпляри кроку для процесу ОІД."
         ordering = ['-id']
+
+     

@@ -42,18 +42,28 @@ urlpatterns = [
 	path('oid/<int:oid_id_from_url>/update-status/', views.update_oid_status_view, name='update_specific_oid_status'),
 	path('oid/create/', views.oid_create_view, name='oid_create'), # Новий URL для форми
 	
-    
-    
-    path('attestation-registration/send/', views.send_attestation_for_registration_view, name='send_attestation_for_registration'), # URL для форми створення нової відправки на реєстрацію
-    path('attestation-response/record/', views.record_attestation_response_view, name='record_attestation_response'), # URL для форми внесення відповіді ДССЗЗІ
-    path('attestation-registration/<int:att_reg_sent_id>/record-response/', views.record_attestation_response_view, name='record_attestation_response_for_registration'), # передавати ID відправки в URL для форми відповіді
-	path('attestation-acts/registered/', views.attestation_registered_acts_list_view, name='list_registered_acts'),
-    
-    path('azr-registration/send/', views.send_azr_for_registration_view, name='send_azr_for_registration'),
-    path('azr-response/record/', views.record_azr_response_view, name='record_azr_response'), 
 
+
+	# --- Атестація ---
+    path('attestation-registration/send/', views.send_attestation_for_registration_view, name='send_attestation_for_registration'),
+    # Цей шлях тепер приймає ID відправки
+    path('attestation-response/record/', views.record_attestation_response_view, name='record_attestation_response'), # URL для форми внесення відповіді ДССЗЗІ
+	# який вірний ?
+    path('attestation-registration/<int:att_reg_sent_id>/record-response/', views.record_attestation_response_view, name='record_attestation_response_for_registration'), # передавати ID відправки в URL для форми відповіді
+    
+    # --- АЗР (Акт завершення робіт) ---
+    path('azr-registration/send/', views.send_azr_for_registration_view, name='send_azr_for_registration'),
+	# path('azr-response/record/', views.record_azr_response_view, name='record_azr_response'), 
+    # ВИПРАВЛЕНО: Додаємо <int:registration_id> для захоплення ID з URL
+    path('azr-response/record/<int:registration_id>/', views.record_azr_response_view, name='record_azr_response'),
+
+    # --- Декларації ---
     path('declaration-registration/send/', views.send_declaration_for_registration_view, name='send_declaration_for_registration'),
-    path('declaration-response/record/', views.record_declaration_response_view, name='record_declaration_response'), 
+    # path('declaration-response/record/', views.record_declaration_response_view, name='record_declaration_response'), 
+    # ВИПРАВЛЕНО: Додаємо <int:registration_id> для захоплення ID з URL
+    path('declaration-response/record/<int:registration_id>/', views.record_declaration_response_view, name='record_declaration_response'),
+    
+
 
 	path('processing-control/', views.processing_control_view, name='processing_control_dashboard'),
 	path('technical-task-control/', views.technical_task_control_view, name='technical_task_control'),
@@ -79,11 +89,11 @@ urlpatterns = [
     path('trips/', views.trip_list_view, name='list_trips'),
     path('technical-tasks/', views.technical_task_list_view, name='list_technical_tasks'),
     path('attestation-responses/', views.attestation_response_list_view, name='list_attestation_responses'),
+	path('attestation-acts/registered/', views.attestation_registered_acts_list_view, name='list_registered_acts'),
     path('trip-results/', views.trip_result_for_unit_list_view, name='list_trip_results_for_units'),
     path('oid-status-changes/', views.oid_status_change_list_view, name='list_oid_status_changes'),
    	path('attestation-registrations/', views.attestation_registration_list_view, name='list_attestation_registrations'), # URL для списку Відправок на реєстрацію
     path('attestation-responses/', views.attestation_response_list_view, name='list_attestation_responses'),  # URL для списку Отриманих відповідей на реєстрацію
-
 	# path("person-autocomplete/", PersonAutocompleteView.as_view(), name="person_autocomplete"),
     path('declaration_process/', views.start_declaration_process_view, name='declaration_process_view'),
 
