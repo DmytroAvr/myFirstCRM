@@ -647,7 +647,7 @@ class WorkCompletionResponseForm(forms.ModelForm):
 class AzrSubmissionForm(forms.Form):
     outgoing_letter_number = forms.CharField(label="Вихідний номер супровідного листа", max_length=50, required=True)
     outgoing_letter_date = forms.DateField(label="Дата вихідного листа", widget=forms.DateInput(attrs={'type': 'date'}), required=True)
-    note = forms.CharField(label="Примітки до відправки", widget=forms.Textarea(attrs={'rows': 2}), required=False)
+    note = forms.CharField(label="Примітки до відправки", widget=forms.Textarea(attrs={'rows': 1}), required=False)
 
 # Форма для одного рядка в нашому динамічному списку.
 # Вона не прив'язана до моделі, бо ми створюємо об'єкти вручну.
@@ -724,6 +724,7 @@ class DeclarationResponseForm(forms.ModelForm):
         }
 # Ми можемо перевикористовувати AzrUpdateForm, оскільки поля ті ж самі,
 # але для чистоти коду краще створити окрему.
+
 class DeclarationUpdateForm(forms.ModelForm):
     class Meta:
         model = Document

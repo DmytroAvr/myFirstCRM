@@ -132,7 +132,8 @@ def ajax_load_oids_for_multiple_units(request):
                     'full_name': oid.full_name or "",
                     'unit_code': oid.unit.code, # Додаємо код ВЧ для кращого відображення
                     'unit_city': oid.unit.city,
-					'oid_type_display': oid.get_oid_type_display()
+					'oid_type_display': oid.get_oid_type_display(),
+                    'pemin_sub_type': oid.get_pemin_sub_type_display()
                 })
         except ValueError:
             return JsonResponse({'error': 'Невірні ID військових частин'}, status=400)
@@ -2840,8 +2841,6 @@ def start_declaration_process_view(request):
         'page_title': f'Ініціація процесу: {template_name}'
     }
     return render(request, 'oids/generic_form.html', context)
-
-# oids/views.py
 
 @login_required
 def azr_documents_list_view(request):

@@ -12,30 +12,9 @@
         <div class="card-body">
             <form method="post" novalidate>
                 {% csrf_token %}
-                
-                {# Службові поля для формсету. JavaScript буде ними керувати. #}
-                {{ item_formset.management_form }}
-
-                {# --- Блок 1: Вибір ОІДів --- #}
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label for="unit_selector_id" class="form-label">1. Оберіть військові частини</label>
-                        {{ unit_selector.label_tag }}
-                        <select name="unit_selector" id="unit_selector_id" multiple class="form-control"></select>
-                    </div>
-                    <div class="col-md-6">
-                        <label for="oid_selector_id" class="form-label">2. Оберіть ОІДи для створення АЗР</label>
-                        <select name="oid_selector" id="oid_selector_id" multiple class="form-control"></select>
-                    </div>
-                </div>
-
-                {# --- Блок 2: Динамічні поля для кожного ОІДа --- #}
-                <div id="azr-items-container">
-                    {# Сюди JavaScript буде додавати форми #}
-                </div>
-
-                {# --- Блок 3: Дані супровідного листа --- #}
-                <hr class="mt-4">
+				
+				{# --- Блок 1: Дані супровідного листа --- #}
+               
                 <h5 class="mb-3">Дані супровідного листа</h5>
                 <div class="row">
                     <div class="col-md-6 mb-3">
@@ -51,9 +30,34 @@
                      <label for="{{ submission_form.note.id_for_label }}" class="form-label">{{ submission_form.note.label }}</label>
                      {{ submission_form.note }}
                 </div>
+                <hr class="mt-4">
+				
+                {# Службові поля для формсету. JavaScript буде ними керувати. #}
+                {{ item_formset.management_form }}
+
+                {# --- Блок 2: Вибір ОІДів --- #}
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="unit_selector_id" class="form-label">1. Оберіть військові частини</label>
+                        {{ unit_selector.label_tag }}
+                        <select name="unit_selector" id="unit_selector_id" multiple class="form-control"></select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="oid_selector_id" class="form-label">2. Оберіть ОІДи для створення АЗР</label>
+                        <select name="oid_selector" id="oid_selector_id" multiple class="form-control"></select>
+                    </div>
+                </div>
+
+                {# --- Блок 3: Динамічні поля для кожного ОІДа --- #}
+                <div id="azr-items-container">
+                    {# Сюди JavaScript буде додавати форми #}
+                </div>
+
                 
+				<br>
+				<br>
                 <div class="d-grid gap-2">
-                    <button type="submit" class="btn btn-primary">Створити відправку</button>
+                    <button type="submit" class="btn btn-primary ">Створити відправку</button>
                 </div>
             </form>
         </div>
@@ -64,7 +68,7 @@
 <template id="azr-item-template">
     <div class="azr-item-form row p-3 mb-2 border rounded align-items-center" data-oid-id="">
         <div class="col-md-4">
-            <strong>ОІД: <span class="oid-cipher-text"></span></strong>
+           	<strong>ВЧ: <span class="unit-code-text"></span> | ОІД: <span class="oid-cipher-text"></span></strong>
             <input type="hidden" name="form-__prefix__-oid" value="">
         </div>
         <div class="col-md-4">
@@ -110,10 +114,18 @@ document.addEventListener('DOMContentLoaded', function() {
         oidTomSelect.disable();
         if (!value || value.length === 0) return;
         const url = `{% url 'oids:ajax_load_oids_for_multiple_units' %}?unit_ids[]=${value.join('&unit_ids[]=')}`;
+        
         fetch(url)
             .then(response => response.json())
             .then(data => {
-                const options = data.map(oid => ({ id: oid.id.toString(), text: `${oid.cipher}` }));
+                // Тепер ми зберігаємо всю інформацію (id, шифр, код ВЧ) для кожної опції
+                const options = data.map(oid => ({
+                    id: oid.id.toString(),
+                    text: oid.cipher,
+                    unitCode: oid.unit_code // Зберігаємо код ВЧ
+                }));
+				 console.log('Опції, підготовлені для TomSelect:', options);
+
                 oidTomSelect.addOptions(options);
                 oidTomSelect.enable();
             });
@@ -123,7 +135,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const container = document.getElementById('azr-items-container');
     const template = document.getElementById('azr-item-template');
     const totalFormsInput = document.querySelector('#id_form-TOTAL_FORMS');
-    let formCount = 0;
+    let formCount = container.querySelectorAll('.azr-item-form').length; // Починаємо з існуючих форм
+    // let formCount = 0;
 
     oidTomSelect.on('change', (selectedOids) => {
         // Синхронізуємо форми з обраними ОІДами
@@ -138,15 +151,19 @@ document.addEventListener('DOMContentLoaded', function() {
         // Форми, які потрібно додати
         const oidsToAdd = selectedOids.filter(id => !currentOidIds.includes(id));
         oidsToAdd.forEach(oidId => {
-            const selectedOption = oidTomSelect.getOption(oidId);
+            const selectedOption = oidTomSelect.options[oidId];
+			console.log('Об\'єкт обраної опції (selectedOption):', selectedOption);
+
             const newFormHtml = template.innerHTML.replace(/__prefix__/g, formCount);
             const newFormNode = document.createElement('div');
             newFormNode.innerHTML = newFormHtml;
             
             newFormNode.querySelector('.azr-item-form').dataset.oidId = oidId;
-            newFormNode.querySelector('.oid-cipher-text').textContent = selectedOption.textContent;
+			if (selectedOption && selectedOption.unitCode) {
+                 newFormNode.querySelector('.unit-code-text').textContent = selectedOption.unitCode;
+            }
+			newFormNode.querySelector('.oid-cipher-text').textContent = selectedOption.text;
             newFormNode.querySelector('input[type="hidden"]').value = oidId;
-
             container.appendChild(newFormNode.firstElementChild);
             formCount++;
         });
