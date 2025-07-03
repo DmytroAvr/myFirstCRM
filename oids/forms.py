@@ -168,7 +168,13 @@ class TripForm(forms.ModelForm):
                 self.fields['oids'].queryset = OID.objects.filter(
                     unit__id__in=selected_unit_ids,
                     # Можна додати фільтр по статусу ОІД, наприклад, тільки активні:
-                    status__in=[OIDStatusChoices.NEW, OIDStatusChoices.RECEIVED_REQUEST, OIDStatusChoices.RECEIVED_TZ, OIDStatusChoices.ACTIVE, OIDStatusChoices.TERMINATED] 
+                    status__in=[
+                        OIDStatusChoices.NEW,
+                        OIDStatusChoices.RECEIVED_REQUEST,
+                        OIDStatusChoices.RECEIVED_TZ,
+                        OIDStatusChoices.ACTIVE,
+                        OIDStatusChoices.TERMINATED
+                        ] 
                 ).distinct().order_by('unit__code', 'cipher')
 
         # Встановлюємо queryset для поля oids на основі обраних ВЧ (для валідації POST)
@@ -631,8 +637,10 @@ class WorkCompletionResponseForm(forms.ModelForm):
             'response_letter_date': "Дата листа-відповіді",
             'note': "Примітки до відповіді"
         }
+
         widgets = {
             'response_letter_date': forms.DateInput(attrs={'type': 'date'}),
+            'note': forms.Textarea(attrs={'rows': 1})
         }
 
 

@@ -55,7 +55,8 @@
                     <table class="table table-bordered">
                         <thead class="table-light">
                             <tr>
-                                <th>ВЧ / ОІД</th>
+                                <th>ВЧ</th>
+                                <th>ОІД</th>
                             	<th>Підг. № / від</th>
                                 <th>Зареєстрований № в ДССЗЗІ</th>
                                 <th>Дата реєстрації в ДССЗЗІ</th>
@@ -66,7 +67,8 @@
                                 <tr>
                                     {# Приховане поле ID для кожного документа, щоб Django знав, який об'єкт оновлювати #}
                                     {{ form.id }}
-									<td>{{ form.instance.unit.code }} / {{ form.instance.oid.cipher }}</td>
+									<td>{{ form.instance.oid.unit.code }}</td>
+									<td>{{ form.instance.oid.cipher }}</td>
                                 	<td>{{ form.instance.document_number }} від {{ form.instance.process_date|date:"d.m.Y" }}</td>
                                 
                                     <td>

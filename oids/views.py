@@ -87,8 +87,8 @@ def ajax_load_oids_for_unit_categorized(request):
                     data['creating'].append(oid_item)
                 elif oid_instance.status == OIDStatusChoices.ACTIVE:
                     # Тепер передаємо повний екземпляр oid_instance
-                    oid_item['ik_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Висновок', WorkTypeChoices.IK)
-                    oid_item['attestation_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Акт атестації', WorkTypeChoices.ATTESTATION)
+                    oid_item['ik_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Висновок')
+                    oid_item['attestation_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Акт атестації')
                     oid_item['prescription_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Припис')
                     data['active'].append(oid_item)
                 elif oid_instance.status in [OIDStatusChoices.CANCELED, OIDStatusChoices.TERMINATED]:
@@ -546,8 +546,8 @@ def main_dashboard(request):
                 if oid_instance.status in OID_to_show_main_dashboard_creating:
                     oids_creating_list.append(oid_item_data)
                 elif oid_instance.status in OID_to_show_main_dashboard_active:
-                    oid_item_data['ik_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Висновок', WorkTypeChoices.IK)
-                    oid_item_data['attestation_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Акт атестації', WorkTypeChoices.ATTESTATION)
+                    oid_item_data['ik_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Висновок')
+                    oid_item_data['attestation_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Акт атестації')
                     oid_item_data['prescription_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Припис')
                     oids_active_list.append(oid_item_data)
                 elif oid_instance.status in OID_to_show_main_dashboard_cancel:
@@ -2599,7 +2599,7 @@ def processing_control_view(request):
         ).order_by('-end_date').values('end_date')[:1]
     )
 
-    attestation_act_type = DocumentType.objects.filter(name__icontains="атестац").first()
+    attestation_act_type = DocumentType.objects.filter(name__icontains="Атестація").first()
     ik_conclusion_type = DocumentType.objects.filter(duration_months=20).first()
 
     attestation_date_subquery = Document.objects.filter(

@@ -14,7 +14,6 @@
             <h4 class="mb-0">Контроль опрацювання документів Заявок (після відряджень)</h4>
         </div>
         <div class="card-body">
-            {# ... (вся форма фільтрації для wri_filter_form залишається тут) ... #}
             <form method="GET" class="mb-3 p-3 border bg-light rounded" id="wriFilterForm">
                  <div class="row g-2 align-items-end">
                     <div class="col-md-3">
@@ -60,14 +59,14 @@
                 </div>
             </form>
             
-            {# ... (вся таблиця для work_request_items залишається тут) ... #}
              {% if work_request_items.object_list %}
                <div class="table-responsive">
                 <table class="table table-sm table-striped table-bordered table-hover">
                     <thead class="thead-light">
                         <tr>
-                            <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=unit&wri_sort_order={% if current_wri_sort_by == 'unit' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">ВЧ / ОІД</a></th>
-                            <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=unit&wri_sort_order={% if current_wri_sort_by == 'unit' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Тип ЕОТ</a></th>
+							<th><a href="?{{ request.GET.urlencode }}&wri_sort_by=unit&wri_sort_order={% if current_wri_sort_by == 'unit' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">ВЧ</a></th>
+                            <th>ОІД</th>
+                            <th>Тип ЕОТ</th>
                             <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=req_num&wri_sort_order={% if current_wri_sort_by == 'req_num' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Заявка (№, дата)</a></th>
                             <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=work_type&wri_sort_order={% if current_wri_sort_by == 'work_type' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Тип робіт</a></th>
                             <th><a href="?{{ request.GET.urlencode }}&wri_sort_by=status&wri_sort_order={% if current_wri_sort_by == 'status' and current_wri_sort_order == 'asc' %}desc{% else %}asc{% endif %}">Статус опрац. ОІД</a></th>
@@ -78,9 +77,6 @@
                     </thead>
              <tbody>
                         {% for item in work_request_items %}
-                            {# --- Початок блоку для визначення кольору рядка --- #}
-
-							
                             {% if item.work_type == 'Атестація' and item.final_attestation_date or item.work_type == 'ІК' and item.final_ik_date %}
                                 <tr class="table-success">
                             {% elif item.doc_processing_deadline and item.doc_processing_deadline < today_date %}
@@ -90,10 +86,8 @@
                             {% endif %}
                             {# --- Кінець блоку для визначення кольору рядка --- #}
                             
-                                <td>
-                                    <small>{{ item.request.unit.code }}</small><br> 
-                                    <a href="{% url 'oids:oid_detail_view_name' item.oid.id %}">{{ item.oid.cipher }}</a>
-                                </td>
+                                <td>{{ item.request.unit.code }}</td>
+                                <td><a href="{% url 'oids:oid_detail_view_name' item.oid.id %}">{{ item.oid.cipher }}</a></td>
                                 <td>
                                     {{ item.oid.pemin_sub_type|default:"-" }}
                                 </td>

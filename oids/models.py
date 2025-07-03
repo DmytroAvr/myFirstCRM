@@ -930,6 +930,16 @@ class Document(models.Model):
     
     def save(self, *args, **kwargs):
         old_instance = Document.objects.filter(pk=self.pk).first()
+        
+		 # Логіка обчислення expiration_date
+        if self.document_type and self.document_type.has_expiration and self.document_type.duration_months > 0 and self.work_date:
+            from dateutil.relativedelta import relativedelta 
+            self.expiration_date = self.work_date + relativedelta(months=self.document_type.duration_months)
+        else:
+            # Якщо у документа немає терміну дії або не вказана дата робіт, дата завершення дії не встановлюється
+             if not (self.document_type and self.document_type.has_expiration and self.document_type.duration_months > 0):
+                self.expiration_date = None # Очищаємо, якщо умови не виконані
+                
         # old_instance = self.__class__.objects.filter(pk=self.pk).first()
         # Виконуємо стандартне збереження
         super().save(*args, **kwargs)
