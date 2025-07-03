@@ -1,49 +1,94 @@
 {% extends "oids/base.html" %}
+{% load static %}
+
 {% block title %}{{ page_title }}{% endblock %}
 
 {% block content %}
-<div class="container">
-    <h2 class="mb-4">{{ page_title }}</h2>
-    
-    <form method="post">
+<div class="container mt-4">
+    <form method="post" novalidate>
         {% csrf_token %}
-        <div class="card mb-4">
-            <div class="card-header">Дані листа-відповіді</div>
-            <div class="card-body">
-                {{ response_form.as_p }}
-            </div>
-        </div>
+        
+        {# Обов'язкове службове поле для управління формсетом #}
+        {{ formset.management_form }}
 
         <div class="card">
-            <div class="card-header">Оновлення реєстраційних номерів для Актів завершення робіт</div>
+            <div class="card-header">
+                <h3>{{ page_title }}</h3>
+                <p class="text-muted mb-0">Відправка: {{ registration_request }}</p>
+            </div>
             <div class="card-body">
-                {{ formset.management_form }}
-                <table class="table table-sm">
-                    <thead>
-                        <tr>
-                            <th>ОІД</th>
-                            <th>Підготовлений номер АЗР</th>
-                            <th>Реєстраційний номер ДССЗЗІ</th>
-                            <th>Дата реєстрації ДССЗЗІ</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for form in formset %}
+                <h5 class="mb-3">Дані листа-відповіді</h5>
+
+                {# Виводимо помилки основної форми #}
+                {% if response_form.non_field_errors %}
+                    <div class="alert alert-danger">{{ response_form.non_field_errors }}</div>
+                {% endif %}
+                
+                {# Поля основної форми для відповіді #}
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ response_form.response_letter_number.id_for_label }}" class="form-label">{{ response_form.response_letter_number.label }}</label>
+                        {{ response_form.response_letter_number }}
+                         {% if response_form.response_letter_number.errors %}<div class="invalid-feedback d-block">{{ response_form.response_letter_number.errors.as_text }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ response_form.response_letter_date.id_for_label }}" class="form-label">{{ response_form.response_letter_date.label }}</label>
+                        {{ response_form.response_letter_date }}
+                        {% if response_form.response_letter_date.errors %}<div class="invalid-feedback d-block">{{ response_form.response_letter_date.errors.as_text }}</div>{% endif %}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="{{ response_form.note.id_for_label }}" class="form-label">{{ response_form.note.label }}</label>
+                    {{ response_form.note }}
+                    {% if response_form.note.errors %}<div class="invalid-feedback d-block">{{ response_form.note.errors.as_text }}</div>{% endif %}
+                </div>
+                
+                <hr>
+                <h5 class="mb-3">Внесення реєстраційних даних для АЗР</h5>
+
+                {# Виводимо помилки формсету #}
+                 {% if formset.non_form_errors %}
+                    <div class="alert alert-danger">{{ formset.non_form_errors }}</div>
+                {% endif %}
+
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead class="table-light">
                             <tr>
-                                <td>
-                                    {{ form.instance.oid.cipher }}
-                                    {{ form.id }} {# Приховане поле ID для формсету #}
-                                </td>
-                                <td>{{ form.instance.document_number }}</td>
-                                <td>{{ form.dsszzi_registered_number }}</td>
-                                <td>{{ form.dsszzi_registered_date }}</td>
+                                <th>ВЧ / ОІД</th>
+                            	<th>Підг. № / від</th>
+                                <th>Зареєстрований № в ДССЗЗІ</th>
+                                <th>Дата реєстрації в ДССЗЗІ</th>
                             </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {% for form in formset %}
+                                <tr>
+                                    {# Приховане поле ID для кожного документа, щоб Django знав, який об'єкт оновлювати #}
+                                    {{ form.id }}
+									<td>{{ form.instance.unit.code }} / {{ form.instance.oid.cipher }}</td>
+                                	<td>{{ form.instance.document_number }} від {{ form.instance.process_date|date:"d.m.Y" }}</td>
+                                
+                                    <td>
+                                        {{ form.dsszzi_registered_number }}
+                                        {% if form.dsszzi_registered_number.errors %}<div class="invalid-feedback d-block">{{ form.dsszzi_registered_number.errors.as_text }}</div>{% endif %}
+                                    </td>
+                                    <td>
+                                        {{ form.dsszzi_registered_date }}
+                                        {% if form.dsszzi_registered_date.errors %}<div class="invalid-feedback d-block">{{ form.dsszzi_registered_date.errors.as_text }}</div>{% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+            <div class="card-footer text-end">
+                <a href="#" onclick="window.history.back();" class="btn btn-secondary">Назад</a>
+                <button type="submit" class="btn btn-primary">Зберегти відповідь</button>
             </div>
         </div>
-        <button type="submit" class="btn btn-primary mt-3">Зберегти відповідь</button>
     </form>
 </div>
 {% endblock %}

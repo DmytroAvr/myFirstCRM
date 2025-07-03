@@ -328,3 +328,34 @@ class RegisteredActsFilterForm(forms.Form):
         label="Пошук",
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Номер акту, ОІД, реєстр. номер...'})
     )
+
+class AzrDocumentFilterForm(forms.Form):
+    """
+    Оновлена форма для фільтрації списку АЗР з підтримкою множинного вибору.
+    """
+    # Змінюємо на ModelMultipleChoiceField для множинного вибору
+    unit = forms.ModelMultipleChoiceField(
+        queryset=Unit.objects.all().order_by('code'),
+        label="ВЧ",
+        required=False,
+        # Важливо: використовуємо SelectMultiple і додаємо клас для TomSelect
+        widget=forms.SelectMultiple(attrs={'class': 'tomselect-field', 'id': 'id_filter_unit'})
+    )
+    
+    # Поле OID, яке буде завантажуватися динамічно
+    oid = forms.ModelMultipleChoiceField(
+        # Починаємо з порожнього queryset, оскільки він заповниться через JS
+        queryset=OID.objects.all(),
+        label="ОІД",
+        required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'tomselect-field', 'id': 'id_filter_oid'})
+    )
+
+    # Решта полів залишаються без змін
+    # Текстовий пошук по номерах
+    document_number = forms.CharField(label="Підготовлений №", required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
+    registered_number = forms.CharField(label="Зареєстрований №", required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
+    # Фільтр по датах
+    date_from = forms.DateField(label="Дата (від)", required=False, widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}))
+    date_to = forms.DateField(label="Дата (до)", required=False, widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}))
+    

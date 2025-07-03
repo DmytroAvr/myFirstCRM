@@ -125,6 +125,8 @@ return "\n".join(
 форматувати цю дату всередині самого методу за допомогою .strftime('%d.%m.%Y').
 
 
+в html 
+{{ form.instance.process_date|date:"d.m.Y" }}
 
 реалізувати 
 

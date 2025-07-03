@@ -1,0 +1,159 @@
+{% extends "oids/base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header">
+            <h3>{{ page_title }}</h3>
+        </div>
+        <div class="card-body">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                
+                {# Службові поля для формсету. JavaScript буде ними керувати. #}
+                {{ item_formset.management_form }}
+
+                {# --- Блок 1: Вибір ОІДів --- #}
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="unit_selector_id" class="form-label">1. Оберіть військові частини</label>
+                        {{ unit_selector.label_tag }}
+                        <select name="unit_selector" id="unit_selector_id" multiple class="form-control"></select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="oid_selector_id" class="form-label">2. Оберіть ОІДи для створення АЗР</label>
+                        <select name="oid_selector" id="oid_selector_id" multiple class="form-control"></select>
+                    </div>
+                </div>
+
+                {# --- Блок 2: Динамічні поля для кожного ОІДа --- #}
+                <div id="azr-items-container">
+                    {# Сюди JavaScript буде додавати форми #}
+                </div>
+
+                {# --- Блок 3: Дані супровідного листа --- #}
+                <hr class="mt-4">
+                <h5 class="mb-3">Дані супровідного листа</h5>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ submission_form.outgoing_letter_number.id_for_label }}" class="form-label">{{ submission_form.outgoing_letter_number.label }}</label>
+                        {{ submission_form.outgoing_letter_number }}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ submission_form.outgoing_letter_date.id_for_label }}" class="form-label">{{ submission_form.outgoing_letter_date.label }}</label>
+                        {{ submission_form.outgoing_letter_date }}
+                    </div>
+                </div>
+                <div class="mb-3">
+                     <label for="{{ submission_form.note.id_for_label }}" class="form-label">{{ submission_form.note.label }}</label>
+                     {{ submission_form.note }}
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary">Створити відправку</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{# Шаблон для одного рядка формсету. Він прихований і використовується для копіювання. #}
+<template id="azr-item-template">
+    <div class="azr-item-form row p-3 mb-2 border rounded align-items-center" data-oid-id="">
+        <div class="col-md-4">
+            <strong>ОІД: <span class="oid-cipher-text"></span></strong>
+            <input type="hidden" name="form-__prefix__-oid" value="">
+        </div>
+        <div class="col-md-4">
+            <label for="id_form-__prefix__-prepared_number" class="form-label-sm">Підг. № АЗР</label>
+            <input type="text" name="form-__prefix__-prepared_number" class="form-control form-control-sm" required>
+        </div>
+        <div class="col-md-4">
+            <label for="id_form-__prefix__-prepared_date" class="form-label-sm">від (АЗР)</label>
+            <input type="date" name="form-__prefix__-prepared_date" class="form-control form-control-sm" required>
+        </div>
+    </div>
+</template>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // --- Ініціалізація TomSelect ---
+    const unitTomSelect = new TomSelect('#unit_selector_id', {
+        plugins: ['remove_button'],
+        placeholder: 'Оберіть одну або декілька ВЧ...',
+        options: [
+            {% for unit in unit_selector.queryset %}
+                { value: '{{ unit.pk }}', text: '{{ unit.code }} - {{ unit.name }}' },
+            {% endfor %}
+        ]
+    });
+
+    const oidTomSelect = new TomSelect('#oid_selector_id', {
+        plugins: ['remove_button'],
+        placeholder: 'Спочатку оберіть ВЧ...',
+        valueField: 'id',
+        labelField: 'text',
+        searchField: ['text'],
+    });
+    oidTomSelect.disable();
+
+    // --- Логіка завантаження ОІДів ---
+    unitTomSelect.on('change', (value) => {
+        oidTomSelect.clear();
+        oidTomSelect.clearOptions();
+        oidTomSelect.disable();
+        if (!value || value.length === 0) return;
+        const url = `{% url 'oids:ajax_load_oids_for_multiple_units' %}?unit_ids[]=${value.join('&unit_ids[]=')}`;
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                const options = data.map(oid => ({ id: oid.id.toString(), text: `${oid.cipher}` }));
+                oidTomSelect.addOptions(options);
+                oidTomSelect.enable();
+            });
+    });
+
+    // --- Головна логіка: динамічне створення форм ---
+    const container = document.getElementById('azr-items-container');
+    const template = document.getElementById('azr-item-template');
+    const totalFormsInput = document.querySelector('#id_form-TOTAL_FORMS');
+    let formCount = 0;
+
+    oidTomSelect.on('change', (selectedOids) => {
+        // Синхронізуємо форми з обраними ОІДами
+        const currentOidIds = Array.from(container.querySelectorAll('.azr-item-form')).map(form => form.dataset.oidId);
+
+        // Форми, які потрібно видалити
+        const oidsToRemove = currentOidIds.filter(id => !selectedOids.includes(id));
+        oidsToRemove.forEach(oidId => {
+            container.querySelector(`[data-oid-id="${oidId}"]`).remove();
+        });
+
+        // Форми, які потрібно додати
+        const oidsToAdd = selectedOids.filter(id => !currentOidIds.includes(id));
+        oidsToAdd.forEach(oidId => {
+            const selectedOption = oidTomSelect.getOption(oidId);
+            const newFormHtml = template.innerHTML.replace(/__prefix__/g, formCount);
+            const newFormNode = document.createElement('div');
+            newFormNode.innerHTML = newFormHtml;
+            
+            newFormNode.querySelector('.azr-item-form').dataset.oidId = oidId;
+            newFormNode.querySelector('.oid-cipher-text').textContent = selectedOption.textContent;
+            newFormNode.querySelector('input[type="hidden"]').value = oidId;
+
+            container.appendChild(newFormNode.firstElementChild);
+            formCount++;
+        });
+
+        // Оновлюємо кількість форм у менеджмент-формі
+        totalFormsInput.value = container.querySelectorAll('.azr-item-form').length;
+    });
+});
+</script>
+{% endblock %}

@@ -1,5 +1,6 @@
 # C:\myFirstCRM\oids\forms.py
 from django import forms
+
 from django.forms import inlineformset_factory, modelformset_factory, formset_factory
 from .models import (OIDTypeChoices, OIDStatusChoices, SecLevelChoices, WorkRequestStatusChoices, WorkTypeChoices, 
     DocumentReviewResultChoices, AttestationRegistrationStatusChoices, PeminSubTypeChoices
@@ -213,8 +214,8 @@ class DocumentForm(forms.ModelForm):
         }
         labels = {
             'oid': "Об'єкт інформаційної діяльності",
-            'document_number': "Підготовлений № документа (наприклад, 27/14-XXXX)",
-            'process_date': "Дата опрацювання документа (створення)",
+            'document_number': "Підг. № документа (наприклад, 27/14-XXXX)",
+            'process_date': "Дата створення документа (від)",
             'work_date': "Дата фактичного проведення робіт на ОІД",
             'author': "Автор/Виконавець документа",
             'note': "Примітки до документа",
@@ -275,7 +276,7 @@ class DocumentItemForm(forms.ModelForm):
         required=True
     )
     document_number = forms.CharField(
-        label="Підготовлений № документа",
+        label="Підг. №",
         widget=forms.TextInput(attrs={'class': 'form-control'}),
         initial='27/14-', # Можна встановити тут, або динамічно в JS
         required=True
@@ -583,54 +584,114 @@ AttestationActUpdateFormSet = modelformset_factory(
 
 
 class WorkCompletionSendForm(forms.ModelForm):
-    documents = forms.ModelMultipleChoiceField(
-        queryset=Document.objects.filter(
-            document_type__name__icontains='акт завершення робіт', 
-            dsszzi_registered_number__isnull=True
-        ).order_by('oid__unit__code', 'oid__cipher'),
-        widget=forms.SelectMultiple(attrs={'class': 'tomselect-field', 'size': '15'}),
-        label="Оберіть Акти завершення робіт для відправки",
+    """
+    Основна форма для сторінки "Відправка АЗР на реєстрацію".
+    Збирає дані про супровідний лист та обирає ОІДи.
+    """
+    # Поле для вибору кількох військових частин, щоб відфільтрувати ОІДи
+    units = forms.ModelMultipleChoiceField(
+        queryset=Unit.objects.all().order_by('code'),
+        label="1. Оберіть військові частини",
+        widget=forms.SelectMultiple(attrs={'class': 'tomselect-field'}),
         required=True
     )
     
+    # Поле для вибору ОІДів, queryset якого буде оновлюватися через AJAX
+    oids = forms.ModelMultipleChoiceField(
+        queryset=OID.objects.none(), # Починаємо з порожнього
+        label="2. Оберіть ОІДи для створення АЗР",
+        widget=forms.SelectMultiple(attrs={'class': 'tomselect-field'}),
+        required=True
+    )
+
     class Meta:
         model = WorkCompletionRegistration
-        fields = ['documents', 'outgoing_letter_number', 'outgoing_letter_date', 'note']
-        widgets = {
-            'outgoing_letter_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'outgoing_letter_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'note': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+        # Поля з моделі "конверта"
+        fields = ['outgoing_letter_number', 'outgoing_letter_date', 'note']
+        labels = {
+            'outgoing_letter_number': "3. Вихідний номер супровідного листа",
+            'outgoing_letter_date': "4. Дата вихідного листа",
+            'note': "5. Примітки до відправки"
         }
-        
+        widgets = {
+            'outgoing_letter_date': forms.DateInput(attrs={'type': 'date'}),
+        }
+
+
 class WorkCompletionResponseForm(forms.ModelForm):
+    """
+    Основна форма для сторінки "Внесення відповіді по АЗР".
+    Збирає дані про лист-відповідь.
+    """
     class Meta:
         model = WorkCompletionResponse
         fields = ['response_letter_number', 'response_letter_date', 'note']
-        widgets = {
-            'outgoing_letter_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'outgoing_letter_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'note': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
-        }
-        
-class AzrUpdateForm(forms.ModelForm):
-    """Форма для оновлення одного АЗР в формсеті."""
-    class Meta:
-        model = Document
-        fields = ['dsszzi_registered_number', 'dsszzi_registered_date']
         labels = {
-            'dsszzi_registered_number': 'Реєстр. номер',
-            'dsszzi_registered_date': 'Дата реєстр.',
+            'response_letter_number': "Номер листа-відповіді від ДССЗЗІ",
+            'response_letter_date': "Дата листа-відповіді",
+            'note': "Примітки до відповіді"
         }
         widgets = {
-            'dsszzi_registered_date': forms.DateInput(attrs={'type': 'date'}),
+            'response_letter_date': forms.DateInput(attrs={'type': 'date'}),
         }
 
-# Створюємо формсет
-AzrUpdateFormSet = modelformset_factory(
+
+
+# ========================================================
+# 
+# AZR AZR AZR 
+# 
+# ========================================================
+
+# Форма для "шапки" сторінки - дані супровідного листа
+class AzrSubmissionForm(forms.Form):
+    outgoing_letter_number = forms.CharField(label="Вихідний номер супровідного листа", max_length=50, required=True)
+    outgoing_letter_date = forms.DateField(label="Дата вихідного листа", widget=forms.DateInput(attrs={'type': 'date'}), required=True)
+    note = forms.CharField(label="Примітки до відправки", widget=forms.Textarea(attrs={'rows': 2}), required=False)
+
+# Форма для одного рядка в нашому динамічному списку.
+# Вона не прив'язана до моделі, бо ми створюємо об'єкти вручну.
+class AzrItemForm(forms.Form):
+    oid = forms.IntegerField(widget=forms.HiddenInput()) # Приховане поле для ID ОІДа
+    prepared_number = forms.CharField(label="Підготовлений № АЗР", max_length=50, required=True)
+    prepared_date = forms.DateField(label="Дата опрацювання АЗР", widget=forms.DateInput(attrs={'type': 'date'}), required=True)
+
+# Створюємо FormSet на основі нашої форми для одного рядка
+AzrItemFormSet = forms.formset_factory(AzrItemForm, extra=0)
+
+
+# ========================================================
+# 
+# AZR AZR AZR 
+# 
+# ========================================================
+
+
+class AzrUpdateForm(forms.ModelForm):
+    """
+    Форма для ОДНОГО рядка в таблиці на сторінці відповіді.
+    Дозволяє внести реєстраційні дані для конкретного АЗР.
+    """
+    class Meta:
+        model = Document
+        # Поля, які користувач може редагувати
+        fields = ['dsszzi_registered_number', 'dsszzi_registered_date']
+        labels = {
+            'dsszzi_registered_number': "Зареєстрований №",
+            'dsszzi_registered_date': "Дата реєстрації"
+        }
+        widgets = {
+            'dsszzi_registered_date': forms.DateInput(attrs={'type': 'date'})
+        }
+
+
+# Створюємо формсет на основі нашої форми для одного рядка
+AzrUpdateFormSet = forms.modelformset_factory(
     Document,
     form=AzrUpdateForm,
-    extra=0 # Не створюємо порожніх форм
+    extra=0 # Не показувати порожніх форм для додавання
 )
+
 
 class DeclarationSendForm(forms.ModelForm):
     documents = forms.ModelMultipleChoiceField(

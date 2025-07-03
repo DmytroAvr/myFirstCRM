@@ -725,6 +725,106 @@ class AttestationResponse(models.Model):
         verbose_name_plural = "АА відповіді ДССЗЗІ"
         ordering = ['-response_letter_date', '-id']
 
+class WorkCompletionRegistration(models.Model):
+    """
+    Модель для фіксації відправки Актів Завершення Робіт (АЗР) на реєстрацію.
+    Один запис = один вихідний лист, що може містити декілька АЗР.
+    """
+    outgoing_letter_number = models.CharField(max_length=50, verbose_name="Вихідний номер супровідного листа")
+    outgoing_letter_date = models.DateField(verbose_name="Дата вихідного супровідного листа")
+    # Зв'язок ManyToMany з ОІД, щоб знати, які ОІДи були в цьому листі
+    oids = models.ManyToManyField(OID, verbose_name="ОІДи, що згадуються у відправці")
+    note = models.TextField(blank=True, null=True, verbose_name="Примітки до відправки")
+
+    # Ключовий зв'язок: один лист може містити багато документів (АЗР)
+    documents = models.ManyToManyField(
+        'Document',
+        verbose_name="Документи (АЗР), відправлені на реєстрацію",
+        related_name="completion_registrations"
+    )
+    send_by = models.ForeignKey(
+        Person,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        verbose_name="Хто створив запис"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    history = HistoricalRecords()
+    
+    def save(self, *args, **kwargs):
+        # Спочатку зберігаємо сам об'єкт, щоб він отримав ID
+        super().save(*args, **kwargs)
+        
+        # Використовуємо .all() після збереження, щоб отримати доступ до M2M
+        # Цей цикл пройде по всіх документах (АЗР), які були додані до цієї відправки
+        for doc in self.documents.all():
+            oid_to_update = doc.oid
+            if oid_to_update:
+                old_status = oid_to_update.get_status_display()
+                new_status_enum = OIDStatusChoices.AZR_SEND
+
+                if oid_to_update.status != new_status_enum:
+                    oid_to_update.status = new_status_enum
+                    oid_to_update.save(update_fields=['status'])
+                    
+                    # Створюємо запис в історії
+                    OIDStatusChange.objects.create(
+                        oid=oid_to_update,
+                        old_status=old_status,
+                        new_status=new_status_enum.label,
+                        reason=f"АЗР (документ №{doc.document_number}) відправлено на реєстрацію в складі листа №{self.outgoing_letter_number}",
+                        initiating_document=doc
+                    )
+
+    def __str__(self):
+        return f"Відправка АЗР (лист №{self.outgoing_letter_number} від {self.outgoing_letter_date.strftime('%d.%m.%Y')})"
+
+    class Meta:
+        verbose_name = "АЗР відправка на реєстрацію"
+        verbose_name_plural = "АЗР відправки на реєстрацію"
+        ordering = ['-outgoing_letter_date']
+
+class WorkCompletionResponse(models.Model):
+    """
+    Модель для фіксації отримання відповіді від ДССЗЗІ
+    щодо реєстрації Актів Завершення Робіт.
+    """
+    # Зв'язок "один-до-одного" з відправкою
+    registration_request = models.OneToOneField(
+        WorkCompletionRegistration,
+        on_delete=models.CASCADE,
+        verbose_name="Запит на реєстрацію (відправлений лист)",
+        related_name="response_received"
+    )
+    response_letter_number = models.CharField(
+        max_length=50,
+        verbose_name="Номер листа-відповіді від ДССЗЗІ"
+    )
+    response_letter_date = models.DateField(
+        verbose_name="Дата листа-відповіді"
+    )
+    note = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Примітки до відповіді"
+    )
+    received_by = models.ForeignKey(
+        Person,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        verbose_name="Хто вніс відповідь"
+    )
+    received_at = models.DateTimeField(auto_now_add=True)
+    history = HistoricalRecords()
+
+    def __str__(self):
+        return f"Відповідь на лист №{self.registration_request.outgoing_letter_number}"
+
+    class Meta:
+        verbose_name = "АЗР відповідь ДССЗЗІ"
+        verbose_name_plural = "АЗР відповіді ДССЗЗІ"
+
 
 class Document(models.Model):
     """
@@ -799,7 +899,17 @@ class Document(models.Model):
     )
     # Можна додати статус реєстрації саме для цього документа, якщо потрібно більш детально
     # dsszzi_document_status = models.CharField(max_length=20, choices=..., null=True, blank=True)
-	
+	# --- НОВЕ ПОЛЕ ---
+    # Цей зв'язок показує, в якому "конверті" цей АЗР був відправлений на реєстрацію
+    wcr_submission = models.ForeignKey(
+        WorkCompletionRegistration,
+        on_delete=models.SET_NULL, # Якщо відправку видалять, документ залишиться
+        null=True, blank=True,
+        verbose_name="Відправка АЗР на реєстрацію",
+        related_name="submitted_documents"
+    )
+    # --- КІНЕЦЬ НОВОГО ПОЛЯ ---
+
     @property
     def get_sent_info_for_export(self):
         """Повертає рядок з інформацією про відправку для експорту."""
@@ -1002,121 +1112,36 @@ class Document(models.Model):
         ordering = ['-process_date', '-work_date']
             
 
-class WorkCompletionRegistration(models.Model):
-    """
-    Модель для фіксації відправки Актів Завершення Робіт (АЗР) на реєстрацію.
-    Один запис = один вихідний лист, що може містити декілька АЗР.
-    """
-    outgoing_letter_number = models.CharField(
-        max_length=50,
-        verbose_name="Вихідний номер супровідного листа"
-    )
-    outgoing_letter_date = models.DateField(
-        verbose_name="Дата вихідного супровідного листа"
-    )
-    # Ключовий зв'язок: один лист може містити багато документів (АЗР)
-    # documents = models.ManyToManyField(
-    #     Document,
-    #     verbose_name="Документи (АЗР), відправлені на реєстрацію",
-    #     related_name="completion_registrations"
-    # )
-    note = models.TextField(
-        blank=True,
-        null=True,
-        verbose_name="Примітки до відправки"
-    )
-    send_by = models.ForeignKey(
-        Person,
-        on_delete=models.SET_NULL,
-        null=True, blank=True,
-        verbose_name="Хто створив запис"
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    history = HistoricalRecords()
-    
-    def save(self, *args, **kwargs):
-        # Спочатку зберігаємо сам об'єкт, щоб він отримав ID
-        super().save(*args, **kwargs)
-        
-        # Використовуємо .all() після збереження, щоб отримати доступ до M2M
-        # Цей цикл пройде по всіх документах (АЗР), які були додані до цієї відправки
-        for doc in self.documents.all():
-            oid_to_update = doc.oid
-            if oid_to_update:
-                old_status = oid_to_update.get_status_display()
-                new_status_enum = OIDStatusChoices.AZR_SEND
 
-                if oid_to_update.status != new_status_enum:
-                    oid_to_update.status = new_status_enum
-                    oid_to_update.save(update_fields=['status'])
-                    
-                    # Створюємо запис в історії
-                    OIDStatusChange.objects.create(
-                        oid=oid_to_update,
-                        old_status=old_status,
-                        new_status=new_status_enum.label,
-                        reason=f"АЗР (документ №{doc.document_number}) відправлено на реєстрацію в складі листа №{self.outgoing_letter_number}",
-                        initiating_document=doc
-                    )
+class DskEot(models.Model):
+    """
+    Нова сутність: ДСК ЕОТ (Декларація відповідності).
+    """
+    unit = models.ForeignKey(Unit, on_delete=models.CASCADE, verbose_name="Військова частина")
+    cipher = models.CharField(max_length=200, verbose_name="Шифр")
+    serial_number = models.CharField(max_length=200, verbose_name="Серійний номер")
+    inventory_number = models.CharField(max_length=200, verbose_name="Інвентарний номер")
+    room = models.CharField(max_length=255, verbose_name="Приміщення")
+    security_level = models.CharField(max_length=50, default="ДСК", verbose_name="Гриф")
+    note = models.TextField(blank=True, null=True, verbose_name="Примітки")
+    # ... (поля created_at, updated_at, history) ...
 
     def __str__(self):
-        return f"Відправка АЗР (лист №{self.outgoing_letter_number} від {self.outgoing_letter_date.strftime('%d.%m.%Y')})"
+        return f"{self.cipher} (ВЧ: {self.unit.code})"
 
     class Meta:
-        verbose_name = "АЗР відправка на реєстрацію"
-        verbose_name_plural = "АЗР відправки на реєстрацію"
-        ordering = ['-outgoing_letter_date']
-
-class WorkCompletionResponse(models.Model):
-    """
-    Модель для фіксації отримання відповіді від ДССЗЗІ
-    щодо реєстрації Актів Завершення Робіт.
-    """
-    # Зв'язок "один-до-одного" з відправкою
-    registration_request = models.OneToOneField(
-        WorkCompletionRegistration,
-        on_delete=models.CASCADE,
-        verbose_name="Запит на реєстрацію (відправлений лист)",
-        related_name="response_received"
-    )
-    response_letter_number = models.CharField(
-        max_length=50,
-        verbose_name="Номер листа-відповіді від ДССЗЗІ"
-    )
-    response_letter_date = models.DateField(
-        verbose_name="Дата листа-відповіді"
-    )
-    note = models.TextField(
-        blank=True,
-        null=True,
-        verbose_name="Примітки до відповіді"
-    )
-    received_by = models.ForeignKey(
-        Person,
-        on_delete=models.SET_NULL,
-        null=True, blank=True,
-        verbose_name="Хто вніс відповідь"
-    )
-    received_at = models.DateTimeField(auto_now_add=True)
-    history = HistoricalRecords()
-
-    def __str__(self):
-        return f"Відповідь на лист №{self.registration_request.outgoing_letter_number}"
-
-    class Meta:
-        verbose_name = "АЗР відповідь ДССЗЗІ"
-        verbose_name_plural = "АЗР відповіді ДССЗЗІ"
+        verbose_name = "ДСК ЕОТ"
+        verbose_name_plural = "ДСК ЕОТ"
+        ordering = ['unit', 'cipher']
 
 class DeclarationRegistration(models.Model):
-    """Модель для фіксації відправки Декларацій відповідності на реєстрацію."""
+    """
+    Модель для фіксації ВІДПРАВКИ Декларацій на реєстрацію.
+    """
     outgoing_letter_number = models.CharField(max_length=50, verbose_name="Вихідний номер супровідного листа")
     outgoing_letter_date = models.DateField(verbose_name="Дата вихідного супровідного листа")
-    documents = models.ManyToManyField(
-        Document,
-        verbose_name="Документи (Декларації), відправлені на реєстрацію",
-        related_name="declaration_registrations"
-    )
+    # Зв'язок з документами типу "Декларація", які ми створимо в процесі
+    documents = models.ManyToManyField(Document, verbose_name="Документи (Декларації), відправлені на реєстрацію")
     note = models.TextField(blank=True, null=True, verbose_name="Примітки")
     created_by = models.ForeignKey(Person, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Хто створив запис")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -1153,7 +1178,9 @@ class DeclarationRegistration(models.Model):
 
 
 class DeclarationResponse(models.Model):
-    """Модель для фіксації отримання відповіді по Деклараціях."""
+    """
+    Модель для фіксації ОТРИМАННЯ ВІДПОВІДІ по Деклараціях.
+    """
     registration_request = models.OneToOneField(
         DeclarationRegistration,
         on_delete=models.CASCADE,

@@ -21,8 +21,8 @@
                 <table class="table table-sm">
                     <thead>
                         <tr>
-                            <th>ОІД</th>
-                            <th>Підготовлений номер документа</th>
+                            <th>ВЧ / ОІД</th>
+                            <th>Підг. № / від</th>
                             <th>Реєстраційний номер ДССЗЗІ</th>
                             <th>Дата реєстрації ДССЗЗІ</th>
                         </tr>
@@ -30,8 +30,8 @@
                     <tbody>
                         {% for form in formset %}
                             <tr>
-                                <td>{{ form.instance.oid.cipher }} {{ form.id }}</td>
-                                <td>{{ form.instance.document_number }}</td>
+                                <td>{{ form.instance.unit.code }}  {{ form.instance.oid.cipher }} {{ form.id }}</td>
+                                <td>{{ form.instance.document_number }} від {{ form.instance.process_date }}</td>
                                 <td>{{ form.dsszzi_registered_number }}</td>
                                 <td>{{ form.dsszzi_registered_date }}</td>
                             </tr>

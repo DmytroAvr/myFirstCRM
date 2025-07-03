@@ -1,0 +1,57 @@
+{% extends "oids/base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>{{ page_title }}</h3>
+        <a href="{% url 'oids:send_azr_for_registration' %}" class="btn btn-primary">
+            + Створити нову відправку
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            {% if registrations %}
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Вихідний лист (№, дата)</th>
+                            <th>ОІДи у відправці</th>
+                            <th>Статус відповіді</th>
+                            <th>Дії</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for reg in registrations %}
+                            <tr>
+                                <td>№ {{ reg.outgoing_letter_number }} від {{ reg.outgoing_letter_date|date:"d.m.Y" }}</td>
+                                <td>{{ reg.oids.count }} шт.</td>
+                                <td>
+                                    {% if reg.response_received %}
+                                        <span class="badge bg-success">Відповідь отримано</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark">Очікується відповідь</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if not reg.response_received %}
+                                        {# Ось тут ми використовуємо правильне посилання з ID #}
+                                        <a href="{% url 'oids:record_azr_response' registration_id=reg.id %}" class="btn btn-sm btn-outline-primary">
+                                            Внести відповідь
+                                        </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% include "oids/includes/pagination.html" with page_obj=registrations %}
+            {% else %}
+                <p>Жодної відправки АЗР ще не створено.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -69,14 +69,14 @@ def export_to_excel(queryset, columns, filename='export.xlsx', include_row_numbe
             except (AttributeError, TypeError):
                 value = None
             
-			# --- ЛОГІКА ФОРМАТУВАННЯ ДАТ ---
+            # --- ЛОГІКА ФОРМАТУВАННЯ ДАТ ---
             if isinstance(value, (datetime.date, datetime.datetime)):
                 cell.value = value
                 cell.number_format = 'dd.mm.yyyy'
             else:
                 cell.value = str(value) if value is not None else ""
 
-            cell.value = str(value) if value is not None else ""
+            # Застосовуємо стилі
             cell.font = data_font
             cell.alignment = wrap_alignment_data
 

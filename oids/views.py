@@ -1,4 +1,5 @@
 # :\myFirstCRM\oids\views.py
+from django import forms 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
@@ -6,7 +7,7 @@ from django.http import JsonResponse
 from django.urls import reverse_lazy, reverse
 from django.contrib import messages
 from django.db.models import Q, Max, Prefetch, Count, OuterRef, Subquery
-from django.db import  transaction 
+from django.db import  transaction
 from django.utils import timezone
 from .utils import export_to_excel
 import datetime
@@ -21,13 +22,13 @@ from .models import (Unit, UnitGroup, OID, OIDStatusChange, TerritorialManagemen
 from .forms import ( TripForm, TripResultSendForm, DocumentProcessingMainForm, DocumentItemFormSet, DocumentForm, 
 	WorkRequestForm, WorkRequestItemFormSet,  OIDCreateForm, OIDStatusUpdateForm,  TechnicalTaskCreateForm, TechnicalTaskProcessForm,
 	AttestationRegistrationSendForm, AttestationResponseMainForm, AttestationActUpdateFormSet, WorkCompletionSendForm, WorkCompletionResponseForm,
-    AzrUpdateForm, DeclarationSendForm, DeclarationUpdateFormSet, DeclarationResponseForm
+    AzrUpdateForm, DeclarationSendForm, DeclarationUpdateFormSet, AzrItemFormSet, AzrSubmissionForm, AzrUpdateFormSet
 )
 from .forms_process import ( DeclarationProcessStartForm, SendForRegistrationForm    
 )
 from .forms_filters import (
     WorkRequestFilterForm, OIDFilterForm, TechnicalTaskFilterForm, WorkRequestItemProcessingFilterForm, DocumentFilterForm,
-    TechnicalTaskFilterForm, AttestationRegistrationFilterForm, AttestationResponseFilterForm, RegisteredActsFilterForm, 
+    TechnicalTaskFilterForm, AttestationRegistrationFilterForm, AttestationResponseFilterForm, RegisteredActsFilterForm, AzrDocumentFilterForm
 )
 
 # from .utils import add_working_days # Або перемістіть add_working_days сюди
@@ -1126,49 +1127,96 @@ def send_document_for_registration_view(request, pk):
 
 @login_required
 def send_azr_for_registration_view(request):
+    """
+    Обробляє сторінку "Відправка АЗР" з динамічним створенням полів.
+    """
     if request.method == 'POST':
-        form = WorkCompletionSendForm(request.POST)
-        if form.is_valid():
-            # Метод save() моделі сам оновить статуси ОІДів
-            send_instance = form.save(commit=False)
-            send_instance.created_by = request.user.person # Якщо у вас є зв'язок User-Person
-            send_instance.save()
-            form.save_m2m() # Важливо для збереження ManyToMany зв'язку з документами
-            
-            messages.success(request, f"Запис про відправку АЗР (лист №{send_instance.outgoing_letter_number}) успішно створено.")
-            return redirect('some_list_view_name') # Перенаправлення на список відправок
+        submission_form = AzrSubmissionForm(request.POST)
+        item_formset = AzrItemFormSet (request.POST)
+
+        if submission_form.is_valid() and item_formset.is_valid():
+            # 1. Створюємо "конверт" - запис про відправку
+            registration_request = WorkCompletionRegistration.objects.create(
+                outgoing_letter_number=submission_form.cleaned_data['outgoing_letter_number'],
+                outgoing_letter_date=submission_form.cleaned_data['outgoing_letter_date'],
+                note=submission_form.cleaned_data['note'],
+                # created_by=request.user.person # Якщо потрібно
+            )
+
+            try:
+                azr_doc_type = DocumentType.objects.get(name__icontains="АЗР")
+            except DocumentType.DoesNotExist:
+                messages.error(request, "Критична помилка: Тип документу 'АЗР' не знайдено.")
+                return redirect('oids:main_dashboard') # Або на сторінку помилки
+
+            docs_to_create = []
+            oids_for_m2m = []
+            # 2. Проходимо по даних з формсету і створюємо документи
+            for form in item_formset:
+                oid_id = form.cleaned_data.get('oid')
+                oid_instance = OID.objects.get(pk=oid_id)
+                
+                docs_to_create.append(
+                    Document(
+                        oid=oid_instance,
+                        document_type=azr_doc_type,
+                        document_number=form.cleaned_data.get('prepared_number'),
+                        process_date=form.cleaned_data.get('prepared_date'),
+                        work_date=form.cleaned_data.get('prepared_date'), # Можна використовувати одну дату
+                        wcr_submission=registration_request,
+                        # author=request.user.person
+                    )
+                )
+                oids_for_m2m.append(oid_instance)
+
+            # 3. Ефективно створюємо всі документи
+            Document.objects.bulk_create(docs_to_create)
+            # Додаємо ОІДи до m2m поля "конверта"
+            registration_request.oids.set(oids_for_m2m)
+
+            messages.success(request, f"Створено та відправлено на реєстрацію {len(docs_to_create)} АЗР.")
+            return redirect('oids:list_azr_registrations') # Перенаправляємо на список відправок
     else:
-        form = WorkCompletionSendForm()
+        submission_form = AzrSubmissionForm()
+        item_formset = AzrItemFormSet()
 
     context = {
-        'form': form,
-        'page_title': 'Відправка Актів завершення робіт на реєстрацію'
+        'submission_form': submission_form,
+        'item_formset': item_formset,
+        # Поле для вибору ВЧ передаємо окремо, воно не є частиною форми
+        'unit_selector': forms.ModelMultipleChoiceField(queryset=Unit.objects.order_by('name').filter(is_active=True), required=False),
+        'page_title': 'Відправка Актів Завершення Робіт на реєстрацію'
     }
-    return render(request, 'oids/send_azr_form.html', context)
+    return render(request, 'oids/send_azr_for_registration.html', context)
 
 @login_required
 def record_azr_response_view(request, registration_id):
+    """
+    Обробляє сторінку "Внесення відповіді по АЗР".
+    """
     registration_request = get_object_or_404(WorkCompletionRegistration, pk=registration_id)
-    # Отримуємо queryset тільки тих АЗР, які були в цій відправці
-    queryset_for_formset = registration_request.documents.all()
+    # Отримуємо queryset тільки тих АЗР, які були в цій конкретній відправці
+    queryset_for_formset = registration_request.submitted_documents.all()
 
     if request.method == 'POST':
         response_form = WorkCompletionResponseForm(request.POST)
         formset = AzrUpdateFormSet(request.POST, queryset=queryset_for_formset)
 
         if response_form.is_valid() and formset.is_valid():
-            # Створюємо запис про відповідь
+            # Створюємо запис про сам факт отримання відповіді
             response_instance = response_form.save(commit=False)
             response_instance.registration_request = registration_request
-            response_instance.created_by = request.user.person
+            # response_instance.created_by = request.user.person
             response_instance.save()
             
-            # Зберігаємо оновлені дані для кожного АЗР.
-            # Метод .save() кожного документа запустить нашу логіку оновлення статусів OID.
+            # Зберігаємо оновлені дані для кожного АЗР (реєстраційні номери/дати).
+            # Метод .save() для формсету викличе .save() для кожного екземпляра
+            # моделі Document, що, в свою чергу, запустить нашу логіку
+            # оновлення статусів OID та WorkRequestItem, якщо вона там є.
             formset.save()
 
-            messages.success(request, "Відповідь по АЗР успішно внесено. Статуси ОІД оновлено.")
-            return redirect('some_list_view_name')
+            messages.success(request, "Відповідь по АЗР успішно внесено.")
+            return redirect('oids:list_azr_documents')
     else:
         response_form = WorkCompletionResponseForm()
         formset = AzrUpdateFormSet(queryset=queryset_for_formset)
@@ -1180,6 +1228,7 @@ def record_azr_response_view(request, registration_id):
         'page_title': f'Внесення відповіді на лист №{registration_request.outgoing_letter_number}'
     }
     return render(request, 'oids/record_azr_response.html', context)
+
 
 @login_required
 def send_declaration_for_registration_view(request):
@@ -1358,6 +1407,7 @@ def summary_information_hub_view(request):
         {'label': 'Надсилання на реєстрацію Актів Атестації', 'url_name': 'oids:list_attestation_registrations'},
         {'label': 'Відповіді Реєстрація Атестації', 'url_name': 'oids:list_attestation_responses'},
         {'label': 'Всі Акти зареєстровані Атестації', 'url_name': 'oids:list_registered_acts'},
+        {'label': 'Всі AZR', 'url_name': 'oids:list_azr_documents'},
         {'label': 'Надсилання до частин пакетів документів', 'url_name': 'oids:list_trip_results_for_units'},
         {'label': 'Довідник: Територіальні управління', 'url_name': 'oids:list_territorial_managements'},
         {'label': 'Довідник: Групи військових частин', 'url_name': 'oids:list_unit_groups'},
@@ -2508,6 +2558,24 @@ def record_attestation_response_view(request, att_reg_sent_id=None): # Може 
     }
     return render(request, 'oids/forms/record_attestation_response_form.html', context)
 
+@login_required
+def list_azr_registrations_view(request):
+    """
+    Відображає список усіх відправок АЗР на реєстрацію.
+    """
+    all_registrations = WorkCompletionRegistration.objects.all().order_by('-outgoing_letter_date')
+
+    # Тут можна додати пагінацію, як на інших сторінках
+    paginator = Paginator(all_registrations, 20) # 20 записів на сторінку
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'page_title': 'Відправки АЗР на реєстрацію',
+        'registrations': page_obj,
+    }
+    return render(request, 'oids/lists/azr_registration_list.html', context)
+
 @login_required 
 def processing_control_view(request):
     """
@@ -2773,3 +2841,93 @@ def start_declaration_process_view(request):
     }
     return render(request, 'oids/generic_form.html', context)
 
+# oids/views.py
+
+@login_required
+def azr_documents_list_view(request):
+    """
+    Відображає список всіх документів типу "АЗР" з фільтрацією та сортуванням.
+    Також обробляє експорт в Excel.
+    """
+    try:
+        azr_doc_type = DocumentType.objects.get(name="АЗР")
+    except DocumentType.DoesNotExist:
+        messages.error(request, "Тип документу 'АЗР' не знайдено.")
+        return redirect('oids:main_dashboard')
+
+    queryset = Document.objects.filter(document_type=azr_doc_type).select_related('oid__unit')
+    
+    # --- Фільтрація (залишається без змін) ---
+    filter_form = AzrDocumentFilterForm(request.GET or None)
+    if filter_form.is_valid():
+        selected_units = filter_form.cleaned_data.get('unit')
+        if selected_units:
+            # Використовуємо __in для фільтрації по списку значень
+            queryset = queryset.filter(oid__unit__in=selected_units)
+
+        selected_oids = filter_form.cleaned_data.get('oid')
+        if selected_oids:
+            # Використовуємо __in для фільтрації по списку значень
+            queryset = queryset.filter(oid__in=selected_oids)
+            
+		# if filter_form.cleaned_data.get('unit'):
+        #     queryset = queryset.filter(oid__unit__in=filter_form.cleaned_data['unit'])
+        # if filter_form.cleaned_data.get('oid'):
+        #     queryset = queryset.filter(oid__in=filter_form.cleaned_data['oid'])
+        # if filter_form.cleaned_data.get('document_number'):
+        #     queryset = queryset.filter(document_number__icontains=filter_form.cleaned_data['document_number'])
+        # if filter_form.cleaned_data.get('registered_number'):
+        #     queryset = queryset.filter(dsszzi_registered_number__icontains=filter_form.cleaned_data['registered_number'])
+        # if filter_form.cleaned_data.get('date_from'):
+        #     queryset = queryset.filter(process_date__gte=filter_form.cleaned_data['date_from'])
+        # if filter_form.cleaned_data.get('date_to'):
+        #     queryset = queryset.filter(process_date__lte=filter_form.cleaned_data['date_to'])
+ 
+        pass
+
+    # --- Сортування (залишається без змін) ---
+    sort_by = request.GET.get('sort', '-process_date')
+    valid_sort_fields = ['oid__unit__code', 'oid__cipher', 'document_number', 'process_date', 'dsszzi_registered_number', 'dsszzi_registered_date']
+    if sort_by.lstrip('-') in valid_sort_fields:
+        queryset = queryset.order_by(sort_by)
+
+    # --- Експорт в Excel ---
+    if 'export' in request.GET:
+        # Визначаємо, які поля та з якими назвами ми хочемо експортувати
+        columns = {
+            'oid__unit__code': 'ВЧ',
+            'oid__cipher': 'Шифр ОІД',
+            'document_number': 'Підг. №',
+            'process_date': 'Від',
+            'dsszzi_registered_number': 'Зареєстрований № АЗР',
+            'dsszzi_registered_date': 'Від якого числа',
+        }
+        # Викликаємо нашу універсальну функцію
+        return export_to_excel(
+            queryset, 
+            columns, 
+            filename='azr_documents_export.xlsx'
+        )
+    
+    # --- Пагінація (залишається без змін) ---
+    paginator = Paginator(queryset, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # --- НОВА ЛОГІКА: Підготовка URL для сортування ---
+    query_params = request.GET.copy()
+    # Видаляємо параметри 'sort' та 'page', щоб уникнути їх дублювання в URL
+    if 'sort' in query_params:
+        del query_params['sort']
+    if 'page' in query_params:
+        del query_params['page']
+    # --------------------------------------------------
+
+    context = {
+        'page_title': 'Реєстр Актів Завершення Робіт (АЗР)',
+        'documents': page_obj,
+        'filter_form': filter_form,
+        'current_sort': sort_by,
+        'sort_url_part': query_params.urlencode(), # <-- Передаємо готову частину URL в шаблон
+    }
+    return render(request, 'oids/lists/azr_document_list.html', context)
