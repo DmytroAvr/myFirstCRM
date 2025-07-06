@@ -38,7 +38,8 @@
                             <tr>
                                 <th>ВЧ</th>
                                 <th>Шифр ДСК ЕОТ</th>
-                                <th>Підготовлений номер</th>
+								<th>s/n<br>(інв.)</th>
+                                <th>Підг. номер</th>
                                 <th>Зареєстрований №</th>
                                 <th>Дата реєстрації</th>
                             </tr>
@@ -49,6 +50,7 @@
                                     {{ form.id }}
                                     <td>{{ form.instance.dsk_eot.unit.code }}</td>
                                     <td>{{ form.instance.dsk_eot.cipher }}</td>
+                                    <td>{{ form.instance.dsk_eot.serial_number}}<br>({{ form.instance.dsk_eot.inventory_number}})</td>
                                     <td>{{ form.instance.prepared_number }}</td>
                                     <td>{{ form.registered_number }}</td>
                                     <td>{{ form.registered_date }}</td>

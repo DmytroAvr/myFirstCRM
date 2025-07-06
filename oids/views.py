@@ -1198,7 +1198,7 @@ def send_azr_for_registration_view(request):
         'unit_selector': forms.ModelMultipleChoiceField(queryset=Unit.objects.order_by('name').filter(is_active=True), required=False),
         'page_title': 'Відправка Актів Завершення Робіт на реєстрацію'
     }
-    return render(request, 'oids/send_azr_for_registration.html', context)
+    return render(request, 'oids/form/send_azr_for_registration.html', context)
 
 @login_required
 def record_azr_response_view(request, registration_id):
@@ -1236,9 +1236,9 @@ def record_azr_response_view(request, registration_id):
         'response_form': response_form,
         'formset': formset,
         'registration_request': registration_request,
-        'page_title': f'Внесення відповіді на лист №{registration_request.outgoing_letter_number}'
+        'page_title': f'Внесення відповіді на лист № {registration_request.outgoing_letter_number}'
     }
-    return render(request, 'oids/record_azr_response.html', context)
+    return render(request, 'oids/form/record_azr_response.html', context)
 
 
 
@@ -1315,7 +1315,7 @@ def list_declaration_registrations_view(request):
     page_obj = paginator.get_page(page_number)
 
     context = {
-        'page_title': 'Відправки Декларацій на реєстрацію',
+        'page_title': 'Декларації відправлені на реєстрацію до ДССЗЗІ',
         'submissions': page_obj,
     }
     return render(request, 'oids/lists/declaration_registration_list.html', context)
@@ -1431,7 +1431,7 @@ def record_declaration_response_view(request, submission_id):
         'response_form': response_form,
         'formset': formset,
         'submission': submission,
-        'page_title': f'Внесення відповіді на лист №{submission.outgoing_letter_number}'
+        'page_title': f'Внесення відповіді на лист № {submission.outgoing_letter_number}'
     }
     return render(request, 'oids/forms/record_declaration_response.html', context)
 

@@ -820,7 +820,7 @@ class WorkCompletionResponse(models.Model):
     history = HistoricalRecords()
 
     def __str__(self):
-        return f"Відповідь на лист №{self.registration_request.outgoing_letter_number}"
+        return f"Відповідь на лист № {self.registration_request.outgoing_letter_number}"
 
     class Meta:
         verbose_name = "ДССЗЗІ: АЗР відповідь ДССЗЗІ"
