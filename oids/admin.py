@@ -4,10 +4,11 @@ from .models import (
     TerritorialManagement, UnitGroup, Unit, OID,
     Person, WorkRequest, WorkRequestItem,
     DocumentType, Document, Trip, OIDStatusChange,
+    TripResultForUnit, TechnicalTask, 
     AttestationRegistration, AttestationResponse,
-    TripResultForUnit, TechnicalTask, ProcessTemplate,
-    ProcessStep, OIDProcess, OIDProcessStepInstance,
-    WorkCompletionRegistration, WorkCompletionResponse
+    WorkCompletionRegistration, WorkCompletionResponse,
+    Declaration, DeclarationRegistration,
+    OIDProcess, OIDProcessStepInstance, ProcessTemplate, ProcessStep, 
 )
 
 @admin.register(TerritorialManagement)
@@ -185,3 +186,17 @@ class OIDProcessAdmin(admin.ModelAdmin):
 @admin.register(OIDProcessStepInstance)
 class OIDProcessStepInstanceAdmin(admin.ModelAdmin):
     list_display = ('oid_process', 'process_step', 'status', 'linked_document', 'completed_at')
+
+
+@admin.register(Declaration)
+class DeclarationAdmin(admin.ModelAdmin):
+    list_display = ('dsk_eot', 'prepared_number', 'prepared_date', 'registered_number', 'registered_date', 'note', 'created_at', 'updated_at')
+
+
+
+@admin.register(DeclarationRegistration)
+class DeclarationRegistrationAdmin(admin.ModelAdmin):
+    list_display = ('outgoing_letter_number', 'outgoing_letter_date', 'note', 'created_by', 'created_at', 'updated_at', 'response_letter_number', 'response_letter_date', 'response_note', 'response_by', 'response_at')
+
+
+ 

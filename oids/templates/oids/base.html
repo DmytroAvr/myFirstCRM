@@ -91,8 +91,8 @@
 									<h5>Відправка на реєстрацію</h5>
 									<ul>										
 										<li><a href="{% url 'oids:send_attestation_for_registration' %}" class="nav-link">Реєстрація АА</a></li>
-											<li><a href="{% url 'oids:send_azr_for_registration' %}" class="nav-link">Реєстрація АЗР</a></li>
-											{# <li><a href="{% url 'oids:send_declaration_for_registration' %}" class="nav-link">Реєстрація Декларації</a></li> #}
+										<li><a href="{% url 'oids:send_azr_for_registration' %}" class="nav-link">Реєстрація АЗР</a></li>
+										<li><a href="{% url 'oids:send_declaration_for_registration' %}" class="nav-link">Реєстрація Декларації</a></li>
 									</ul>
 								</div>
 								<div>
@@ -100,18 +100,15 @@
 									<ul>
 										<li><a href="{% url 'oids:record_attestation_response' %}" class="nav-link">Зареєстрований № АА</a></li>
 										<li><a href="{% url 'oids:list_azr_registrations' %}" class="nav-link">Зареєстрований № АЗР</a></li>
-										{# <li><a href="{% url 'oids:record_declaration_response' %}" class="nav-link">Зареєстрований № Декларації</a></li> #}
+										<li><a href="{% url 'oids:list_declaration_registrations' %}" class="nav-link">Зареєстрований № Декларації</a></li>
+									</ul>
+									<h5>тест</h5>
+									<ul>
+										<li><a href="{% url 'oids:list_declarations' %}" class="nav-link">list_declarations</a></li>
+										<li><a href="{% url 'oids:send_declaration_for_registration' %}" class="nav-link">send_declaration_for_registration</a></li>
+										<li><a href="{% url 'oids:list_declaration_registrations' %}" class="nav-link">record_declaration_response</a></li>
 									</ul>
 								</div>
-							<!-- 
-								<a href="{% url 'oids:send_attestation_for_registration' %}" class="nav-link">Відправка на реєстрацію АА (до ДССЗЗІ) </a>
-								<a href="{% url 'oids:record_attestation_response' %}" class="nav-link">Зареєстрований № АА (відповідь ДССЗЗІ)</a>
-								<a href="{% url 'oids:update_oid_status' %}" class="nav-link">Змінити статус ОІД</a>
-								<a href="{% url 'oids:send_azr_for_registration' %}" class="nav-link">Відправка на реєстрацію АЗР (до ДССЗЗІ) </a>
-									{# <a href="{% url 'oids:record_azr_response' %}" class="nav-link">Зареєстрований № АЗР (відповідь ДССЗЗІ)</a> #}
-								<a href="{% url 'oids:send_declaration_for_registration' %}" class="nav-link">Відправка на реєстрацію Декларації (до ДССЗЗІ) </a>
-									{# <a href="{% url 'oids:record_declaration_response' %}" class="nav-link">Зареєстрований № Декларації (відповідь ДССЗЗІ)</a> #}
-							-->
 							</div>
 						</div></li>
 

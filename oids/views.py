@@ -14,21 +14,31 @@ import datetime
 from .models import (OIDTypeChoices, OIDStatusChoices, SecLevelChoices, WorkRequestStatusChoices, WorkTypeChoices, 
     DocumentReviewResultChoices, AttestationRegistrationStatusChoices, PeminSubTypeChoices, DocumentProcessingStatusChoices, add_working_days
 )
-from .models import (Unit, UnitGroup, OID, OIDStatusChange, TerritorialManagement, 
+from .models import (Unit, UnitGroup, OID, DskEot, OIDStatusChange, TerritorialManagement, 
 	Document, DocumentType, WorkRequest, WorkRequestItem, Trip,TripResultForUnit, 
     Person, TechnicalTask, AttestationRegistration, AttestationResponse, WorkCompletionRegistration,
-    ProcessTemplate, OIDProcess, OIDProcessStepInstance, DeclarationRegistration
+    ProcessTemplate, OIDProcess, OIDProcessStepInstance,
+    Declaration, DeclarationRegistration,
 )
+
+
 from .forms import ( TripForm, TripResultSendForm, DocumentProcessingMainForm, DocumentItemFormSet, DocumentForm, 
-	WorkRequestForm, WorkRequestItemFormSet,  OIDCreateForm, OIDStatusUpdateForm,  TechnicalTaskCreateForm, TechnicalTaskProcessForm,
-	AttestationRegistrationSendForm, AttestationResponseMainForm, AttestationActUpdateFormSet, WorkCompletionSendForm, WorkCompletionResponseForm,
-    AzrUpdateForm, DeclarationSendForm, DeclarationUpdateFormSet, AzrItemFormSet, AzrSubmissionForm, AzrUpdateFormSet
+    OIDCreateForm, OIDStatusUpdateForm, 
+	WorkRequestForm, WorkRequestItemFormSet,  
+    TechnicalTaskCreateForm, TechnicalTaskProcessForm,
+	AttestationRegistrationSendForm, AttestationResponseMainForm, AttestationActUpdateFormSet,
+    WorkCompletionSendForm, WorkCompletionResponseForm,    
+	AzrUpdateForm, AzrItemFormSet, AzrSubmissionForm, AzrUpdateFormSet, 
+    DeclarationSubmissionForm, DeclarationItemFormSet, DeclarationResponseForm, DeclarationUpdateFormSet
 )
 from .forms_process import ( DeclarationProcessStartForm, SendForRegistrationForm    
 )
 from .forms_filters import (
     WorkRequestFilterForm, OIDFilterForm, TechnicalTaskFilterForm, WorkRequestItemProcessingFilterForm, DocumentFilterForm,
-    TechnicalTaskFilterForm, AttestationRegistrationFilterForm, AttestationResponseFilterForm, RegisteredActsFilterForm, AzrDocumentFilterForm
+    TechnicalTaskFilterForm,
+    AttestationRegistrationFilterForm, AttestationResponseFilterForm,
+    RegisteredActsFilterForm, AzrDocumentFilterForm,
+    DeclarationFilterForm
 )
 
 # from .utils import add_working_days # Або перемістіть add_working_days сюди
@@ -1231,54 +1241,200 @@ def record_azr_response_view(request, registration_id):
     return render(request, 'oids/record_azr_response.html', context)
 
 
+
+# view declaration
+
+
 @login_required
+@transaction.atomic
 def send_declaration_for_registration_view(request):
+    """
+    ОНОВЛЕНА ВЕРСІЯ: Гарантовано створює зв'язки між відправкою та деклараціями.
+    """
     if request.method == 'POST':
-        form = DeclarationSendForm(request.POST)
-        if form.is_valid():
-            send_instance = form.save() # Метод .save() моделі зробить всю роботу
-            messages.success(request, f"Запис про відправку Декларацій (лист №{send_instance.outgoing_letter_number}) успішно створено.")
+        submission_form = DeclarationSubmissionForm(request.POST)
+        item_formset = DeclarationItemFormSet(request.POST, prefix='items')
+
+        if submission_form.is_valid() and item_formset.is_valid():
+            # 1. Створюємо "конверт"
+            submission = submission_form.save(commit=False)
+            # submission.created_by = request.user.person # Якщо потрібно
+            submission.save() # Зберігаємо, щоб отримати ID
+
+            declarations_to_link = []
+            
+            # 2. Проходимо по всіх формах з формсету
+            for form in item_formset:
+                # 3. Створюємо ДСК ЕОТ
+                dsk_eot = DskEot.objects.create(
+                    unit=form.cleaned_data.get('unit'),
+                    cipher=form.cleaned_data.get('cipher'),
+                    serial_number=form.cleaned_data.get('serial_number'),
+                    inventory_number=form.cleaned_data.get('inventory_number'),
+                    room=form.cleaned_data.get('room'),
+                )
+                
+                # 4. Створюємо відповідну Декларацію
+                declaration = Declaration.objects.create(
+                    dsk_eot=dsk_eot,
+                    prepared_number=form.cleaned_data.get('prepared_number'),
+                    prepared_date=form.cleaned_data.get('prepared_date'),
+                )
+                declarations_to_link.append(declaration)
+
+            # 5. Прив'язуємо всі створені декларації до нашої відправки
+            if declarations_to_link:
+                submission.declarations.set(declarations_to_link)
+
+            messages.success(request, f"Створено та відправлено на реєстрацію {len(declarations_to_link)} Декларацій.")
             return redirect('oids:list_declaration_registrations')
     else:
-        form = DeclarationSendForm()
+        submission_form = DeclarationSubmissionForm()
+        item_formset = DeclarationItemFormSet(prefix='items')
 
     context = {
-        'form': form,
+        'submission_form': submission_form,
+        'item_formset': item_formset,
+        'all_units': Unit.objects.all().order_by('code'),
         'page_title': 'Відправка Декларацій відповідності на реєстрацію'
     }
-    return render(request, 'oids/declaration_send_form.html', context)
+    return render(request, 'oids/forms/send_declaration_for_registration.html', context)
+
 
 @login_required
-def record_declaration_response_view(request, registration_id):
-    registration_request = get_object_or_404(DeclarationRegistration, pk=registration_id)
-    queryset_for_formset = registration_request.documents.all()
+def list_declaration_registrations_view(request):
+    """
+    Відображає список усіх ВІДПРАВОК Декларацій на реєстрацію.
+    """
+    # prefetch_related('declarations') - оптимізація, щоб уникнути зайвих запитів до БД
+    all_submissions = DeclarationRegistration.objects.prefetch_related('declarations').order_by('-outgoing_letter_date')
+    
+    # Тут можна додати пагінацію, як на інших сторінках
+    paginator = Paginator(all_submissions, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'page_title': 'Відправки Декларацій на реєстрацію',
+        'submissions': page_obj,
+    }
+    return render(request, 'oids/lists/declaration_registration_list.html', context)
+
+
+
+@login_required
+def declaration_list_view(request):
+    """
+    Відображає список всіх Декларацій відповідності з фільтрацією та сортуванням.
+    """
+    queryset = Declaration.objects.select_related('dsk_eot__unit').prefetch_related('registrations').all()
+    
+    # --- Фільтрація ---
+    filter_form = DeclarationFilterForm(request.GET or None)
+    if filter_form.is_valid():
+        if filter_form.cleaned_data.get('unit'):
+            queryset = queryset.filter(dsk_eot__unit__in=filter_form.cleaned_data['unit'])
+        if filter_form.cleaned_data.get('dsk_eot'):
+            queryset = queryset.filter(dsk_eot__in=filter_form.cleaned_data['dsk_eot'])
+        if filter_form.cleaned_data.get('prepared_number'):
+            queryset = queryset.filter(prepared_number__icontains=filter_form.cleaned_data['prepared_number'])
+        if filter_form.cleaned_data.get('registered_number'):
+            queryset = queryset.filter(registered_number__icontains=filter_form.cleaned_data['registered_number'])
+        if filter_form.cleaned_data.get('date_from'):
+            queryset = queryset.filter(prepared_date__gte=filter_form.cleaned_data['date_from'])
+        if filter_form.cleaned_data.get('date_to'):
+            queryset = queryset.filter(prepared_date__lte=filter_form.cleaned_data['date_to'])
+
+    # --- Сортування ---
+    sort_by = request.GET.get('sort', '-prepared_date')
+    valid_sort_fields = ['dsk_eot__unit__code', 'dsk_eot__cipher', 'prepared_number', 'prepared_date', 'registered_number', 'registered_date']
+    if sort_by.lstrip('-') in valid_sort_fields:
+        queryset = queryset.order_by(sort_by)
+
+    # --- Експорт в Excel ---
+    if 'export' in request.GET:
+        columns = {
+            'dsk_eot__unit__code': 'ВЧ',
+            'dsk_eot__cipher': 'Шифр ДСК ЕОТ',
+            'dsk_eot__serial_number': 'Серійний №',
+            'dsk_eot__inventory_number': 'Інв. №',
+            'dsk_eot__room': 'Приміщення',
+            'prepared_number': 'Підготовлений №',
+            'prepared_date': 'Дата підготовки',
+            'registered_number': 'Зареєстрований №',
+            'registered_date': 'Дата реєстрації',
+            'get_status_display': 'Статус',
+            'get_submission_info': 'Інформація про відправку',
+        }
+        return export_to_excel(
+            queryset,
+            columns,
+            filename='declarations.xlsx',
+            include_row_numbers=True 
+            )
+    # --- Пагінація ---
+    paginator = Paginator(queryset, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    query_params = request.GET.copy()
+    if 'sort' in query_params:
+        del query_params['sort']
+    if 'page' in query_params:
+        del query_params['page']
+
+    context = {
+        'page_title': 'Реєстр Декларацій відповідності',
+        'declarations': page_obj,
+        'filter_form': filter_form,
+        'current_sort': sort_by,
+        'sort_url_part': query_params.urlencode(),
+    }
+    return render(request, 'oids/lists/declaration_list.html', context)
+
+# oids/views.py
+
+@login_required
+def record_declaration_response_view(request, submission_id):
+    """ 
+    Обробляє сторінку "Внесення відповіді по Деклараціях".
+    ОНОВЛЕНА ВЕРСІЯ: Правильно оновлює існуючий запис.
+    """
+    # Отримуємо існуючий запис про відправку, який ми будемо оновлювати
+    submission = get_object_or_404(DeclarationRegistration, pk=submission_id)
+    queryset_for_formset = submission.declarations.select_related('dsk_eot__unit').all()
 
     if request.method == 'POST':
-        response_form = DeclarationResponseForm(request.POST)
+        # Ми оновлюємо існуючий об'єкт, тому передаємо `instance=submission`
+        response_form = DeclarationResponseForm(request.POST, instance=submission)
         formset = DeclarationUpdateFormSet(request.POST, queryset=queryset_for_formset)
 
         if response_form.is_valid() and formset.is_valid():
+            # 1. Зберігаємо дані про відповідь В ТОЙ САМИЙ об'єкт відправки
             response_instance = response_form.save(commit=False)
-            response_instance.registration_request = registration_request
+            response_instance.response_at = timezone.now()
+            # response_instance.response_by = request.user.person
             response_instance.save()
             
-            # .save() для формсету викличе .save() для кожної моделі Document,
-            # що запустить нашу логіку оновлення статусу OID на ACTIVE.
+            # 2. Зберігаємо реєстраційні дані для кожної Декларації
             formset.save()
 
             messages.success(request, "Відповідь по Деклараціях успішно внесено.")
             return redirect('oids:list_declaration_registrations')
     else:
-        response_form = DeclarationResponseForm()
+        # При першому завантаженні також передаємо `instance`,
+        # щоб форма могла показати вже існуючі дані, якщо вони є.
+        response_form = DeclarationResponseForm(instance=submission)
         formset = DeclarationUpdateFormSet(queryset=queryset_for_formset)
 
     context = {
         'response_form': response_form,
         'formset': formset,
-        'registration_request': registration_request,
-        'page_title': f'Внесення відповіді на лист по Деклараціях №{registration_request.outgoing_letter_number}'
+        'submission': submission,
+        'page_title': f'Внесення відповіді на лист №{submission.outgoing_letter_number}'
     }
-    return render(request, 'oids/generic_record_response.html', context)
+    return render(request, 'oids/forms/record_declaration_response.html', context)
+
 
 @login_required 
 def technical_task_create_view(request):
@@ -1409,6 +1565,7 @@ def summary_information_hub_view(request):
         {'label': 'Відповіді Реєстрація Атестації', 'url_name': 'oids:list_attestation_responses'},
         {'label': 'Всі Акти зареєстровані Атестації', 'url_name': 'oids:list_registered_acts'},
         {'label': 'Всі AZR', 'url_name': 'oids:list_azr_documents'},
+        {'label': 'Всі Декларації (зареєстровані)', 'url_name': 'oids:list_declarations'},
         {'label': 'Надсилання до частин пакетів документів', 'url_name': 'oids:list_trip_results_for_units'},
         {'label': 'Довідник: Територіальні управління', 'url_name': 'oids:list_territorial_managements'},
         {'label': 'Довідник: Групи військових частин', 'url_name': 'oids:list_unit_groups'},

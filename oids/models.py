@@ -124,8 +124,8 @@ class TerritorialManagement(models.Model):
         return self.name
 
     class Meta:
-        verbose_name = "Територіальне управління"
-        verbose_name_plural = "Територіальні управління"
+        verbose_name = "Структура: Територіальне управління"
+        verbose_name_plural = "Структура: Територіальні управління"
 
 class UnitGroup(models.Model):
     """
@@ -142,8 +142,8 @@ class UnitGroup(models.Model):
         return self.name
 
     class Meta:
-        verbose_name = "Група військових частин (для відряджень)"
-        verbose_name_plural = "Групи військових частин (для відряджень)"
+        verbose_name = "Структура: Група військових частин (для відряджень)"
+        verbose_name_plural = "Структура: Групи військових частин (для відряджень)"
 
 class Unit(models.Model): 
     """
@@ -178,8 +178,8 @@ class Unit(models.Model):
         return f"{self.code} - {self.name or self.city}" # Виводимо код і назву/місто
 
     class Meta:
-        verbose_name = "Військова частина"
-        verbose_name_plural = "Військові частини"
+        verbose_name = "Структура: Військова частина"
+        verbose_name_plural = "Структура: Військові частини"
 
 class OID(models.Model): 
     """
@@ -212,13 +212,13 @@ class OID(models.Model):
     )
     serial_number = models.CharField(
         max_length=20, 
-        verbose_name="Серійний номер", 
+        verbose_name="s/n", 
         blank=True, 
         null=True
     )
     inventory_number = models.CharField(
         max_length=20, 
-        verbose_name="Інвентарний номер", 
+        verbose_name="Інв. №", 
         blank=True, 
         null=True
     )
@@ -251,8 +251,8 @@ class Person(models.Model):
         return self.full_name
 
     class Meta:
-        verbose_name = "Виконавець"
-        verbose_name_plural = "Виконавці"
+        verbose_name = "Довідково: Виконавець"
+        verbose_name_plural = "Довідково: Виконавці"
 
 class WorkRequest(models.Model):
     """
@@ -316,8 +316,8 @@ class WorkRequest(models.Model):
 						# def ajax_load_work_requests_for_oids(request): 
     					# 'text': f"заявка вх.№ {wr.incoming_number} від {wr.incoming_date.strftime('%d.%m.%Y')} (ВЧ: {wr.unit.code}) - {wr.get_status_display()}"
     class Meta:
-        verbose_name = "Заявка на проведення робіт"
-        verbose_name_plural = "Заявки на проведення робіт"
+        verbose_name = "Заявки: Заявка на проведення робіт"
+        verbose_name_plural = "Заявки: Заявки на проведення робіт"
         unique_together = ('unit', 'incoming_number') # Заявка унікальна в межах частини
 
 class WorkRequestItem(models.Model):
@@ -549,8 +549,8 @@ class WorkRequestItem(models.Model):
     
     class Meta:
         unique_together = ('request', 'oid', 'work_type') # Один ОІД не може мати двічі одну і ту ж роботу в одній заявці
-        verbose_name = "Елемент заявки"
-        verbose_name_plural = "Елементи заявки"
+        verbose_name = "Заявки: Елемент заявки"
+        verbose_name_plural = "Заявки: Елементи заявки"
         # ordering = ['request', 'oid'] # Додано сортування
         ordering = ['request', 'request__incoming_date' ] # Додав сортування за замовчуванням
 
@@ -582,14 +582,15 @@ class DocumentType(models.Model):
     )
     # is_required = models.BooleanField("Обов'язковість", default=True) # раніше логіка будувалась на обов`язковості документів, зараз перебудував на duration
     history = HistoricalRecords()
-    class Meta:
-        unique_together = ('oid_type', 'work_type', 'name') # Документ унікальний для комбінації тип ОІД/робота/назва
-        verbose_name = "Тип документа"
-        verbose_name_plural = "Типи документів"
-        ordering = ['oid_type', 'work_type', 'name'] # Додано сортування
     def __str__(self):
     #     return f"{self.name} ({self.oid_type}, {self.work_type})"
         return f"{self.name} ({self.get_oid_type_display()}, {self.get_work_type_display()})"
+    
+    class Meta:
+        unique_together = ('oid_type', 'work_type', 'name') # Документ унікальний для комбінації тип ОІД/робота/назва
+        verbose_name = "Довідково: Тип документа"
+        verbose_name_plural = "Довідково: Типи документів"
+        ordering = ['oid_type', 'work_type', 'name'] # Додано сортування
 
 class AttestationRegistration(models.Model):
     """
@@ -655,8 +656,8 @@ class AttestationRegistration(models.Model):
 
    
     class Meta:
-        verbose_name = "АА відправка на реєстрацію (ДССЗЗІ)"
-        verbose_name_plural = "АА відправки на реєстрацію (ДССЗЗІ)"
+        verbose_name = "ДССЗЗІ: АА відправка на реєстрацію"
+        verbose_name_plural = "ДССЗЗІ: АА відправки на реєстрацію"
         ordering = ['-outgoing_letter_date', '-id']     
 
 class AttestationResponse(models.Model):
@@ -721,8 +722,8 @@ class AttestationResponse(models.Model):
 
 
     class Meta:
-        verbose_name = "АА відповідь ДССЗЗІ"
-        verbose_name_plural = "АА відповіді ДССЗЗІ"
+        verbose_name = "ДССЗЗІ: АА відповідь"
+        verbose_name_plural = "ДССЗЗІ: АА відповіді"
         ordering = ['-response_letter_date', '-id']
 
 class WorkCompletionRegistration(models.Model):
@@ -781,8 +782,8 @@ class WorkCompletionRegistration(models.Model):
         return f"Відправка АЗР (лист №{self.outgoing_letter_number} від {self.outgoing_letter_date.strftime('%d.%m.%Y')})"
 
     class Meta:
-        verbose_name = "АЗР відправка на реєстрацію"
-        verbose_name_plural = "АЗР відправки на реєстрацію"
+        verbose_name = "ДССЗЗІ: АЗР відправка на реєстрацію"
+        verbose_name_plural = "ДССЗЗІ: АЗР відправки на реєстрацію"
         ordering = ['-outgoing_letter_date']
 
 class WorkCompletionResponse(models.Model):
@@ -822,8 +823,8 @@ class WorkCompletionResponse(models.Model):
         return f"Відповідь на лист №{self.registration_request.outgoing_letter_number}"
 
     class Meta:
-        verbose_name = "АЗР відповідь ДССЗЗІ"
-        verbose_name_plural = "АЗР відповіді ДССЗЗІ"
+        verbose_name = "ДССЗЗІ: АЗР відповідь ДССЗЗІ"
+        verbose_name_plural = "ДССЗЗІ: АЗР відповіді ДССЗЗІ"
 
 
 class Document(models.Model):
@@ -874,7 +875,7 @@ class Document(models.Model):
     )
     history = HistoricalRecords()
 
-    # --- НОВІ ПОЛЯ для реєстрації в ДССЗЗІ (для актів атестації) ---
+    # --- поля для реєстрації в ДССЗЗІ (для актів атестації) ---
     # Посилання на запис про відправку (вихідний лист)
     attestation_registration_sent = models.ForeignKey(
         'AttestationRegistration', # Використовуємо рядок
@@ -908,8 +909,8 @@ class Document(models.Model):
         verbose_name="Відправка АЗР на реєстрацію",
         related_name="submitted_documents"
     )
-    # --- КІНЕЦЬ НОВОГО ПОЛЯ ---
-
+    # --- КІНЕЦЬ полів для реєстрації в ДССЗЗІ (для актів атестації) ---
+    
     @property
     def get_sent_info_for_export(self):
         """Повертає рядок з інформацією про відправку для експорту."""
@@ -1148,94 +1149,167 @@ class Document(models.Model):
         ordering = ['-process_date', '-work_date']
             
 
+# --------------------------------------------------------------------------
+# ## МОДЕЛІ ДЛЯ ПРОЦЕСУ РЕЄСТРАЦІЇ ДЕКЛАРАЦІЙ ВІДПОВІДНОСТІ ##
+# --------------------------------------------------------------------------
 
 class DskEot(models.Model):
     """
-    Нова сутність: ДСК ЕОТ (Декларація відповідності).
+    Нова сутність: ДСК ЕОТ.
+    Це не ОІД, а окремий об'єкт для відстеження Декларацій.
     """
-    unit = models.ForeignKey(Unit, on_delete=models.CASCADE, verbose_name="Військова частина")
+    unit = models.ForeignKey(Unit, on_delete=models.CASCADE, verbose_name="Військова частина", related_name="dsk_eots")
     cipher = models.CharField(max_length=200, verbose_name="Шифр")
-    serial_number = models.CharField(max_length=200, verbose_name="Серійний номер")
-    inventory_number = models.CharField(max_length=200, verbose_name="Інвентарний номер")
+    serial_number = models.CharField(max_length=200, verbose_name="Серійний номер", blank=True, null=True)
+    inventory_number = models.CharField(max_length=200, verbose_name="Інвентарний номер", blank=True, null=True)
     room = models.CharField(max_length=255, verbose_name="Приміщення")
     security_level = models.CharField(max_length=50, default="ДСК", verbose_name="Гриф")
     note = models.TextField(blank=True, null=True, verbose_name="Примітки")
-    # ... (поля created_at, updated_at, history) ...
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    history = HistoricalRecords()
 
     def __str__(self):
-        return f"{self.cipher} (ВЧ: {self.unit.code})"
+        return f"ДСК ЕОТ: {self.cipher} (ВЧ: {self.unit.code})"
 
     class Meta:
-        verbose_name = "ДСК ЕОТ"
-        verbose_name_plural = "ДСК ЕОТ"
+        verbose_name = "ОІД ДСК ЕОТ"
+        verbose_name_plural = "ОІД ДСК ЕОТ"
         ordering = ['unit', 'cipher']
+
+
+class Declaration(models.Model):
+    """
+    НОВА, ОКРЕМА СУТНІСТЬ: Декларація відповідності.
+    Не пов'язана з моделлю Document.
+    """
+    dsk_eot = models.ForeignKey(
+        DskEot, 
+        on_delete=models.CASCADE,
+        verbose_name="Об'єкт ДСК ЕОТ",
+        related_name="declarations"
+    )
+    prepared_number = models.CharField(
+        max_length=50, 
+        verbose_name="Підготовлений № Декларації"
+    )
+    prepared_date = models.DateField(
+        verbose_name="Дата опрацювання Декларації"
+    )
+    # Поля для відповіді від ДССЗЗІ
+    registered_number = models.CharField(
+        max_length=50,
+        blank=True, null=True,
+        verbose_name="Зареєстрований № в ДССЗЗІ"
+    )
+    registered_date = models.DateField(
+        blank=True, null=True,
+        verbose_name="Дата реєстрації в ДССЗЗІ"
+    )
+    note = models.TextField(blank=True, null=True, verbose_name="Примітки")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    history = HistoricalRecords()
+    
+    @property
+    def get_status_display(self):
+        if self.registered_number:
+            return "Зареєстровано"
+        if self.registrations.exists():
+            return "Відправлено на реєстрацію"
+        return "Чернетка"
+
+    @property
+    def get_submission_info(self):
+        submission = self.registrations.first()
+        if submission:
+            return f"Лист №{submission.outgoing_letter_number} від {submission.outgoing_letter_date.strftime('%d.%m.%Y')}"
+        return "-"
+    def __str__(self):
+        return f"Декларація №{self.prepared_number} для {self.dsk_eot.cipher}"
+
+    class Meta:
+        verbose_name = "ДССЗЗІ: Декларація відповідності відправка"
+        verbose_name_plural = "ДССЗЗІ: Декларації відповідності відправка"
+        ordering = ['-prepared_date']
+
 
 class DeclarationRegistration(models.Model):
     """
-    Модель для фіксації ВІДПРАВКИ Декларацій на реєстрацію.
+    НОВА, ОБ'ЄДНАНА МОДЕЛЬ.
+    Відстежує весь цикл реєстрації Декларації: відправку та отримання відповіді.
+    Один запис = один вихідний лист.
     """
-    outgoing_letter_number = models.CharField(max_length=50, verbose_name="Вихідний номер супровідного листа")
-    outgoing_letter_date = models.DateField(verbose_name="Дата вихідного супровідного листа")
-    # Зв'язок з документами типу "Декларація", які ми створимо в процесі
-    documents = models.ManyToManyField(Document, verbose_name="Документи (Декларації), відправлені на реєстрацію")
-    note = models.TextField(blank=True, null=True, verbose_name="Примітки")
-    created_by = models.ForeignKey(Person, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Хто створив запис")
+    # === ПОЛЯ, ЩО СТОСУЮТЬСЯ ВІДПРАВКИ ===
+    outgoing_letter_number = models.CharField(
+        max_length=50,
+        verbose_name="Вихідний номер супровідного листа"
+    )
+    outgoing_letter_date = models.DateField(
+        verbose_name="Дата вихідного супровідного листа"
+    )
+    # Зв'язок з деклараціями, які були в цьому листі
+    declarations = models.ManyToManyField(
+        Declaration,
+        verbose_name="Декларації у відправці",
+        related_name="registrations"
+    )
+    note = models.TextField(
+        blank=True, null=True,
+        verbose_name="Примітки до відправки"
+    )
+    created_by = models.ForeignKey(
+        Person, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        verbose_name="Хто створив запис",
+        related_name="created_declaration_registrations"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    # === ПОЛЯ, ЩО СТОСУЮТЬСЯ ОТРИМАННЯ ВІДПОВІДІ (необов'язкові) ===
+    response_letter_number = models.CharField(
+        max_length=50, blank=True, null=True,
+        verbose_name="Номер листа-відповіді"
+    )
+    response_letter_date = models.DateField(
+        blank=True, null=True,
+        verbose_name="Дата листа-відповіді"
+    )
+    response_note = models.TextField(
+        blank=True, null=True,
+        verbose_name="Примітки до відповіді"
+    )
+    response_by = models.ForeignKey(
+        Person, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        verbose_name="Хто вніс відповідь",
+        related_name="recorded_declaration_responses"
+    )
+    response_at = models.DateTimeField(
+        blank=True, null=True,
+        verbose_name="Дата внесення відповіді"
+    )
+
     history = HistoricalRecords()
 
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        # Після збереження проходимося по всіх доданих документах
-        for doc in self.documents.all():
-            oid_to_update = doc.oid
-            if oid_to_update:
-                old_status = oid_to_update.get_status_display()
-                new_status_enum = OIDStatusChoices.RECEIVED_DECLARATION
-
-                if oid_to_update.status != new_status_enum:
-                    oid_to_update.status = new_status_enum
-                    oid_to_update.save(update_fields=['status'])
-                    
-                    OIDStatusChange.objects.create(
-                        oid=oid_to_update,
-                        old_status=old_status,
-                        new_status=new_status_enum.label,
-                        reason=f"Декларацію (документ №{doc.document_number}) відправлено на реєстрацію листом №{self.outgoing_letter_number}",
-                        initiating_document=doc
-                    )
-
     def __str__(self):
-        return f"Відправка Декларацій (лист №{self.outgoing_letter_number})"
+        return f"Реєстрація Декларацій (лист №{self.outgoing_letter_number} від {self.outgoing_letter_date.strftime('%d.%m.%Y')})"
+    
+    @property
+    def is_response_received(self):
+        """Перевіряє, чи була внесена відповідь."""
+        return bool(self.response_letter_number and self.response_letter_date)
 
     class Meta:
-        verbose_name = "Декларація відправка на реєстрацію"
-        verbose_name_plural = "Декларації відправки на реєстрацію"
+        verbose_name = "ДССЗЗІ: Декларація відповідь"
+        verbose_name_plural = "ДССЗЗІ: Декларація відповіді"
         ordering = ['-outgoing_letter_date']
 
 
-class DeclarationResponse(models.Model):
-    """
-    Модель для фіксації ОТРИМАННЯ ВІДПОВІДІ по Деклараціях.
-    """
-    registration_request = models.OneToOneField(
-        DeclarationRegistration,
-        on_delete=models.CASCADE,
-        verbose_name="Запит на реєстрацію (відправлений лист)",
-        related_name="response_received"
-    )
-    response_letter_number = models.CharField(max_length=50, verbose_name="Номер листа-відповіді")
-    response_letter_date = models.DateField(verbose_name="Дата листа-відповіді")
-    note = models.TextField(blank=True, null=True, verbose_name="Примітки")
-    created_by = models.ForeignKey(Person, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Хто вніс відповідь")
-    created_at = models.DateTimeField(auto_now_add=True)
-    history = HistoricalRecords()
-
-    def __str__(self):
-        return f"Відповідь на лист по Деклараціях №{self.registration_request.outgoing_letter_number}"
-
-    class Meta:
-        verbose_name = "Декларація відповідь ДССЗЗІ"
-        verbose_name_plural = "Декларації відповіді ДССЗЗІ"
+# --------------------------------------------------------------------------
+# ## КІНЕЦЬ МОДЕЛІ ДЛЯ ПРОЦЕСУ РЕЄСТРАЦІЇ ДЕКЛАРАЦІЙ ВІДПОВІДНОСТІ ##
+# --------------------------------------------------------------------------
 
 class Trip(models.Model):
     """
@@ -1332,8 +1406,8 @@ class OIDStatusChange(models.Model):
         return f"{self.oid.cipher}: {self.old_status} → {self.new_status} ({self.changed_at.strftime('%Y-%m-%d')})"
 
     class Meta:
-        verbose_name = "Зміна статусу ОІД"
-        verbose_name_plural = "Зміни статусу ОІД"
+        verbose_name = "ДССЗЗІ: Зміна статусу ОІД"
+        verbose_name_plural = "ДССЗЗІ: Зміни статусу ОІД"
         ordering = ['-changed_at'] # За замовчуванням сортувати за датою зміни
 
 # --- Додаткові сутності, які були в оригінальному файлі, але не були інтегровані в бізнес-логіку ---
@@ -1385,8 +1459,8 @@ class TripResultForUnit(models.Model):
         return f"Відправка результатів від {self.outgoing_letter_date}"
     
     class Meta:
-        verbose_name = "Результати відрядження для частини"
-        verbose_name_plural = "Результати відрядження для частин"
+        verbose_name = "Опрацювання результат відрядження для частини"
+        verbose_name_plural = "Опрацювання результати відрядження для частин"
         ordering = ['-outgoing_letter_date', '-id']
         
 # oids/models.py

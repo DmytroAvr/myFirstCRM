@@ -1,0 +1,97 @@
+{% extends "oids/base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>{{ page_title }}</h3>
+        <div>
+            <a href="{% url 'oids:send_declaration_for_registration' %}" class="btn btn-primary">+ Створити відправку</a>
+            <a href="?{{ request.GET.urlencode }}&export=1" class="btn btn-success">
+                <i class="fas fa-file-excel"></i> Excel
+            </a>
+        </div>
+    </div>
+
+    {# --- ФОРМА ФІЛЬТРАЦІЇ --- #}
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get">
+                <div class="row g-3">
+                    <div class="col-md-6">{{ filter_form.unit.label_tag }}{{ filter_form.unit }}</div>
+                    <div class="col-md-6">{{ filter_form.dsk_eot.label_tag }}{{ filter_form.dsk_eot }}</div>
+                    <div class="col-md-4">{{ filter_form.prepared_number.label_tag }}{{ filter_form.prepared_number }}</div>
+                    <div class="col-md-4">{{ filter_form.registered_number.label_tag }}{{ filter_form.registered_number }}</div>
+                    <div class="col-md-2">{{ filter_form.date_from.label_tag }}{{ filter_form.date_from }}</div>
+                    <div class="col-md-2">{{ filter_form.date_to.label_tag }}{{ filter_form.date_to }}</div>
+                </div>
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-primary">Фільтрувати</button>
+                    <a href="{% url 'oids:list_declarations' %}" class="btn btn-outline-secondary">Скинути</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {# --- ТАБЛИЦЯ З ДАНИМИ --- #}
+    <div class="card">
+        <div class="card-body table-responsive">
+            <table class="table table-hover table-sm">
+                <thead>
+                    <tr>
+						<th>№<br>з/п</th>
+                        <th><a href="?{{ sort_url_part }}&sort={% if current_sort == 'dsk_eot__unit__code' %}-{% endif %}dsk_eot__unit__code">ВЧ</a></th>
+                        <th><a href="?{{ sort_url_part }}&sort={% if current_sort == 'dsk_eot__cipher' %}-{% endif %}dsk_eot__cipher">Шифр ЕОТ</a></th>
+                        <th><a href="?{{ sort_url_part }}&sort={% if current_sort == 'prepared_number' %}-{% endif %}prepared_number">Підготовлений №</a></th>
+                        <th><a href="?{{ sort_url_part }}&sort={% if current_sort == 'prepared_date' %}-{% endif %}prepared_date">Дата підг.</a></th>
+						<th>Статус</th>
+						<th>Інфо про відправку</th>
+                        <th><a href="?{{ sort_url_part }}&sort={% if current_sort == 'registered_number' %}-{% endif %}registered_number">Зареєстрований №</a></th>
+                        <th><a href="?{{ sort_url_part }}&sort={% if current_sort == 'registered_date' %}-{% endif %}registered_date">Дата реєстр.</a></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in declarations %}
+                    <tr>
+						<td>{{ page_obj.start_index|add:forloop.counter0 }}.</td>
+                        <td>{{ doc.dsk_eot.unit.code }}</td>
+                        <td>{{ doc.dsk_eot.cipher }}</td>
+                        <td>{{ doc.prepared_number }}</td>
+                        <td>{{ doc.prepared_date|date:"d.m.Y" }}</td>
+                       	<td>
+							{# Використовуємо наш новий метод з моделі #}
+							{% if doc.get_status_display == "Зареєстровано" %}
+								<span class="badge bg-success">{{ doc.get_status_display }}</span>
+							{% elif doc.get_status_display == "Відправлено на реєстрацію" %}
+								<span class="badge bg-primary">{{ doc.get_status_display }}</span>
+							{% else %}
+								<span class="badge bg-secondary">{{ doc.get_status_display }}</span>
+							{% endif %}
+						</td>
+						<td>{{ doc.get_submission_info }}</td>
+						<td>{{ doc.registered_number|default:"-" }}</td>
+                        <td>{{ doc.registered_date|date:"d.m.Y"|default:"-" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center">Декларації не знайдено.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% include "oids/includes/pagination.html" with page_obj=declarations %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Ініціалізуємо TomSelect для полів фільтра
+    document.addEventListener('DOMContentLoaded', function () {
+        new TomSelect('#id_unit', { plugins: ['remove_button'] });
+        new TomSelect('#id_dsk_eot', { plugins: ['remove_button'] });
+    });
+</script>
+{% endblock %}

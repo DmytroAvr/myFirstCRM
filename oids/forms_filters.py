@@ -5,7 +5,7 @@ from .models import (OIDTypeChoices, OIDStatusChoices, SecLevelChoices, WorkRequ
     DocumentReviewResultChoices, AttestationRegistrationStatusChoices, PeminSubTypeChoices
 )
 from .models import (
-    WorkRequest, WorkRequestItem, OID, Unit, Person, Trip, TripResultForUnit, Document, DocumentType,
+    WorkRequest, WorkRequestItem, OID, DskEot, Unit, Person, Trip, TripResultForUnit, Document, DocumentType,
     AttestationRegistration, AttestationResponse,  TechnicalTask
 )
 
@@ -358,4 +358,15 @@ class AzrDocumentFilterForm(forms.Form):
     # Фільтр по датах
     date_from = forms.DateField(label="Дата (від)", required=False, widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}))
     date_to = forms.DateField(label="Дата (до)", required=False, widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}))
+
+class DeclarationFilterForm(forms.Form):
+    """
+    Форма для фільтрації списку Декларацій відповідності.
+    """
+    unit = forms.ModelMultipleChoiceField(queryset=Unit.objects.all().order_by('code'), label="ВЧ", required=False, widget=forms.SelectMultiple(attrs={'class': 'tomselect-field'}))
+    dsk_eot = forms.ModelMultipleChoiceField(queryset=DskEot.objects.all().order_by('cipher'), label="ДСК ЕОТ", required=False, widget=forms.SelectMultiple(attrs={'class': 'tomselect-field'}))
+    prepared_number = forms.CharField(label="Підготовлений №", required=False)
+    registered_number = forms.CharField(label="Зареєстрований №", required=False)
+    date_from = forms.DateField(label="Дата підготовки (від)", required=False, widget=forms.DateInput(attrs={'type': 'date'}))
+    date_to = forms.DateField(label="Дата підготовки (до)", required=False, widget=forms.DateInput(attrs={'type': 'date'}))
     

@@ -1,0 +1,58 @@
+{% extends "oids/base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>{{ page_title }}</h3>
+        <a href="{% url 'oids:send_declaration_for_registration' %}" class="btn btn-primary">
+            + Створити нову відправку
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+						<th>№<br>з/п</th>
+                        <th>Вихідний лист (№, дата)</th>
+                        <th>К-сть Декларацій</th>
+                        <th>Статус</th>
+                        <th>Дії</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for submission in submissions %}
+                        <tr>
+							<td>{{ page_obj.start_index|add:forloop.counter0 }}.</td>
+                            <td>№ {{ submission.outgoing_letter_number }} від {{ submission.outgoing_letter_date|date:"d.m.Y" }}</td>
+                            <td>{{ submission.declarations.count }} шт.</td>
+                            <td>
+                                {% if submission.is_response_received %}
+                                    <span class="badge bg-success">Відповідь отримано</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark">Очікується відповідь</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if not submission.is_response_received %}
+                                    <a href="{% url 'oids:record_declaration_response' submission_id=submission.id %}" class="btn btn-sm btn-outline-primary">
+                                        Внести відповідь
+                                    </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center">Жодної відправки ще не створено.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% include "oids/includes/pagination.html" with page_obj=submissions %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,183 @@
+{% extends "oids/base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header">
+            <h3>{{ page_title }}</h3>
+        </div>
+        <div class="card-body">
+            <form method="post" novalidate id="declaration-submission-form">
+                {% csrf_token %}
+                
+                {# Службові поля для формсету. JS буде оновлювати 'TOTAL_FORMS'. #}
+                {{ item_formset.management_form }}
+
+                {# --- Блок 1: Дані супровідного листа --- #}
+                <fieldset class="mb-4 p-3 border rounded">
+                    <legend class="fs-5">Дані супровідного листа</legend>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ submission_form.outgoing_letter_number.id_for_label }}" class="form-label">{{ submission_form.outgoing_letter_number.label }}</label>
+                            {{ submission_form.outgoing_letter_number }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ submission_form.outgoing_letter_date.id_for_label }}" class="form-label">{{ submission_form.outgoing_letter_date.label }}</label>
+                            {{ submission_form.outgoing_letter_date }}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                         <label for="{{ submission_form.note.id_for_label }}" class="form-label">{{ submission_form.note.label }}</label>
+                         {{ submission_form.note }}
+                    </div>
+                </fieldset>
+
+                {# --- Блок 2: Вибір ВЧ та динамічні блоки --- #}
+                <fieldset class="mb-4">
+                    <legend class="fs-5">Об'єкти ДСК ЕОТ</legend>
+                    <div class="mb-3">
+                        <label for="unit_selector_id" class="form-label">1. Оберіть військові частини</label>
+                        <select id="unit_selector_id" multiple>
+                            {% for unit in all_units %}
+                                <option value="{{ unit.pk }}">{{ unit.code }} - {{ unit.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    {# Сюди JavaScript буде додавати блоки для кожної обраної ВЧ #}
+                    <div id="unit-formsets-container"></div>
+                </fieldset>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg">Створити та відправити</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{# --- ШАБЛОНИ ДЛЯ JAVASCRIPT --- #}
+
+{# Шаблон для блоку однієї військової частини #}
+<template id="unit-fieldset-template">
+    <fieldset class="unit-fieldset mb-3 p-3 border rounded" data-unit-id="">
+        <legend class="fs-6 d-flex justify-content-between align-items-center">
+            <span>ВЧ: <strong class="unit-name-text"></strong></span>
+            <button type="button" class="btn btn-sm btn-outline-primary add-eot-btn">
+                <i class="fas fa-plus"></i> Додати ЕОТ
+            </button>
+        </legend>
+        <div class="eot-forms-container">
+            {# Сюди будуть додаватися форми для ДСК ЕОТ #}
+        </div>
+    </fieldset>
+</template>
+
+{# Шаблон для одного рядка форми ДСК ЕОТ #}
+<template id="dsk-eot-item-template">
+    <div class="dsk-eot-form row g-2 p-2 mb-2 border-start border-4 border-info rounded-end align-items-center">
+        {# Використовуємо префікс 'items' #}
+        <input type="hidden" name="items-__prefix__-unit" value="">
+        <div class="col-md-4"><input type="text" name="items-__prefix__-cipher" placeholder="Шифр" class="form-control form-control-sm" required></div>
+        <div class="col-md-4"><input type="text" name="items-__prefix__-serial_number" placeholder="Серійний №" class="form-control form-control-sm"></div>
+        <div class="col-md-4"><input type="text" name="items-__prefix__-inventory_number" placeholder="Інв. №" class="form-control form-control-sm"></div>
+        <div class="col-12"><input type="text" name="items-__prefix__-room" placeholder="Приміщення" class="form-control form-control-sm" required></div>
+        <div class="col-md-5"><input type="text" name="items-__prefix__-prepared_number" placeholder="Підготовлений № Декларації" class="form-control form-control-sm" required></div>
+        <div class="col-md-5"><input type="date" name="items-__prefix__-prepared_date" title="Дата опрацювання Декларації" class="form-control form-control-sm" required></div>
+        <div class="col-md-2 text-end">
+            <button type="button" class="btn btn-sm btn-outline-danger remove-eot-btn">Видалити</button>
+        </div>
+    </div>
+</template>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const unitContainer = document.getElementById('unit-formsets-container');
+    const unitTemplate = document.getElementById('unit-fieldset-template');
+    const eotTemplate = document.getElementById('dsk-eot-item-template');
+    const totalFormsInput = document.querySelector('#id_items-TOTAL_FORMS');
+    let formCount = 0;
+
+    const unitTomSelect = new TomSelect('#unit_selector_id', {
+        plugins: ['remove_button'],
+        placeholder: 'Оберіть одну або декілька ВЧ...'
+    });
+
+    // Функція для додавання блоку ВЧ
+    const addUnitBlock = (unitId, unitText) => {
+        if (document.querySelector(`.unit-fieldset[data-unit-id="${unitId}"]`)) return; // Вже існує
+
+        const newUnitHtml = unitTemplate.innerHTML;
+        const newUnitNode = document.createElement('div');
+        newUnitNode.innerHTML = newUnitHtml;
+
+        const fieldset = newUnitNode.querySelector('.unit-fieldset');
+        fieldset.dataset.unitId = unitId;
+        fieldset.querySelector('.unit-name-text').textContent = unitText;
+        
+        unitContainer.appendChild(fieldset);
+    };
+
+    // Функція для видалення блоку ВЧ
+    const removeUnitBlock = (unitId) => {
+        const fieldset = document.querySelector(`.unit-fieldset[data-unit-id="${unitId}"]`);
+        if (fieldset) {
+            // Перед видаленням блоку оновлюємо загальну кількість форм
+            const formsInBlock = fieldset.querySelectorAll('.dsk-eot-form').length;
+            totalFormsInput.value = parseInt(totalFormsInput.value) - formsInBlock;
+            fieldset.remove();
+        }
+    };
+    
+    // Слухач на зміну вибору ВЧ
+    unitTomSelect.on('change', (selectedUnits) => {
+        const currentUnitIds = Array.from(unitContainer.querySelectorAll('.unit-fieldset')).map(fs => fs.dataset.unitId);
+
+        // Видаляємо блоки
+        const unitsToRemove = currentUnitIds.filter(id => !selectedUnits.includes(id));
+        unitsToRemove.forEach(removeUnitBlock);
+
+        // Додаємо блоки
+        const unitsToAdd = selectedUnits.filter(id => !currentUnitIds.includes(id));
+        unitsToAdd.forEach(unitId => {
+            const unitText = unitTomSelect.getOption(unitId).textContent;
+            addUnitBlock(unitId, unitText);
+        });
+    });
+
+    // Слухач для кнопок "Додати ЕОТ" та "Видалити" (використовуємо делегування подій)
+    unitContainer.addEventListener('click', function(event) {
+        // Якщо клікнули на кнопку "Додати ЕОТ"
+        if (event.target.classList.contains('add-eot-btn')) {
+            const fieldset = event.target.closest('.unit-fieldset');
+            const unitId = fieldset.dataset.unitId;
+            const eotContainer = fieldset.querySelector('.eot-forms-container');
+
+            const newFormHtml = eotTemplate.innerHTML.replace(/__prefix__/g, formCount);
+            const newFormNode = document.createElement('div');
+            newFormNode.innerHTML = newFormHtml;
+
+            // Встановлюємо ID військової частини у приховане поле
+            newFormNode.querySelector('input[name$="-unit"]').value = unitId;
+            
+            eotContainer.appendChild(newFormNode.firstElementChild);
+            formCount++;
+            totalFormsInput.value = formCount;
+        }
+
+        // Якщо клікнули на кнопку "Видалити"
+        if (event.target.classList.contains('remove-eot-btn')) {
+            event.target.closest('.dsk-eot-form').remove();
+            // Оновлюємо загальну кількість форм
+            totalFormsInput.value = unitContainer.querySelectorAll('.dsk-eot-form').length;
+        }
+    });
+});
+</script>
+{% endblock %}

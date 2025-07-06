@@ -39,14 +39,44 @@
             <thead class="thead-dark">
                 <tr>
                     <th>№<br>з/п</th>
-                    <th>ВЧ</th>
+                    <th>
+                        <a href="?{% for key, value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}sort_by=oid_loc{% if current_sort_by == 'oid_loc' and not current_sort_order_is_desc %}&sort_order=desc{% endif %}" 
+                           class=" text-decoration-none">
+                            ВЧ {% if current_sort_by == 'oid_loc' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                        </a>
+                    </th>
                     <th>ОІД</th>
                     <th>Вхідний № ТЗ</th>
-                    <th>Вхідна дата</th>
-                    <th>Опрацювати ДО</th>
-                    <th>Статус</th>
-                    <th>Опрацьовано</th>
-                    <th>Хто опрацював</th>
+                    <th>
+                        <a href="?{% for key, value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}sort_by=input_date{% if current_sort_by == 'input_date' and not current_sort_order_is_desc %}&sort_order=desc{% endif %}" 
+                           class=" text-decoration-none">
+                            Вхідна дата {% if current_sort_by == 'input_date' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="?{% for key, value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}sort_by=read_till_date{% if current_sort_by == 'read_till_date' and not current_sort_order_is_desc %}&sort_order=desc{% endif %}" 
+                           class=" text-decoration-none">
+                            Опрацювати ДО {% if current_sort_by == 'read_till_date' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="?{% for key, value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}sort_by=review_result{% if current_sort_by == 'review_result' and not current_sort_order_is_desc %}&sort_order=desc{% endif %}" 
+                           class=" text-decoration-none">
+                            Статус {% if current_sort_by == 'review_result' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="?{% for key, value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}sort_by=updated_at{% if current_sort_by == 'updated_at' and not current_sort_order_is_desc %}&sort_order=desc{% endif %}" 
+                           class=" text-decoration-none">
+                            Опрацьовано {% if current_sort_by == 'updated_at' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="?{% for key, value in request.GET.items %}{% if key != 'sort_by' and key != 'sort_order' and key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}sort_by=reviewed_by{% if current_sort_by == 'reviewed_by' and not current_sort_order_is_desc %}&sort_order=desc{% endif %}" 
+                           class=" text-decoration-none">
+                            Хто опрацював {% if current_sort_by == 'reviewed_by' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+                        </a>
+                    </th>
                     <th>Примітки</th>
                     <th>Дії</th>
                 </tr>
@@ -65,15 +95,12 @@
                     <td>{{ task.reviewed_by.full_name|default:"-" }}</td>
                     <td>{{ task.note|truncatewords:10|default:"-" }}</td>
                     <td>
-                        	
+                        {% if task.review_result == 'опрацювати' %}
+                            <a href="{% url 'oids:technical_task_process_specific' task.id %}" class="btn btn-sm btn-warning">Опрацювати</a>
+                        {% else %}
+                            <span class="text-muted">Опрацьовано</span>
+                        {% endif %}
                     </td>
-                    <td>
-						{% if task.review_result == 'опрацювати' %}
-							<a href="{% url 'oids:technical_task_process_specific' task.id %}" class="btn btn-sm btn-warning">Опрацювати</a>
-						{% else %}
-							<span class="text-muted">Опрацьовано</span>
-						{% endif %}
-					</td>
                 </tr>
                 {% endfor %}
             </tbody>

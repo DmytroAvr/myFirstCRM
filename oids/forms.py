@@ -6,9 +6,9 @@ from .models import (OIDTypeChoices, OIDStatusChoices, SecLevelChoices, WorkRequ
     DocumentReviewResultChoices, AttestationRegistrationStatusChoices, PeminSubTypeChoices
 )
 from .models import (
-    WorkRequest, WorkRequestItem, OID, Unit, Person, Trip, TripResultForUnit, Document, DocumentType,
+    WorkRequest, WorkRequestItem, OID, DskEot , Unit, Person, Trip, TripResultForUnit, Document, DocumentType,
     AttestationRegistration, AttestationResponse, WorkCompletionRegistration, WorkCompletionResponse, 
-    DeclarationRegistration, DeclarationResponse, TechnicalTask,
+    Declaration, DeclarationRegistration, TechnicalTask, 
 )
 from django_tomselect.forms import TomSelectModelChoiceField, TomSelectConfig
 from django.utils import timezone
@@ -700,50 +700,98 @@ AzrUpdateFormSet = forms.modelformset_factory(
     extra=0 # Не показувати порожніх форм для додавання
 )
 
+# --- ФОРМИ ДЛЯ ПРОЦЕСУ РЕЄСТРАЦІЇ ДЕКЛАРАЦІЙ ---
 
-class DeclarationSendForm(forms.ModelForm):
-    documents = forms.ModelMultipleChoiceField(
-        queryset=Document.objects.filter(
-            document_type__name__icontains='декларація відповідності', 
-            dsszzi_registered_number__isnull=True
-        ).order_by('oid__unit__code', 'oid__cipher'),
-        widget=forms.SelectMultiple(attrs={'class': 'tomselect-field', 'size': '15'}),
-        label="Оберіть Декларації для відправки",
-        required=True
-    )
-    
+
+class DeclarationSubmissionForm(forms.ModelForm):
+    """
+    Форма для даних супровідного листа ("шапки" сторінки відправки).
+    Працює з об'єднаною моделлю DeclarationRegistration.
+    """
     class Meta:
         model = DeclarationRegistration
-        fields = ['documents', 'outgoing_letter_number', 'outgoing_letter_date', 'note']
-        widgets = {
-            'outgoing_letter_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'outgoing_letter_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'note': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+        # Вказуємо тільки ті поля, що стосуються ВІДПРАВКИ
+        fields = ['outgoing_letter_number', 'outgoing_letter_date', 'note']
+        labels = {
+            'outgoing_letter_number': "Вихідний номер супровідного листа",
+            'outgoing_letter_date': "Дата вихідного листа",
+            'note': "Примітки до відправки"
         }
+        widgets = {
+            'outgoing_letter_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'note': forms.Textarea(attrs={'rows': 2, 'class': 'form-control'}),
+            'outgoing_letter_number': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+
+class DskEotItemForm(forms.ModelForm):
+    """
+    Форма для створення ОДНОГО об'єкта ДСК ЕОТ.
+    Використовується як шаблон у нашому динамічному формсеті.
+    """
+    # Додаємо поля для створення пов'язаної Декларації
+    prepared_number = forms.CharField(label="Підготовлений № Декларації", required=True)
+    prepared_date = forms.DateField(label="Дата опрацювання", widget=forms.DateInput(attrs={'type': 'date'}), required=True)
+    
+    class Meta:
+        model = DskEot
+        # Поля, які користувач заповнює для кожного ЕОТ
+        fields = ['unit', 'cipher', 'serial_number', 'inventory_number', 'room']
+        # Поле 'unit' буде прихованим, оскільки воно визначається блоком, в якому знаходиться форма
+        widgets = {
+            'unit': forms.HiddenInput(),
+        }
+
+# Створюємо FormSet на основі нашої форми. `formset_factory` краще підходить,
+# оскільки ми створюємо об'єкти двох різних моделей (DskEot та Declaration).
+DeclarationItemFormSet = forms.formset_factory(DskEotItemForm, extra=0)
+
 
 class DeclarationResponseForm(forms.ModelForm):
+    """
+    Форма для внесення даних про лист-відповідь.
+    Працює з тими ж полями моделі DeclarationRegistration, що стосуються відповіді.
+    """
     class Meta:
-        model = DeclarationResponse
-        fields = ['response_letter_number', 'response_letter_date', 'note']
-        widgets = {
-            'outgoing_letter_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'outgoing_letter_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'note': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+        model = DeclarationRegistration
+        # Вказуємо тільки ті поля, що стосуються ВІДПОВІДІ
+        fields = ['response_letter_number', 'response_letter_date', 'response_note']
+        labels = {
+            'response_letter_number': "Номер листа-відповіді від ДССЗЗІ",
+            'response_letter_date': "Дата листа-відповіді",
+            'response_note': "Примітки до відповіді"
         }
-# Ми можемо перевикористовувати AzrUpdateForm, оскільки поля ті ж самі,
-# але для чистоти коду краще створити окрему.
+        widgets = {
+             'response_letter_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+             'response_note': forms.Textarea(attrs={'rows': 2, 'class': 'form-control'}),
+             'response_letter_number': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
 
 class DeclarationUpdateForm(forms.ModelForm):
+    """
+    Форма для ОДНОГО рядка в таблиці на сторінці відповіді.
+    Дозволяє внести реєстраційні дані для конкретної Декларації.
+    """
     class Meta:
-        model = Document
-        fields = ['dsszzi_registered_number', 'dsszzi_registered_date']
-        # ... (labels та widgets)
+        model = Declaration
+        fields = ['registered_number', 'registered_date']
+        labels = {
+            'registered_number': "Зареєстрований №",
+            'registered_date': "Дата реєстрації"
+        }
+        widgets = {
+            'registered_date': forms.DateInput(attrs={'type': 'date'})
+        }
 
-DeclarationUpdateFormSet = modelformset_factory(
-    Document,
+# Створюємо modelformset, який буде працювати з моделлю Declaration
+DeclarationUpdateFormSet = forms.modelformset_factory(
+    Declaration,
     form=DeclarationUpdateForm,
-    extra=0
-)        
+    extra=0 # Не показувати порожніх форм
+)
+
+# --- КІНЕЦЬ ФОРМИ ДЛЯ ПРОЦЕСУ РЕЄСТРАЦІЇ ДЕКЛАРАЦІЙ ---
 
 
 ALLOWED_STATUS_CHOICES = [

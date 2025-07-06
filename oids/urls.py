@@ -53,17 +53,19 @@ urlpatterns = [
     
 
     # --- АЗР (Акт завершення робіт) ---
-  	path('azr-registrations/', views.list_azr_registrations_view, name='list_azr_registrations'), # <-- НОВИЙ ШЛЯХ
+  	path('azr-registrations/', views.list_azr_registrations_view, name='list_azr_registrations'),
     path('azr-registration/send/', views.send_azr_for_registration_view, name='send_azr_for_registration'),
     path('azr-response/record/<int:registration_id>/', views.record_azr_response_view, name='record_azr_response'),
     
-    # --- Декларації ---
-    path('declaration-registration/send/', views.send_declaration_for_registration_view, name='send_declaration_for_registration'),
-    # path('declaration-response/record/', views.record_declaration_response_view, name='record_declaration_response'), 
-    # ВИПРАВЛЕНО: Додаємо <int:registration_id> для захоплення ID з URL
-    path('declaration-response/record/<int:registration_id>/', views.record_declaration_response_view, name='record_declaration_response'),
     
-
+    # --- Декларації ---   
+	# --- URL-адреси для процесу реєстрації Декларацій ---
+    path('declarations/', views.declaration_list_view, name='list_declarations'),
+	path('declaration-registrations/', views.list_declaration_registrations_view, name='list_declaration_registrations'),
+    path('declaration-registration/send/', views.send_declaration_for_registration_view, name='send_declaration_for_registration'),
+    # Додаємо шлях для сторінки внесення відповіді
+    path('declaration-response/record/<int:submission_id>/', views.record_declaration_response_view, name='record_declaration_response'),
+    
 
 	path('processing-control/', views.processing_control_view, name='processing_control_dashboard'),
 	path('technical-task-control/', views.technical_task_control_view, name='technical_task_control'),
@@ -95,7 +97,7 @@ urlpatterns = [
    	path('attestation-registrations/', views.attestation_registration_list_view, name='list_attestation_registrations'), # URL для списку Відправок на реєстрацію
     path('attestation-responses/', views.attestation_response_list_view, name='list_attestation_responses'),  # URL для списку Отриманих відповідей на реєстрацію
 	path('azr/list/', views.azr_documents_list_view, name='list_azr_documents'),
-    
+	path('declaration-registrations/', views.list_declaration_registrations_view, name='list_declaration_registrations'),
 	
 	# path("person-autocomplete/", PersonAutocompleteView.as_view(), name="person_autocomplete"),
     path('declaration_process/', views.start_declaration_process_view, name='declaration_process_view'),
