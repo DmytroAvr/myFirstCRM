@@ -1198,7 +1198,7 @@ def send_azr_for_registration_view(request):
         'unit_selector': forms.ModelMultipleChoiceField(queryset=Unit.objects.order_by('name').filter(is_active=True), required=False),
         'page_title': 'Відправка Актів Завершення Робіт на реєстрацію'
     }
-    return render(request, 'oids/form/send_azr_for_registration.html', context)
+    return render(request, 'oids/forms/send_azr_for_registration.html', context)
 
 @login_required
 def record_azr_response_view(request, registration_id):
@@ -1238,7 +1238,7 @@ def record_azr_response_view(request, registration_id):
         'registration_request': registration_request,
         'page_title': f'Внесення відповіді на лист № {registration_request.outgoing_letter_number}'
     }
-    return render(request, 'oids/form/record_azr_response.html', context)
+    return render(request, 'oids/forms/record_azr_response.html', context)
 
 
 
@@ -1563,9 +1563,9 @@ def summary_information_hub_view(request):
         {'label': 'Відрядження', 'url_name': 'oids:list_trips'},
         {'label': 'Надсилання на реєстрацію Актів Атестації', 'url_name': 'oids:list_attestation_registrations'},
         {'label': 'Відповіді Реєстрація Атестації', 'url_name': 'oids:list_attestation_responses'},
-        {'label': 'Всі Акти зареєстровані Атестації', 'url_name': 'oids:list_registered_acts'},
+        {'label': 'Всі Акти Атестації (зареєстровані)', 'url_name': 'oids:list_registered_acts'},
         {'label': 'Всі AZR', 'url_name': 'oids:list_azr_documents'},
-        {'label': 'Всі Декларації (зареєстровані)', 'url_name': 'oids:list_declarations'},
+        {'label': 'Всі Декларації', 'url_name': 'oids:list_declarations'},
         {'label': 'Надсилання до частин пакетів документів', 'url_name': 'oids:list_trip_results_for_units'},
         {'label': 'Довідник: Територіальні управління', 'url_name': 'oids:list_territorial_managements'},
         {'label': 'Довідник: Групи військових частин', 'url_name': 'oids:list_unit_groups'},
