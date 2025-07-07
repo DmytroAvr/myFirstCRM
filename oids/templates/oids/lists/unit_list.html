@@ -47,9 +47,10 @@
 					{% url 'oids:list_units' as list_url %}
 					{% with tm_param_str=current_tm_id|default_if_none:""|stringformat:"s" search_param_str=current_search_query|default_if_none:"" %}
 					{% with base_params="territorial_management="|add:tm_param_str|add:"&search_query="|add:search_param_str %}
+					<th>№<br>з/п</th>
 					<th>
 						<a href="{{ list_url }}?sort_by=code&sort_order={% if current_sort_by == 'code' and not is_sorted_desc %}desc{% else %}asc{% endif %}&{{ base_params }}">
-							№<br>ВЧ {% if current_sort_by == 'code' %}{% if is_sorted_desc %}▼{% else %}▲{% endif %}{% endif %}
+							ВЧ {% if current_sort_by == 'code' %}{% if is_sorted_desc %}▼{% else %}▲{% endif %}{% endif %}
 						</a>
 					</th>
 					<th>
@@ -82,6 +83,7 @@
 			<tbody>
 				{% for unit in units %}
 				<tr>
+					<td>{{ page_obj.start_index|add:forloop.counter0 }}.</td>
 					<td>{{ unit.code }}</td>
 					<td>{{ unit.city }}</td>
 					<td>{{ unit.territorial_management.name|default:"Не вказано" }}</td>

@@ -1,0 +1,4 @@
+unit_code,cipher,serial_number,inventory_number,room,security_level
+1101,ДЕКЛ-001,SN-111,INV-111,Кімната 101,ДСК
+1101,ДЕКЛ-002,SN-222,INV-222,Кімната 102,ДСК
+A0000,ДЕКЛ-003-Ц,SN-333,INV-333,Кабінет 5,ДСК

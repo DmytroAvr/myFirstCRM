@@ -135,3 +135,22 @@ return "\n".join(
 RECEIVED_REQUEST = 'отримано заявку', 'Отримано Заявку' 
 
 RECEIVED_REQUEST_ACTIVE = 'отримано заявку (активний ОІД)', 'Отримано Заявку (активний ОІД)' 	
+
+
+
+
+<th style="width: {{ table_config.number_column_width }};">№<br>з/п</th>
+
+    context = {
+        'page_title': 'Список Об\'єктів Інформаційної Діяльності (ОІД)',
+        'object_list': page_obj,
+        'page_obj': page_obj,
+        'form': form, 
+        'current_sort_by': sort_by_param.lstrip('-'),
+        'current_sort_order_is_desc': sort_by_param.startswith('-'),
+        'table_config': {
+			'number_column_width': '40px',
+			# 'unit_column_width': '80px',
+			# інші налаштування
+		}
+    }

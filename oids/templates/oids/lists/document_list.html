@@ -54,19 +54,52 @@
     <div class="table-responsive">
         <table class="table table-striped table-bordered table-hover">
             <thead class="thead-dark">
-                <tr>
-                    <th>№<br>з/п</th>
-                    <th>ВЧ</th>
-                    <th>ОІД</th>
-                    <th>Тип документа</th>
-                    <th>Підг. №</th>
-                    <th>Підг. від</th>
-                    <th>Дата проведення робіт</th>
-                    <th>Термін дії</th>
-                    <th>Автор</th>
-                    <th>Примітки</th>
-                </tr>
-            </thead>
+				<tr>
+					<th>№<br>з/п</th>
+					<th>
+						<a href="?{{ sort_url_part }}&sort_by=unit&sort_order={% if current_sort_by == 'unit' and current_sort_order == 'asc' %}desc{% else %}asc{% endif %}">
+							ВЧ {% if current_sort_by == 'unit' %}{% if current_sort_order == 'desc' %}▼{% else %}▲{% endif %}{% endif %}
+						</a>
+					</th>
+					<th>
+						<a href="?{{ sort_url_part }}&sort_by=oid&sort_order={% if current_sort_by == 'oid' and current_sort_order == 'asc' %}desc{% else %}asc{% endif %}">
+							ОІД {% if current_sort_by == 'oid' %}{% if current_sort_order == 'desc' %}▼{% else %}▲{% endif %}{% endif %}
+						</a>
+					</th>
+					<th>
+						<a href="?{{ sort_url_part }}&sort_by=doc_type&sort_order={% if current_sort_by == 'doc_type' and current_sort_order == 'asc' %}desc{% else %}asc{% endif %}">
+							Тип документа {% if current_sort_by == 'doc_type' %}{% if current_sort_order == 'desc' %}▼{% else %}▲{% endif %}{% endif %}
+						</a>
+					</th>
+					<th>
+						<a href="?{{ sort_url_part }}&sort_by=doc_num&sort_order={% if current_sort_by == 'doc_num' and current_sort_order == 'asc' %}desc{% else %}asc{% endif %}">
+							Підг. № {% if current_sort_by == 'doc_num' %}{% if current_sort_order == 'desc' %}▼{% else %}▲{% endif %}{% endif %}
+						</a>
+					</th>
+					<th>
+						<a href="?{{ sort_url_part }}&sort_by=proc_date&sort_order={% if current_sort_by == 'proc_date' and current_sort_order == 'asc' %}desc{% else %}asc{% endif %}">
+							Підг. від {% if current_sort_by == 'proc_date' %}{% if current_sort_order == 'desc' %}▼{% else %}▲{% endif %}{% endif %}
+						</a>
+					</th>
+					<th>
+						<a href="?{{ sort_url_part }}&sort_by=work_date&sort_order={% if current_sort_by == 'work_date' and current_sort_order == 'asc' %}desc{% else %}asc{% endif %}">
+							Дата робіт {% if current_sort_by == 'work_date' %}{% if current_sort_order == 'desc' %}▼{% else %}▲{% endif %}{% endif %}
+						</a>
+					</th>
+					<th>
+						<a href="?{{ sort_url_part }}&sort_by=exp_date&sort_order={% if current_sort_by == 'exp_date' and current_sort_order == 'asc' %}desc{% else %}asc{% endif %}">
+							Термін дії {% if current_sort_by == 'exp_date' %}{% if current_sort_order == 'desc' %}▼{% else %}▲{% endif %}{% endif %}
+						</a>
+					</th>
+					<th>
+						<a href="?{{ sort_url_part }}&sort_by=author&sort_order={% if current_sort_by == 'author' and current_sort_order == 'asc' %}desc{% else %}asc{% endif %}">
+							Автор {% if current_sort_by == 'author' %}{% if current_sort_order == 'desc' %}▼{% else %}▲{% endif %}{% endif %}
+						</a>
+					</th>
+					<th>Примітки</th>
+				</tr>
+			</thead>
+
             <tbody>
                 {% for doc in documents %}
                 <tr>

@@ -56,6 +56,7 @@
             <table class="table table-hover">
                    <thead>
 						<tr>
+							<th>№<br>з/п</th>
 							<th><a href="?{{ sort_url_part }}&sort={% if current_sort == 'oid__unit__code' %}-{% endif %}oid__unit__code">ВЧ</a></th>
 							<th><a href="?{{ sort_url_part }}&sort={% if current_sort == 'oid__cipher' %}-{% endif %}oid__cipher">Шифр ОІД</a></th>
 							<th><a href="?{{ sort_url_part }}&sort={% if current_sort == 'document_number' %}-{% endif %}document_number">Підг. №</a></th>
@@ -67,6 +68,7 @@
                 <tbody>
                     {% for doc in documents %}
                     <tr>
+						<td>{{ page_obj.start_index|add:forloop.counter0 }}.</td>
                         <td>{{ doc.oid.unit.code }}</td>
                         <td><a href="{% url 'oids:oid_detail_view_name' doc.oid.id %}">{{ doc.oid.cipher }}</a></td>
                         <td>{{ doc.document_number }}</td>

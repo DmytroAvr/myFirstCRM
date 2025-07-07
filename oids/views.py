@@ -1347,10 +1347,18 @@ def declaration_list_view(request):
 
     # --- Сортування ---
     sort_by = request.GET.get('sort', '-prepared_date')
-    valid_sort_fields = ['dsk_eot__unit__code', 'dsk_eot__cipher', 'prepared_number', 'prepared_date', 'registered_number', 'registered_date']
+    valid_sort_fields = [
+        'dsk_eot__unit__code',
+        'dsk_eot__cipher',
+        'prepared_number',
+        'prepared_date',
+        'registered_number',
+        'registered_date'
+        ]
     if sort_by.lstrip('-') in valid_sort_fields:
         queryset = queryset.order_by(sort_by)
-
+    
+	
     # --- Експорт в Excel ---
     if 'export' in request.GET:
         columns = {
@@ -1563,6 +1571,7 @@ def summary_information_hub_view(request):
         {'label': 'Відрядження', 'url_name': 'oids:list_trips'},
         {'label': 'Надсилання на реєстрацію Актів Атестації', 'url_name': 'oids:list_attestation_registrations'},
         {'label': 'Відповіді Реєстрація Атестації', 'url_name': 'oids:list_attestation_responses'},
+        {'label': 'Всі опрацьовані документи', 'url_name': 'oids:list_documents'},
         {'label': 'Всі Акти Атестації (зареєстровані)', 'url_name': 'oids:list_registered_acts'},
         {'label': 'Всі AZR', 'url_name': 'oids:list_azr_documents'},
         {'label': 'Всі Декларації', 'url_name': 'oids:list_declarations'},
@@ -1570,7 +1579,6 @@ def summary_information_hub_view(request):
         {'label': 'Довідник: Територіальні управління', 'url_name': 'oids:list_territorial_managements'},
         {'label': 'Довідник: Групи військових частин', 'url_name': 'oids:list_unit_groups'},
         {'label': 'Довідник: Типи документів', 'url_name': 'oids:list_document_types'},
-        {'label': 'Довідник: Опрацьовані документи', 'url_name': 'oids:list_documents'},
         {'label': 'Довідник: Виконавці (Особи)', 'url_name': 'oids:list_persons'},
     ]
     context = {
@@ -1581,13 +1589,15 @@ def summary_information_hub_view(request):
 
 @login_required 
 def document_list_view(request):
-
+	
     documents_list = Document.objects.select_related(
         'oid__unit',
         'document_type', 
         'author',
         'work_request_item__request'
-    ).order_by('-process_date', '-created_at')
+	)
+    # ).order_by('-process_date', '-created_at')
+	
     form = DocumentFilterForm(request.GET or None)
     if form.is_valid():
         if form.cleaned_data.get('unit'):
@@ -1608,7 +1618,33 @@ def document_list_view(request):
                 Q(oid__cipher__icontains=search_query) |
                 Q(note__icontains=search_query)
             ).distinct()
+            
+	# --- ОНОВЛЕНА ЛОГІКА СОРТУВАННЯ ---
+    sort_by = request.GET.get('sort_by', 'process_date') # Ключ для сортування
+    sort_order = request.GET.get('sort_order', 'desc')   # Напрямок
 
+    valid_sort_fields = {
+        'unit': 'oid__unit__code',
+        'oid': 'oid__cipher',
+        'doc_type': 'document_type__name',
+        'doc_num': 'document_number',
+        'proc_date': 'process_date',
+        'work_date': 'work_date',
+        'exp_date': 'expiration_date',
+        'author': 'author__full_name',
+    }
+    
+    order_by_field = valid_sort_fields.get(sort_by)
+    
+    if order_by_field:
+        if sort_order == 'desc':
+            order_by_field = f'-{order_by_field}'
+        documents_list = documents_list.order_by(order_by_field, '-created_at')
+    else:
+        # Сортування за замовчуванням
+        documents_list = documents_list.order_by('-process_date', '-created_at')
+    # --- КІНЕЦЬ БЛОКУ СОРТУВАННЯ ---
+    
     # --- ЛОГІКА ЕКСПОРТУ В EXCEL ---
     if request.GET.get('export') == 'excel':
         columns = {
@@ -1634,11 +1670,20 @@ def document_list_view(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+	# Готуємо параметри для URL-адрес сортування
+    query_params = request.GET.copy()
+    for key in ['sort_by', 'sort_order', 'page']:
+        if key in query_params:
+            del query_params[key]
+
     context = {
         'page_title': 'Список опрацьованих документів',
         'documents': page_obj,
         'page_obj': page_obj,
-        'form': form, # Передаємо форму в шаблон
+        'form': form,
+        'current_sort_by': sort_by,
+        'current_sort_order': sort_order,
+        'sort_url_part': query_params.urlencode(),
     }
     return render(request, 'oids/lists/document_list.html', context)
 
@@ -2555,9 +2600,29 @@ def attestation_registered_acts_list_view(request):
             )
 
     # 3. Сортування
-    sort_by = request.GET.get('sort_by', '-dsszzi_registered_date') # За замовчуванням - найновіші
-    # (можна додати більш складну логіку сортування, як на інших сторінках)
-    final_queryset = base_queryset.order_by(sort_by)
+    # ---  ПОВНОЦІННА ЛОГІКА СОРТУВАННЯ ---
+    sort_by = request.GET.get('sort_by', 'reg_date') # Ключ для сортування
+    sort_order = request.GET.get('sort_order', 'desc') # Напрямок
+
+    valid_sort_fields = {
+        'unit': 'oid__unit__code',
+        'oid': 'oid__cipher',
+        'prep_num': 'document_number',
+        'work_date': 'work_date',
+        'reg_num': 'dsszzi_registered_number',
+        'reg_date': 'dsszzi_registered_date',
+    }
+    
+    order_by_field = valid_sort_fields.get(sort_by)
+
+    if order_by_field:
+        if sort_order == 'desc':
+            order_by_field = f'-{order_by_field}'
+        final_queryset = base_queryset.order_by(order_by_field)
+    else:
+        # Сортування за замовчуванням, якщо передано невалідний параметр
+        final_queryset = base_queryset.order_by('-dsszzi_registered_date')
+    # --- КІНЕЦЬ БЛОКУ СОРТУВАННЯ ---
 
     # 4. Експорт в Excel
     if request.GET.get('export') == 'excel':
@@ -2583,11 +2648,21 @@ def attestation_registered_acts_list_view(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+	# Готуємо параметри для URL-адрес сортування
+    query_params = request.GET.copy()
+    for key in ['sort_by', 'sort_order', 'page']:
+        if key in query_params:
+            del query_params[key]
+            
     context = {
         'page_title': 'Реєстр Актів Атестації',
         'object_list': page_obj,
         'page_obj': page_obj,
         'form': form,
+        # Передаємо змінні для сортування в шаблон
+        'current_sort_by': sort_by,
+        'current_sort_order': sort_order,
+        'sort_url_part': query_params.urlencode(),
     }
     return render(request, 'oids/lists/attestation_registered_num_list.html', context)
 

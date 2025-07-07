@@ -1,4 +1,6 @@
-# oids/management/commands/import_real_data.py
+# D:\myFirstCRM\oids\management\commands\import_real_data.py
+
+# в файлі oids/management/commands/import_real_data.py
 
 import csv
 import datetime
@@ -6,46 +8,41 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from dateutil import parser as date_parser
 
-# Імпортуємо всі необхідні моделі
+# Імпортуємо ваші моделі (замініть на правильні імпорти для вашого проекту)
 from oids.models import (
-    TerritorialManagement, Unit, Person, DocumentType, OID, DskEot,
-    WorkRequest, WorkRequestItem, Document, Declaration,
-    Trip, TechnicalTask, DeclarationRegistration
+    TerritorialManagement, Unit, Person, DocumentType, OID,
+    WorkRequest, WorkRequestItem, Document
 )
 
+
 class Command(BaseCommand):
-    help = 'Імпорт даних з CSV файлів у правильному порядку'
+    help = 'Імпорт даних з CSV файлів'
 
     def add_arguments(self, parser):
         parser.add_argument('files', nargs='+', type=str, help='Шляхи до CSV файлів')
 
-    @transaction.atomic
     def handle(self, *args, **options):
         files = options['files']
         
-        # Визначаємо порядок імпорту, щоб уникнути помилок залежностей
-        import_order = [
-            ('tu.csv', self._import_territorial_managements),
-            ('units.csv', self._import_units),
-            ('persons.csv', self._import_persons),
-            ('document_types.csv', self._import_document_types),
-            ('oids.csv', self._import_oids),
-            ('dsk_eot.csv', self._import_dsk_eot), # <-- Нова модель
-            ('work_requests.csv', self._import_work_requests),
-            ('work_request_items.csv', self._import_work_request_items),
-            ('technical_tasks.csv', self._import_technical_tasks), # <-- Нова функція
-            ('documents.csv', self._import_documents),
-            ('declarations.csv', self._import_declarations), # <-- Нова модель
-            ('trips.csv', self._import_trips), # <-- Нова функція
-            # Додайте сюди файли для DeclarationRegistration, якщо потрібно
-        ]
-
-        for file_pattern, import_func in import_order:
-            for file_path in files:
-                if file_pattern in file_path:
-                    import_func(file_path)
-                    break # Переходимо до наступного типу файлу
-
+        # Порядок імпорту важливий через залежності між моделями
+        for file_path in files:
+            if 'tu.csv' in file_path:
+                self._import_territorial_managements(file_path) 
+            elif 'units.csv' in file_path:
+                self._import_units(file_path)
+            elif 'persons.csv' in file_path:
+                self._import_persons(file_path)
+            elif 'document_types.csv' in file_path:
+                self._import_document_types(file_path)
+            elif 'oids.csv' in file_path:
+                self._import_oids(file_path)
+            elif 'work_requests.csv' in file_path:
+                self._import_work_requests(file_path)
+            elif 'work_request_items.csv' in file_path:
+                self._import_work_request_items(file_path)
+            elif 'documents.csv' in file_path:
+                self._import_documents(file_path)
+    
     def _parse_date(self, date_string):
         """
         Автоматично парсить дату з різних форматів.
@@ -73,20 +70,19 @@ class Command(BaseCommand):
         for fmt in date_formats:
             try:
                 parsed_date = datetime.datetime.strptime(date_string, fmt)
-                return parsed_date.strftime('%Y-%m-%d')
-                # return parsed_date.date()
+                return parsed_date.date()
             except ValueError:
                 continue
         
         # Якщо стандартні формати не спрацювали, використовуємо dateutil
         try:
             parsed_date = date_parser.parse(date_string, dayfirst=True)  # dayfirst=True для європейського формату
-            return parsed_date.strftime('%Y-%m-%d')
-            # return parsed_date.date()
+            return parsed_date.date()
         except (ValueError, TypeError):
             return None
 
-    # --- ІСНУЮЧІ ФУНКЦІЇ ІМПОРТУ (залишаються без змін) ---
+
+    # --- Функції імпорту ---
 
     def _import_territorial_managements(self, file_path):
         self.stdout.write(f"Імпорт територіальних управлінь з {file_path}...")
@@ -126,6 +122,8 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f"Помилка: файл '{file_path}' не знайдено."))
             raise
             
+    # Додайте решту функцій _import... з попередньої відповіді сюди
+    # ... _import_persons, _import_document_types, і т.д. ...
     def _import_persons(self, file_path):
         self.stdout.write(f"Імпорт виконавців з {file_path}...")
         with open(file_path, mode='r', encoding='utf-8') as csvfile:
@@ -301,116 +299,5 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.ERROR(f"  НЕВІДОМА ПОМИЛКА в рядку {i} для документа '{document_number}': {e}"))
         
         self.stdout.write(self.style.SUCCESS('  Імпорт документів завершено.'))
-  
-    # --- НОВІ ФУНКЦІЇ ІМПОРТУ ---
-
-    def _import_dsk_eot(self, file_path):
-        self.stdout.write(f"Імпорт об'єктів ДСК ЕОТ з {file_path}...")
-        try:
-            with open(file_path, mode='r', encoding='utf-8') as csvfile:
-                reader = csv.DictReader(csvfile)
-                for row in reader:
-                    try:
-                        unit_instance = Unit.objects.get(code=row['unit_code'])
-                        DskEot.objects.get_or_create(
-                            cipher=row['cipher'],
-                            unit=unit_instance,
-                            defaults={
-                                'serial_number': row.get('serial_number'),
-                                'inventory_number': row.get('inventory_number'),
-                                'room': row.get('room'),
-                                'security_level': row.get('security_level', 'ДСК'),
-                            }
-                        )
-                    except Unit.DoesNotExist:
-                        self.stdout.write(self.style.WARNING(f"  Попередження: ВЧ з кодом '{row['unit_code']}' не знайдено для ДСК ЕОТ '{row['cipher']}'. Пропускаємо."))
-                        continue
-            self.stdout.write(self.style.SUCCESS('  Об\'єкти ДСК ЕОТ імпортовано.'))
-        except FileNotFoundError:
-            self.stdout.write(self.style.ERROR(f"Помилка: файл '{file_path}' не знайдено."))
-
-    def _import_declarations(self, file_path):
-        self.stdout.write(f"Імпорт Декларацій відповідності з {file_path}...")
-        try:
-            with open(file_path, mode='r', encoding='utf-8') as csvfile:
-                reader = csv.DictReader(csvfile)
-                for row in reader:
-                    try:
-                        dsk_eot_instance = DskEot.objects.get(cipher=row['dsk_eot_cipher'])
-                        Declaration.objects.get_or_create(
-                            prepared_number=row['prepared_number'],
-                            dsk_eot=dsk_eot_instance,
-                            defaults={
-                                'prepared_date': self._parse_date(row['prepared_date']),
-                                'registered_number': row.get('registered_number'),
-                                'registered_date': self._parse_date(row.get('registered_date')),
-                            }
-                        )
-                    except DskEot.DoesNotExist:
-                        self.stdout.write(self.style.WARNING(f"  Попередження: ДСК ЕОТ з шифром '{row['dsk_eot_cipher']}' не знайдено. Пропускаємо декларацію '{row['prepared_number']}'."))
-                        continue
-            self.stdout.write(self.style.SUCCESS('  Декларації відповідності імпортовано.'))
-        except FileNotFoundError:
-            self.stdout.write(self.style.ERROR(f"Помилка: файл '{file_path}' не знайдено."))
-
-    def _import_technical_tasks(self, file_path):
-        self.stdout.write(f"Імпорт Технічних Завдань з {file_path}...")
-        try:
-            with open(file_path, mode='r', encoding='utf-8') as csvfile:
-                reader = csv.DictReader(csvfile)
-                for row in reader:
-                    try:
-                        oid_instance = OID.objects.get(cipher=row['oid_cipher'])
-                        reviewed_by_instance = Person.objects.get(full_name=row['reviewed_by_full_name']) if row.get('reviewed_by_full_name') else None
-                        
-                        TechnicalTask.objects.get_or_create(
-                            oid=oid_instance,
-                            input_number=row['input_number'],
-                            defaults={
-                                'input_date': self._parse_date(row['input_date']),
-                                'read_till_date': self._parse_date(row['read_till_date']),
-                                'review_result': row['review_result'],
-                                'reviewed_by': reviewed_by_instance
-                            }
-                        )
-                    except OID.DoesNotExist:
-                        self.stdout.write(self.style.WARNING(f"  Попередження: ОІД '{row['oid_cipher']}' не знайдено для ТЗ '{row['input_number']}'. Пропускаємо."))
-                    except Person.DoesNotExist:
-                         self.stdout.write(self.style.WARNING(f"  Попередження: Виконавця '{row['reviewed_by_full_name']}' не знайдено для ТЗ '{row['input_number']}'. Пропускаємо."))
-            self.stdout.write(self.style.SUCCESS('  Технічні Завдання імпортовано.'))
-        except FileNotFoundError:
-            self.stdout.write(self.style.ERROR(f"Помилка: файл '{file_path}' не знайдено."))
-
-    def _import_trips(self, file_path):
-        self.stdout.write(f"Імпорт Відряджень з {file_path}...")
-        try:
-            with open(file_path, mode='r', encoding='utf-8') as csvfile:
-                reader = csv.DictReader(csvfile)
-                for row in reader:
-                    try:
-                        # Створюємо або знаходимо відрядження за унікальним полем, наприклад, purpose
-                        trip_instance, created = Trip.objects.get_or_create(
-                            purpose=row['purpose'],
-                            start_date=self._parse_date(row['start_date']),
-                            end_date=self._parse_date(row['end_date']),
-                        )
-                        if created:
-                            # Додаємо M2M зв'язки, якщо це новий запис
-                            unit_codes = [code.strip() for code in row.get('unit_codes', '').split(',') if code.strip()]
-                            oid_ciphers = [cipher.strip() for cipher in row.get('oid_ciphers', '').split(',') if cipher.strip()]
-                            person_names = [name.strip() for name in row.get('person_names', '').split(',') if name.strip()]
-                            wr_numbers = [num.strip() for num in row.get('wr_numbers', '').split(',') if num.strip()]
-
-                            trip_instance.units.set(Unit.objects.filter(code__in=unit_codes))
-                            trip_instance.oids.set(OID.objects.filter(cipher__in=oid_ciphers))
-                            trip_instance.persons.set(Person.objects.filter(full_name__in=person_names))
-                            trip_instance.work_requests.set(WorkRequest.objects.filter(incoming_number__in=wr_numbers))
-                            
-                            self.stdout.write(f"  Створено відрядження: '{trip_instance.purpose[:50]}...'")
-                        else:
-                            self.stdout.write(f"  Відрядження '{trip_instance.purpose[:50]}...' вже існує.")
-                    except Exception as e:
-                        self.stdout.write(self.style.ERROR(f"  Помилка при обробці рядка для відрядження '{row.get('purpose')}': {e}"))
-            self.stdout.write(self.style.SUCCESS('  Відрядження імпортовано.'))
-        except FileNotFoundError:
-            self.stdout.write(self.style.ERROR(f"Помилка: файл '{file_path}' не знайдено."))
+        
+	
