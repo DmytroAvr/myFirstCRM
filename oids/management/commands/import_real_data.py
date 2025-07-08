@@ -156,6 +156,27 @@ class Command(BaseCommand):
                 )
         self.stdout.write(self.style.SUCCESS('  Типи документів імпортовано.'))
 
+    # def _import_oids(self, file_path):
+    #     self.stdout.write(f"Імпорт ОІД з {file_path}...")
+    #     with open(file_path, mode='r', encoding='utf-8') as csvfile:
+    #         reader = csv.DictReader(csvfile)
+    #         for row in reader:
+    #             try:
+    #                 unit_instance = Unit.objects.get(code=row['unit_code'])
+    #                 OID.objects.get_or_create(
+    #                     cipher=row['cipher'],
+    #                     defaults={ # Змінив на defaults, щоб не оновлювати існуючі ОІД
+    #                         'unit': unit_instance,
+    #                         'oid_type': row['oid_type'], 'full_name': row['full_name'],
+    #                         'room': row['room'], 'status': row['status'],
+    #                         'sec_level': row['sec_level']
+    #                     }
+    #                 )
+    #             except Unit.DoesNotExist:
+    #                 self.stdout.write(self.style.WARNING(f"  Попередження: ВЧ з кодом '{row['unit_code']}' не знайдено для ОІД '{row['cipher']}'. Пропускаємо."))
+    #                 continue
+    #     self.stdout.write(self.style.SUCCESS('  ОІД імпортовано.'))
+
     def _import_oids(self, file_path):
         self.stdout.write(f"Імпорт ОІД з {file_path}...")
         with open(file_path, mode='r', encoding='utf-8') as csvfile:
@@ -163,20 +184,44 @@ class Command(BaseCommand):
             for row in reader:
                 try:
                     unit_instance = Unit.objects.get(code=row['unit_code'])
-                    OID.objects.get_or_create(
+                    
+                    # Створюємо або знаходимо ОІД за його унікальним шифром
+                    oid_instance, created = OID.objects.get_or_create(
                         cipher=row['cipher'],
-                        defaults={ # Змінив на defaults, щоб не оновлювати існуючі ОІД
+                        # Ми шукаємо за шифром, тому він має бути унікальним.
+                        # Якщо шифри не унікальні, потрібно додати unit до пошуку:
+                        # unit=unit_instance,
+                        defaults={
                             'unit': unit_instance,
-                            'oid_type': row['oid_type'], 'full_name': row['full_name'],
-                            'room': row['room'], 'status': row['status'],
-                            'sec_level': row['sec_level']
+                            'oid_type': row['oid_type'],
+                            'full_name': row['full_name'],
+                            'room': row['room'],
+                            'status': row['status'],
+                            'sec_level': row.get('sec_level', 'Таємно'), # Значення за замовчуванням, якщо поле відсутнє
+                            
+                            # --- НОВІ ПОЛЯ ---
+                            # Використовуємо .get() для необов'язкових полів.
+                            # Якщо в CSV немає стовпця, .get() поверне None, і поле в базі буде NULL.
+                            'pemin_sub_type': row.get('pemin_sub_type') or None,
+                            'serial_number': row.get('serial_number') or None,
+                            'inventory_number': row.get('inventory_number') or None,
+                            'note': row.get('note') or None,
                         }
                     )
+                    
+                    if created:
+                        self.stdout.write(f"  Створено ОІД: {oid_instance.cipher}")
+                    else:
+                        self.stdout.write(f"  ОІД {oid_instance.cipher} вже існує, не оновлювався.")
+
                 except Unit.DoesNotExist:
                     self.stdout.write(self.style.WARNING(f"  Попередження: ВЧ з кодом '{row['unit_code']}' не знайдено для ОІД '{row['cipher']}'. Пропускаємо."))
                     continue
-        self.stdout.write(self.style.SUCCESS('  ОІД імпортовано.'))
-
+                except Exception as e:
+                    self.stdout.write(self.style.ERROR(f"  Помилка при обробці ОІД '{row.get('cipher', 'N/A')}': {e}"))
+                    
+        self.stdout.write(self.style.SUCCESS('  Імпорт ОІД завершено.'))
+        
     def _import_work_requests(self, file_path):
         self.stdout.write(f"Імпорт заявок на роботи з {file_path}...")
         with open(file_path, mode='r', encoding='utf-8') as csvfile:
