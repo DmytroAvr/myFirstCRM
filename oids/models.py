@@ -4,6 +4,7 @@ from django.utils import timezone
 import datetime
 from django.db.models import Q
 from simple_history.models import HistoricalRecords
+from dateutil.relativedelta import relativedelta 
 	
 # --- CONSTANTS / CHOICES ---
 # Краще зберігати вибори в окремих файлах або в самих моделях, якщо вони специфічні для моделі.
@@ -938,9 +939,19 @@ class Document(models.Model):
             try:
                 # КЛЮЧОВИЙ МОМЕНТ: Примусово перетворюємо duration_months на число (int)
                 duration = int(self.document_type.duration_months)
+                print(f"DEBUG: duration {duration} ")
                 if duration > 0:
-                    from dateutil.relativedelta import relativedelta 
+                    print(f"DEBUG: 0 < {duration} ")
+                    
+                    print(f"DEBUG: duration {self.work_date} ")
                     self.expiration_date = self.work_date + relativedelta(months=duration)
+                    print(f"DEBUG: duration {relativedelta.months} ")
+                    print(f"DEBUG: duration {str(relativedelta)} ")
+                    print(f"DEBUG: expiration_date {str(self.expiration_date)} ")
+                    print(f"DEBUG: expiration_date {int(self.expiration_date)} ")
+                    print(f"DEBUG: self.document_type.duration_months {self.document_type.duration_months} ")
+                    print(f"DEBUG: duration {duration} ")
+                    print(f"DEBUG: duration {self.work_date} ")
                 else:
                     self.expiration_date = None
             except (ValueError, TypeError):
