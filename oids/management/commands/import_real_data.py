@@ -267,58 +267,62 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.WARNING(f"  Попередження: ОІД з шифром '{row['oid_cipher']}' не знайдено. Пропускаємо елемент."))
                     continue
         self.stdout.write(self.style.SUCCESS('  Елементи заявок імпортовано.'))
+        
           
     def _import_documents(self, file_path):
         self.stdout.write(f"Імпорт документів з {file_path}...")
         
         with open(file_path, mode='r', encoding='utf-8') as csvfile:
             reader = csv.DictReader(csvfile)
-            for i, row in enumerate(reader, start=2): # i - номер рядка для логів
+            for i, row in enumerate(reader, start=2):
                 document_number = row.get('document_number', f'в рядку {i}')
                 try:
-                    # 1. Шукаємо всі зв'язки
-                    oid_instance = OID.objects.get(cipher=row['oid_cipher'])
+                    # --- 1. НАДІЙНИЙ ПОШУК ОІДа ЗА КОМБІНАЦІЄЮ ВЧ + ШИФР ---
+                    # Переконуємося, що в CSV є стовпці 'unit_code' та 'oid_cipher'
+                    unit_code = row['unit_code']
+                    oid_cipher = row['oid_cipher']
                     
+                    oid_instance = OID.objects.get(
+                        unit__code=unit_code,
+                        cipher=oid_cipher
+                    )
+                    
+                    # --- Решта логіки пошуку залишається без змін ---
                     doc_type_instance = DocumentType.objects.get(
                         name=row['document_type_name'],
                         oid_type=row['document_type_oid_type'],
                         work_type=row['document_type_work_type']
                     )
-                    
                     author_instance = Person.objects.get(full_name=row['author_full_name'])
 
-                    # 2. Парсимо дати з автоматичним визначенням формату
+                    # --- 2. Парсинг дат (без змін) ---
                     process_date = self._parse_date(row.get('process_date'))
                     work_date = self._parse_date(row.get('work_date'))
                     dsszzi_registered_date = self._parse_date(row.get('dsszzi_registered_date'))
                     
-                    # Перевіряємо чи обов'язкові дати були успішно розпарсені
-                    if not process_date:
-                        raise ValueError(f"Не вдалося розпарсити process_date: '{row.get('process_date')}'")
-                    if not work_date:
-                        raise ValueError(f"Не вдалося розпарсити work_date: '{row.get('work_date')}'")
+                    if not process_date or not work_date:
+                        raise ValueError(f"Обов'язкові дати (process_date, work_date) не можуть бути порожніми.")
 
-                    # 3. Зв'язок з WorkRequestItem є опційним
+                    # --- 3. Зв'язок з WorkRequestItem (без змін) ---
                     wri_instance = None
                     if row.get('wri_request_number') and row.get('wri_oid_cipher'):
                         try:
-                            # Уточнений пошук WRI
+                            # Шукаємо WRI, використовуючи вже точно знайдений ОІД
                             wri_instance = WorkRequestItem.objects.get(
                                 request__incoming_number=row['wri_request_number'],
-                                oid__cipher=row['wri_oid_cipher'],
-                                # Для надійності можна додати work_type, якщо він є в CSV
-                                # work_type=row['wri_work_type'] 
+                                oid=oid_instance 
                             )
                         except WorkRequestItem.DoesNotExist:
-                             self.stdout.write(self.style.WARNING(f"  Попередження для документа '{document_number}': WRI для заявки '{row.get('wri_request_number')}' та ОІД '{row.get('wri_oid_cipher')}' не знайдено."))
+                            self.stdout.write(self.style.WARNING(f"  Попередження: WRI для заявки '{row.get('wri_request_number')}' та ОІД '{row.get('wri_oid_cipher')}' не знайдено."))
                         except WorkRequestItem.MultipleObjectsReturned:
-                             self.stdout.write(self.style.WARNING(f"  Попередження для документа '{document_number}': Знайдено декілька WRI. Зв'язок не встановлено."))
-
-                    # 4. Створюємо або оновлюємо документ
-                    doc, created = Document.objects.get_or_create(
+                            self.stdout.write(self.style.WARNING(f"  Попередження: Знайдено декілька WRI для документа '{document_number}'. Зв'язок не встановлено."))
+                    
+                   # 4. Створюємо АБО ОНОВЛЮЄМО документ
+                    # Використовуємо update_or_create для гарантованого оновлення
+                    doc, created = Document.objects.update_or_create(
                         document_number=document_number,
+                        oid=oid_instance,
                         defaults={
-                            'oid': oid_instance,
                             'document_type': doc_type_instance,
                             'process_date': process_date,
                             'work_date': work_date,
@@ -328,14 +332,27 @@ class Command(BaseCommand):
                             'dsszzi_registered_date': dsszzi_registered_date,
                         }
                     )
+                    print(f"DEBUG: self.document_type {doc_type_instance}  ")
+                    print(f"DEBUG: self.document_type {row.get('document_type_name')}  ")
+                    print(f"DEBUG: self.document_type {row.get('document_type_oid_type')}  ")
+                    print(f"DEBUG: self.document_type {row.get('document_type_work_type')}  ")
+                    print(f"DEBUG: self.document_type {row.get('process_date')}  ")
+                    print(f"DEBUG: self.document_type {row.get('work_date')}  ")
+                    print(f"DEBUG: self.document_type {row.get('author')}  ")
+                    print(f"DEBUG: self.document_type {row.get('work_request_item')}  ")
+                    print(f"DEBUG: self.document_type {row.get('dsszzi_registered_number')}  ")
+                    print(f"DEBUG: self.document_type {row.get('dsszzi_registered_date')}  ")
+
                     if not created:
-                        self.stdout.write(f"  Документ '{document_number}' вже існує. Дані не оновлено.")
+                        self.stdout.write(f"  Документ '{document_number}' для ОІД '{oid_cipher}' вже існує.")
                     else:
                         self.stdout.write(f"  Успішно імпортовано документ '{document_number}'")
 
-                # --- Блок обробки помилок для одного рядка ---
+                # --- Блок обробки помилок ---
                 except OID.DoesNotExist:
-                    self.stdout.write(self.style.ERROR(f"  ПОМИЛКА в рядку {i}: Не вдалося імпортувати документ '{document_number}'. Причина: ОІД з шифром '{row.get('oid_cipher')}' не знайдено."))
+                    self.stdout.write(self.style.ERROR(f"  ПОМИЛКА в рядку {i}: Не вдалося імпортувати документ '{document_number}'. Причина: ОІД з шифром '{row.get('oid_cipher')}' для ВЧ '{row.get('unit_code')}' не знайдено."))
+                except KeyError as e:
+                    self.stdout.write(self.style.ERROR(f"  ПОМИЛКА в рядку {i}: У CSV-файлі відсутній необхідний стовпець: {e}."))
                 except DocumentType.DoesNotExist:
                     self.stdout.write(self.style.ERROR(f"  ПОМИЛКА в рядку {i}: Не вдалося імпортувати документ '{document_number}'. Причина: Тип документа з параметрами (name='{row.get('document_type_name')}', oid_type='{row.get('document_type_oid_type')}', work_type='{row.get('document_type_work_type')}') не знайдено в базі."))
                 except Person.DoesNotExist:

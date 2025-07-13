@@ -236,6 +236,7 @@ class OID(models.Model):
     class Meta:
         verbose_name = "Об’єкт інформаційної діяльності (ОІД)"
         verbose_name_plural = "Об’єкти інформаційної діяльності (ОІД)"
+        unique_together = ('unit', 'cipher')
 
 class Person(models.Model):
     """
@@ -930,23 +931,34 @@ class Document(models.Model):
         return "N/A"
     
     def save(self, *args, **kwargs):
-        old_instance = Document.objects.filter(pk=self.pk).first()
-        
-		 # Логіка обчислення expiration_date
-        if self.document_type and self.document_type.has_expiration and self.document_type.duration_months > 0 and self.work_date:
-            from dateutil.relativedelta import relativedelta 
-            self.expiration_date = self.work_date + relativedelta(months=self.document_type.duration_months)
+        # === БЛОК 1: Логіка, що виконується ДО збереження в базу даних ===
+
+        # 1.1. Розрахунок терміну дії (expiration_date)
+        if self.document_type and self.document_type.has_expiration and self.document_type.duration_months and self.work_date:
+            try:
+                # КЛЮЧОВИЙ МОМЕНТ: Примусово перетворюємо duration_months на число (int)
+                duration = int(self.document_type.duration_months)
+                if duration > 0:
+                    from dateutil.relativedelta import relativedelta 
+                    self.expiration_date = self.work_date + relativedelta(months=duration)
+                else:
+                    self.expiration_date = None
+            except (ValueError, TypeError):
+                # Якщо перетворення на int не вдалося (напр., там не число), ігноруємо
+                self.expiration_date = None
         else:
-            # Якщо у документа немає терміну дії або не вказана дата робіт, дата завершення дії не встановлюється
-             if not (self.document_type and self.document_type.has_expiration and self.document_type.duration_months > 0):
-                self.expiration_date = None # Очищаємо, якщо умови не виконані
-                
-        # old_instance = self.__class__.objects.filter(pk=self.pk).first()
-        # Виконуємо стандартне збереження
+            self.expiration_date = None
+
+        # 1.2. Отримуємо стан об'єкта з бази даних ДО того, як ми його змінимо.
+        old_instance = self.__class__.objects.filter(pk=self.pk).first()
+        
+        # === БЛОК 2: Виконуємо стандартне збереження ===
         super().save(*args, **kwargs)
 
-        # --- Початок блоку оновлення статусів ---
-
+        # === БЛОК 3: Логіка "ефекту доміно" ПІСЛЯ збереження ===
+        
+        if not self.work_request_item:
+            return
         # 1. Надійно визначаємо типи документів за їхніми назвами
         try:
                 attestation_doc_type = DocumentType.objects.get(name__icontains='Акт атестації')

@@ -80,6 +80,11 @@ python manage.py import_real_data tu.csv units.csv
 <!-- актуально -->
 python manage.py import_real_data tu.csv units.csv persons.csv document_types.csv oids.csv work_requests.csv work_request_items.csv documents.csv
 
+<!-- актуально -->
+python manage.py import_real_data ./realdata/tu.csv ./realdata/units.csv ./realdata/persons.csv ./realdata/document_types.csv ./realdata/oids.csv ./realdata/dsk_eot.csv ./realdata/work_requests.csv ./realdata/work_request_items.csv ./realdata/technical_tasks.csv ./realdata/documents.csv ./realdata/declarations.csv ./realdata/trips.csv
+
+
+
 1. запропонуй атрибути які можуть допомогти узагальнювати інформацію. в яких моделях є потреба в їх доданні. спитай мене про кожній моделі, яка інформація та звязок може бути корисним. на підставі запитань запропонуй нову будову атрибутів та звязків
 
 
