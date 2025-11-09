@@ -65,7 +65,7 @@
                                 {% for doc in reg.registered_documents.all %}
                                 <li>
                                     <a href="{% url 'oids:oid_detail_view_name' doc.oid.id %}#doc-{{ doc.id }}">
-                                        {{ doc.oid.cipher }} (підг. № {{ doc.document_number }} від {{ doc.process_date|date:"d.m.Y" }})
+                                        {{ doc.oid.cipher }} (підг. № {{ doc.document_number }} від {{ doc.doc_process_date|date:"d.m.Y" }})
                                     </a>
                                 </li>
                                 {% endfor %}

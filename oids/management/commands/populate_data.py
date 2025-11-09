@@ -261,7 +261,7 @@ class Command(BaseCommand):
             oid=oid_pemin_101,
             defaults={
                 'work_request_item': wri_attestation,
-                'process_date': datetime.date(2025, 6, 20),
+                'doc_process_date': datetime.date(2025, 6, 20),
                 'work_date': datetime.date(2025, 6, 15),
                 'author': person_petrenko,
                 'note': 'Акт підготовлено, очікує відправки на реєстрацію.'
@@ -277,7 +277,7 @@ class Command(BaseCommand):
             oid=oid_pemin_101,
             defaults={
                 'work_request_item': wri_ik,
-                'process_date': datetime.date(2025, 6, 21),
+                'doc_process_date': datetime.date(2025, 6, 21),
                 'work_date': datetime.date(2025, 6, 15),
                 'author': person_petrenko,
                 'note': 'Висновок підготовлено.'

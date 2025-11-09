@@ -227,7 +227,7 @@
                 <tr id="doc-{{ doc.id }}">
                     <td>{{ doc.document_type.name }}</td>
                     <td>{{ doc.document_number }}</td>
-                    <td>{{ doc.process_date|date:"d.m.Y" }}</td>
+                    <td>{{ doc.doc_process_date|date:"d.m.Y" }}</td>
                     <td>{{ doc.work_date|date:"d.m.Y" }}</td>
                     <td>
                         {% if doc.expiration_date %}

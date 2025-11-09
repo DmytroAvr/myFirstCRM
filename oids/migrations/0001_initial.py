@@ -110,7 +110,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('document_number', models.CharField(default='27/14-', max_length=50, verbose_name='Підготовлений № документа')),
-                ('process_date', models.DateField(verbose_name='Дата опрацювання')),
+                ('doc_process_date', models.DateField(verbose_name='Дата опрацювання')),
                 ('work_date', models.DateField(verbose_name='Дата проведення робіт')),
                 ('attachment', models.FileField(blank=True, null=True, upload_to='attestation_docs/', verbose_name='Прикріплений файл (Опційно)')),
                 ('note', models.TextField(blank=True, null=True, verbose_name='Примітки')),
@@ -127,7 +127,7 @@ class Migration(migrations.Migration):
             options={
                 'verbose_name': 'Опрацьований документ',
                 'verbose_name_plural': 'Опрацьовані документи',
-                'ordering': ['-process_date', '-work_date'],
+                'ordering': ['-doc_process_date', '-work_date'],
             },
         ),
         migrations.CreateModel(
@@ -227,7 +227,7 @@ class Migration(migrations.Migration):
             name='TripResultForUnit',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('process_date', models.DateField(verbose_name='Дата відправки до частини')),
+                ('doc_process_date', models.DateField(verbose_name='Дата відправки до частини')),
                 ('attachment', models.FileField(blank=True, null=True, upload_to='trip_results_docs/', verbose_name='Файл (опційно)')),
                 ('note', models.TextField(blank=True, null=True, verbose_name='Примітка')),
                 ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Дата створення запису')),

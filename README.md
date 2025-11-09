@@ -33,11 +33,11 @@ https://www.w3schools.com/django/django_install_django.php
 
 # !install Django
 python -m pip install Django
-pip install django-multiselectfield
-pip install django-tomselect
-pip install python-dateutil
-pip install django-simple-history
-pip install openpyxl
+python -m pip install django-multiselectfield
+python -m pip install django-tomselect
+python -m pip install python-dateutil
+python -m pip install django-simple-history
+python -m pip install openpyxl
 
 <!-- pip install django-import-export -->
 
@@ -124,14 +124,14 @@ http://127.0.0.1:8000/oids/attestation/new/
 <!-- date -->
 
 return "\n".join(
-	[f"{doc.oid.cipher} ({doc.document_number} від {doc.process_date.strftime('%d.%m.%Y')})" for doc in self.registered_documents.all()]
+	[f"{doc.oid.cipher} ({doc.document_number} від {doc.doc_process_date.strftime('%d.%m.%Y')})" for doc in self.registered_documents.all()]
 )
 
 форматувати цю дату всередині самого методу за допомогою .strftime('%d.%m.%Y').
 
 
 в html 
-{{ form.instance.process_date|date:"d.m.Y" }}
+{{ form.instance.doc_process_date|date:"d.m.Y" }}
 
 реалізувати 
 

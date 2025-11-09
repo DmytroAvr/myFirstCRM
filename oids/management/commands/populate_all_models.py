@@ -164,7 +164,7 @@ def populate_all():
                 defaults={
                     'oid': wri.oid,
                     'document_number': f"27/14-{wri.work_type[:3]}-{i}",
-                    'process_date': FIXED_DATE,
+                    'doc_process_date': FIXED_DATE,
                     'work_date': FIXED_DATE - datetime.timedelta(days=i),
                     'author': random.choice(persons)
                 }

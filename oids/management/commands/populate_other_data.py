@@ -176,7 +176,7 @@ def populate_data():
             document_number=f"27/14-АА-{oid1.cipher}",
             defaults={
                 'work_request_item': wri1,
-                'process_date': FIXED_DATE,
+                'doc_process_date': FIXED_DATE,
                 'work_date': FIXED_DATE - datetime.timedelta(days=5), # Роботи були раніше
                 'author': person1,
                 'note': "Примітка для Документа Акт Атестації (Note)",
@@ -191,7 +191,7 @@ def populate_data():
             document_number=f"27/14-ВІК-{oid2.cipher}",
             defaults={
                 'work_request_item': wri2,
-                'process_date': FIXED_DATE,
+                'doc_process_date': FIXED_DATE,
                 'work_date': FIXED_DATE - datetime.timedelta(days=3),
                 'author': person1,
                 'note': "Примітка для Документа Висновок ІК (Note)",
@@ -262,7 +262,7 @@ def populate_data():
     if trip1 and 'doc1' in locals() and doc1:
         trfu1, created = TripResultForUnit.objects.get_or_create(
             trip=trip1,
-            process_date=FIXED_DATE + datetime.timedelta(days=1), # Дата відправки до частини
+            doc_process_date=FIXED_DATE + datetime.timedelta(days=1), # Дата відправки до частини
             defaults={
                 'note': "Примітка до Результатів відрядження для ВЧ (Note)",
                 'outgoing_letter_number': f"СУПРОВІД-{unit1.code}-{trip1.id}", # Генеруємо унікальний номер

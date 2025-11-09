@@ -12,6 +12,6 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AlterModelOptions(
             name='tripresultforunit',
-            options={'ordering': ['-process_date', '-id'], 'verbose_name': 'Результати відрядження для частини', 'verbose_name_plural': 'Результати відрядження для частин'},
+            options={'ordering': ['-doc_process_date', '-id'], 'verbose_name': 'Результати відрядження для частини', 'verbose_name_plural': 'Результати відрядження для частин'},
         ),
     ]

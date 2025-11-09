@@ -60,7 +60,7 @@
 							<th><a href="?{{ sort_url_part }}&sort={% if current_sort == 'oid__unit__code' %}-{% endif %}oid__unit__code">ВЧ</a></th>
 							<th><a href="?{{ sort_url_part }}&sort={% if current_sort == 'oid__cipher' %}-{% endif %}oid__cipher">Шифр ОІД</a></th>
 							<th><a href="?{{ sort_url_part }}&sort={% if current_sort == 'document_number' %}-{% endif %}document_number">Підг. №</a></th>
-							<th><a href="?{{ sort_url_part }}&sort={% if current_sort == 'process_date' %}-{% endif %}process_date">Від</a></th>
+							<th><a href="?{{ sort_url_part }}&sort={% if current_sort == 'doc_process_date' %}-{% endif %}doc_process_date">Від</a></th>
 							<th><a href="?{{ sort_url_part }}&sort={% if current_sort == 'dsszzi_registered_number' %}-{% endif %}dsszzi_registered_number">Зареєстрований №</a></th>
 							<th><a href="?{{ sort_url_part }}&sort={% if current_sort == 'dsszzi_registered_date' %}-{% endif %}dsszzi_registered_date">Від якого числа</a></th>
 						</tr>
@@ -72,7 +72,7 @@
                         <td>{{ doc.oid.unit.code }}</td>
                         <td><a href="{% url 'oids:oid_detail_view_name' doc.oid.id %}">{{ doc.oid.cipher }}</a></td>
                         <td>{{ doc.document_number }}</td>
-                        <td>{{ doc.process_date|date:"d.m.Y" }}</td>
+                        <td>{{ doc.doc_process_date|date:"d.m.Y" }}</td>
                         <td>{{ doc.dsszzi_registered_number|default:"-" }}</td>
                         <td>{{ doc.dsszzi_registered_date|date:"d.m.Y"|default:"-" }}</td>
                     </tr>

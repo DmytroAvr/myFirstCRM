@@ -4,7 +4,7 @@ from django.utils import timezone
 import datetime
 from django.db.models import Q
 from simple_history.models import HistoricalRecords
-from dateutil.relativedelta import relativedelta 
+from dateutil.relativedelta import relativedelta
 	
 # --- CONSTANTS / CHOICES ---
 # Краще зберігати вибори в окремих файлах або в самих моделях, якщо вони специфічні для моделі.
@@ -643,7 +643,7 @@ class AttestationRegistration(models.Model):
         """
 
         return "\n".join(
-            [f"{doc.oid.cipher} (підг. № {doc.document_number} від {doc.process_date.strftime('%d.%m.%Y')})" for doc in self.registered_documents.all()]
+            [f"{doc.oid.cipher} (підг. № {doc.document_number} від {doc.doc_process_date.strftime('%d.%m.%Y')})" for doc in self.registered_documents.all()]
         )
     
     def __str__(self):
@@ -853,7 +853,7 @@ class Document(models.Model):
         verbose_name="Тип документа"
     )
     document_number = models.CharField(max_length=50, default='27/14-', verbose_name="Підг. № документа")
-    process_date = models.DateField(verbose_name="Дата опрацювання документу (Підг.№ від)") # Дата внесення документа
+    doc_process_date = models.DateField(verbose_name="Дата опрацювання документу (Підг.№ від)") # Дата внесення документа
     work_date = models.DateField(verbose_name="Дата проведення робіт на ОІД") # Дата, коли роботи фактично проводилися
     author = models.ForeignKey(
         'Person', # Використовуємо рядок
@@ -933,33 +933,45 @@ class Document(models.Model):
     
     def save(self, *args, **kwargs):
         # === БЛОК 1: Логіка, що виконується ДО збереження в базу даних ===
-
-        # 1.1. Розрахунок терміну дії (expiration_date)
+		# 1.1. Розрахунок терміну дії (expiration_date)
         if self.document_type and self.document_type.has_expiration and self.document_type.duration_months and self.work_date:
             try:
-                # КЛЮЧОВИЙ МОМЕНТ: Примусово перетворюємо duration_months на число (int)
                 duration = int(self.document_type.duration_months)
-                print(f"DEBUG: duration {duration} ")
+                print(f"DEBUG: duration (from document_type.duration_months): {duration}")
+                
                 if duration > 0:
-                    print(f"DEBUG: 0 < {duration} ")
-                    
-                    print(f"DEBUG: duration {self.work_date} ")
-                    self.expiration_date = self.work_date + relativedelta(months=duration)
-                    print(f"DEBUG: duration {relativedelta.months} ")
-                    print(f"DEBUG: duration {str(relativedelta)} ")
-                    print(f"DEBUG: expiration_date {str(self.expiration_date)} ")
-                    print(f"DEBUG: expiration_date {int(self.expiration_date)} ")
-                    print(f"DEBUG: self.document_type.duration_months {self.document_type.duration_months} ")
-                    print(f"DEBUG: duration {duration} ")
-                    print(f"DEBUG: duration {self.work_date} ")
+                    delta = relativedelta(months=duration)
+                    if isinstance(self.work_date, str):
+                        # Використовуємо self._parse_date, якщо він у вас є, 
+                        # або просту конвертацію, якщо формат відомий (наприклад, 'YYYY-MM-DD')
+                        try:
+                            work_date_obj = datetime.datetime.strptime(self.work_date, '%Y-%m-%d').date()
+                        except ValueError:
+                            # Обробка помилки парсингу, якщо формат невірний
+                            print(f"ERROR: work_date '{self.work_date}' має невірний формат!")
+                            self.expiration_date = None
+                            return super().save(*args, **kwargs) # Перериваємо збереження з None
+                    elif self.work_date is not None:
+                        work_date_obj = self.work_date
+                    else:
+                        # Якщо work_date порожній, пропускаємо
+                        self.expiration_date = None
+                        return super().save(*args, **kwargs)
+        
+                    # --- Використовуємо об'єкт дати для розрахунку ---
+                    self.expiration_date = work_date_obj + delta
+    
+                    print(f"DEBUG: Calculated self.expiration_date object: {self.expiration_date}")
                 else:
                     self.expiration_date = None
-            except (ValueError, TypeError):
-                # Якщо перетворення на int не вдалося (напр., там не число), ігноруємо
+                    
+            # --- ВИПРАВЛЕНИЙ БЛОК EXCEPT (тепер він має 'as e') ---
+            except (ValueError, TypeError) as e:
+                print(f"ERROR calculating expiration_date: {e}") 
                 self.expiration_date = None
         else:
             self.expiration_date = None
-
+        
         # 1.2. Отримуємо стан об'єкта з бази даних ДО того, як ми його змінимо.
         old_instance = self.__class__.objects.filter(pk=self.pk).first()
         
@@ -1020,20 +1032,20 @@ class Document(models.Model):
                                 # Для атестації встановлюємо статус "До відправки"
                                 if wri.status != WorkRequestStatusChoices.TO_SEND:
                                         wri.status = WorkRequestStatusChoices.TO_SEND
-                                        wri.docs_actually_processed_on = self.process_date or datetime.date.today()
+                                        wri.docs_actually_processed_on = self.doc_process_date or datetime.date.today()
                                         wri.save(update_fields=['status', 'docs_actually_processed_on'])
                         else:  # АЗР або Декларація
                                 # Для АЗР та декларації встановлюємо статус "Виконано"
                                 if wri.status != WorkRequestStatusChoices.COMPLETED:
                                         wri.status = WorkRequestStatusChoices.COMPLETED
-                                        wri.docs_actually_processed_on = self.process_date or datetime.date.today()
+                                        wri.docs_actually_processed_on = self.doc_process_date or datetime.date.today()
                                         wri.save(update_fields=['status', 'docs_actually_processed_on'])
                 
                 elif should_process_ik:
                         # Для ІК встановлюємо статус "Виконано"
                         if wri.status != WorkRequestStatusChoices.COMPLETED:
                                 wri.status = WorkRequestStatusChoices.COMPLETED
-                                wri.docs_actually_processed_on = self.process_date or datetime.date.today()
+                                wri.docs_actually_processed_on = self.doc_process_date or datetime.date.today()
                                 wri.save(update_fields=['status', 'docs_actually_processed_on'])
 
         # 4. Обробляємо ОІД незалежно від наявності work_request_item
@@ -1068,7 +1080,7 @@ class Document(models.Model):
                                 if oid_to_update.status in statuses_for_first_attestation:
                                         new_status_enum = OIDStatusChoices.ATTESTED
                                         oid_to_update.status = new_status_enum
-                                        oid_to_update.note = f"Об'єкт атестовано {self.process_date.strftime('%d.%m.%Y') if self.process_date else ''}. ||"
+                                        oid_to_update.note = f"Об'єкт атестовано {self.doc_process_date.strftime('%d.%m.%Y') if self.doc_process_date else ''}. ||"
                                         oid_to_update.save(update_fields=['status', 'note'])
                                         
                                         # Створюємо запис в історії
@@ -1082,7 +1094,7 @@ class Document(models.Model):
                                 
                                 elif oid_to_update.status == OIDStatusChoices.ACTIVE:
                                         # Повторна атестація
-                                        attestation_note = f"Проведено чергову атестацію ({self.process_date.strftime('%d.%m.%Y') if self.process_date else ''}). ||"
+                                        attestation_note = f"Проведено чергову атестацію ({self.doc_process_date.strftime('%d.%m.%Y') if self.doc_process_date else ''}). ||"
                                         oid_to_update.note = f"{attestation_note}\n{oid_to_update.note or ''}".strip()
                                         oid_to_update.save(update_fields=['note'])
                                         
@@ -1131,7 +1143,7 @@ class Document(models.Model):
                         old_status = oid_to_update.get_status_display()
                         
                         # Додаємо нотатку про ІК
-                        ik_note = f"Проведено інструментальний контроль ({self.process_date.strftime('%d.%m.%Y') if self.process_date else ''}). ||"
+                        ik_note = f"Проведено інструментальний контроль ({self.doc_process_date.strftime('%d.%m.%Y') if self.doc_process_date else ''}). ||"
                         oid_to_update.note = f"{ik_note}\n{oid_to_update.note or ''}".strip()
                         oid_to_update.save(update_fields=['note'])
                         
@@ -1140,7 +1152,7 @@ class Document(models.Model):
                                 oid=oid_to_update,
                                 old_status=old_status,
                                 new_status=old_status,  # Статус залишається ACTIVE
-                                reason=f"Проведено інструментальний контроль (Висновок №{self.document_number} від {self.process_date.strftime('%d.%m.%Y')}) ||",
+                                reason=f"Проведено інструментальний контроль (Висновок №{self.document_number} від {self.doc_process_date.strftime('%d.%m.%Y')}) ||",
                                 initiating_document=self
                         )
                         
@@ -1149,7 +1161,7 @@ class Document(models.Model):
                         old_status = oid_to_update.get_status_display()
                         new_status_enum = OIDStatusChoices.ACTIVE
                         # Додаємо нотатку про ІК
-                        ik_note = f"Уточнити попередній статус ОІД.(був {old_status if old_status else ''}) Проведено інструментальний контроль ({self.process_date.strftime('%d.%m.%Y') if self.process_date else ''}) роботи проводились {self.work_date.strftime('%d.%m.%Y') if self.work_date else ''}. ||"
+                        ik_note = f"Уточнити попередній статус ОІД.(був {old_status if old_status else ''}) Проведено інструментальний контроль ({self.doc_process_date.strftime('%d.%m.%Y') if self.doc_process_date else ''}) роботи проводились {self.work_date.strftime('%d.%m.%Y') if self.work_date else ''}. ||"
                         oid_to_update.note = f"{ik_note}\n{oid_to_update.note or ''}".strip()
                         oid_to_update.save(update_fields=['note'])
                         oid_to_update.status = new_status_enum
@@ -1159,7 +1171,7 @@ class Document(models.Model):
                                 oid=oid_to_update,
                                 old_status=old_status,
                                 new_status=old_status,  # Статус залишається ACTIVE
-                                reason=f"Проведено інструментальний контроль (Висновок №{self.document_number} від {self.process_date.strftime('%d.%m.%Y')}) роботи проводились {self.work_date.strftime('%d.%m.%Y') if self.work_date else ''}.",
+                                reason=f"Проведено інструментальний контроль (Висновок №{self.document_number} від {self.doc_process_date.strftime('%d.%m.%Y')}) роботи проводились {self.work_date.strftime('%d.%m.%Y') if self.work_date else ''}.",
                                 initiating_document=self
                         )
 
@@ -1169,7 +1181,7 @@ class Document(models.Model):
     class Meta:
         verbose_name = "Опрацьований документ"
         verbose_name_plural = "Опрацьовані документи"
-        ordering = ['-process_date', '-work_date']
+        ordering = ['-doc_process_date', '-work_date']
             
 
 # --------------------------------------------------------------------------

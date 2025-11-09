@@ -16,10 +16,10 @@ class Migration(migrations.Migration):
         ),
         migrations.RemoveField(
             model_name='historicaltripresultforunit',
-            name='process_date',
+            name='doc_process_date',
         ),
         migrations.RemoveField(
             model_name='tripresultforunit',
-            name='process_date',
+            name='doc_process_date',
         ),
     ]

@@ -81,13 +81,13 @@
             
             {# Поле Process Date (Дата опрацювання документів) #}
             <div class="row mb-3 align-items-center">
-                <label for="{{ main_form.process_date.id_for_label }}" class="col-sm-3 col-form-label text-sm-end fw-bold">
-                    {{ main_form.process_date.label }}{% if main_form.process_date.field.required %}<span class="text-danger">*</span>{% endif %}:
+                <label for="{{ main_form.doc_process_date.id_for_label }}" class="col-sm-3 col-form-label text-sm-end fw-bold">
+                    {{ main_form.doc_process_date.label }}{% if main_form.doc_process_date.field.required %}<span class="text-danger">*</span>{% endif %}:
                 </label>
                 <div class="col-sm-9">
-                    {{ main_form.process_date }} {# Віджет DateInput з class 'form-control' #}
-                    {% if main_form.process_date.help_text %}<small class="form-text text-muted d-block">{{ main_form.process_date.help_text }}</small>{% endif %}
-                    {% for error in main_form.process_date.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                    {{ main_form.doc_process_date }} {# Віджет DateInput з class 'form-control' #}
+                    {% if main_form.doc_process_date.help_text %}<small class="form-text text-muted d-block">{{ main_form.doc_process_date.help_text }}</small>{% endif %}
+                    {% for error in main_form.doc_process_date.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
                 </div>
             </div>
 

@@ -241,13 +241,13 @@ class Command(BaseCommand):
                     author_instance = Person.objects.get(full_name=row['author_full_name'])
 
                     # 2. Парсимо дати з автоматичним визначенням формату
-                    process_date = self._parse_date(row.get('process_date'))
+                    doc_process_date = self._parse_date(row.get('doc_process_date'))
                     work_date = self._parse_date(row.get('work_date'))
                     dsszzi_registered_date = self._parse_date(row.get('dsszzi_registered_date'))
                     
                     # Перевіряємо чи обов'язкові дати були успішно розпарсені
-                    if not process_date:
-                        raise ValueError(f"Не вдалося розпарсити process_date: '{row.get('process_date')}'")
+                    if not doc_process_date:
+                        raise ValueError(f"Не вдалося розпарсити doc_process_date: '{row.get('doc_process_date')}'")
                     if not work_date:
                         raise ValueError(f"Не вдалося розпарсити work_date: '{row.get('work_date')}'")
 
@@ -273,7 +273,7 @@ class Command(BaseCommand):
                         defaults={
                             'oid': oid_instance,
                             'document_type': doc_type_instance,
-                            'process_date': process_date,
+                            'doc_process_date': doc_process_date,
                             'work_date': work_date,
                             'author': author_instance,
                             'work_request_item': wri_instance,

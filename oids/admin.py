@@ -75,7 +75,7 @@ class DocumentAdmin(SimpleHistoryAdmin):
         'document_type', 
         'oid', 
         'work_date', 
-        'process_date', 
+        'doc_process_date', 
         'author', 
         'attestation_registration_sent', # Додано нове поле
         'dsszzi_registered_number',      # Додано нове поле
@@ -83,7 +83,7 @@ class DocumentAdmin(SimpleHistoryAdmin):
     )
     list_filter = ('document_type', 'work_date', 'author', 'oid__unit', 'attestation_registration_sent')
     search_fields = ('document_number', 'oid__cipher', 'dsszzi_registered_number')
-    date_hierarchy = 'process_date'
+    date_hierarchy = 'doc_process_date'
     # history_list_display = ["document_type", 'work_date', 'author', 'oid__unit' ]
 
 

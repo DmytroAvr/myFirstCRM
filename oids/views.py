@@ -302,7 +302,7 @@ def ajax_load_attestation_acts_for_oid(request):
                     oid_id=oid_id,
                     document_type=attestation_act_doc_type,
                     attestation_registration_sent__isnull=True # Ключовий фільтр
-                ).select_related('oid__unit').order_by('-work_date', '-process_date')
+                ).select_related('oid__unit').order_by('-work_date', '-doc_process_date')
                 
                 for doc in acts_queryset:
                     acts_data.append({
@@ -645,7 +645,7 @@ def oid_detail_view(request, oid_id):
         'author',
         'work_request_item__request',
         'attestation_registration_sent' # Додаємо для доступу до даних відправки
-    ).order_by('-process_date', '-work_date')
+    ).order_by('-doc_process_date', '-work_date')
 
     # Отримуємо тільки документи типу "Акт атестації" для цього ОІД для секції реєстрації
     attestation_acts_for_oid = documents.filter(document_type__name__icontains="Акт атестації")
@@ -922,7 +922,7 @@ def get_last_document_expiration_date(oid_instance, document_name_keyword, work_
             oid=oid_instance, # Використовуємо переданий екземпляр OID
             document_type=relevant_doc_type,
             expiration_date__isnull=False
-        ).order_by('-work_date', '-process_date').first()
+        ).order_by('-work_date', '-doc_process_date').first()
         
         return last_document.expiration_date if last_document else None
     except Exception as e:
@@ -960,7 +960,7 @@ def add_document_processing_view(request, oid_id=None, work_request_item_id=None
             # Отримуємо дані з головної форми
             oid_instance = main_form.cleaned_data['oid']
             work_request_item_instance = main_form.cleaned_data.get('work_request_item') # Може бути None
-            process_date_from_main = main_form.cleaned_data['process_date']
+            doc_process_date_from_main = main_form.cleaned_data['doc_process_date']
             work_date_from_main = main_form.cleaned_data['work_date']
             author_instance = main_form.cleaned_data.get('author')
 
@@ -970,7 +970,7 @@ def add_document_processing_view(request, oid_id=None, work_request_item_id=None
                     document_instance = item_form.save(commit=False)
                     document_instance.oid = oid_instance
                     document_instance.work_request_item = work_request_item_instance
-                    document_instance.process_date = process_date_from_main
+                    document_instance.doc_process_date = doc_process_date_from_main
                     document_instance.work_date = work_date_from_main
                     document_instance.author = author_instance
                     
@@ -1172,7 +1172,7 @@ def send_azr_for_registration_view(request):
                         oid=oid_instance,
                         document_type=azr_doc_type,
                         document_number=form.cleaned_data.get('prepared_number'),
-                        process_date=form.cleaned_data.get('prepared_date'),
+                        doc_process_date=form.cleaned_data.get('prepared_date'),
                         work_date=form.cleaned_data.get('prepared_date'), # Можна використовувати одну дату
                         wcr_submission=registration_request,
                         # author=request.user.person
@@ -1596,7 +1596,7 @@ def document_list_view(request):
         'author',
         'work_request_item__request'
 	)
-    # ).order_by('-process_date', '-created_at')
+    # ).order_by('-doc_process_date', '-created_at')
 	
     form = DocumentFilterForm(request.GET or None)
     if form.is_valid():
@@ -1607,9 +1607,9 @@ def document_list_view(request):
         if form.cleaned_data.get('author'):
             documents_list = documents_list.filter(author__in=form.cleaned_data['author'])
         if form.cleaned_data.get('date_from'):
-            documents_list = documents_list.filter(process_date__gte=form.cleaned_data['date_from'])
+            documents_list = documents_list.filter(doc_process_date__gte=form.cleaned_data['date_from'])
         if form.cleaned_data.get('date_to'):
-            documents_list = documents_list.filter(process_date__lte=form.cleaned_data['date_to'])
+            documents_list = documents_list.filter(doc_process_date__lte=form.cleaned_data['date_to'])
 
         search_query = form.cleaned_data.get('search_query')
         if search_query:
@@ -1620,7 +1620,7 @@ def document_list_view(request):
             ).distinct()
             
 	# --- ОНОВЛЕНА ЛОГІКА СОРТУВАННЯ ---
-    sort_by = request.GET.get('sort_by', 'process_date') # Ключ для сортування
+    sort_by = request.GET.get('sort_by', 'doc_process_date') # Ключ для сортування
     sort_order = request.GET.get('sort_order', 'desc')   # Напрямок
 
     valid_sort_fields = {
@@ -1628,7 +1628,7 @@ def document_list_view(request):
         'oid': 'oid__cipher',
         'doc_type': 'document_type__name',
         'doc_num': 'document_number',
-        'proc_date': 'process_date',
+        'proc_date': 'doc_process_date',
         'work_date': 'work_date',
         'exp_date': 'expiration_date',
         'author': 'author__full_name',
@@ -1642,7 +1642,7 @@ def document_list_view(request):
         documents_list = documents_list.order_by(order_by_field, '-created_at')
     else:
         # Сортування за замовчуванням
-        documents_list = documents_list.order_by('-process_date', '-created_at')
+        documents_list = documents_list.order_by('-doc_process_date', '-created_at')
     # --- КІНЕЦЬ БЛОКУ СОРТУВАННЯ ---
     
     # --- ЛОГІКА ЕКСПОРТУ В EXCEL ---
@@ -1652,7 +1652,7 @@ def document_list_view(request):
             'oid__cipher': 'ОІД',
             'document_type__name': 'Тип документа',
             'document_number': 'Підг. №',
-            'process_date': 'Підг. від',
+            'doc_process_date': 'Підг. від',
             'work_date': 'Дата проведення робіт',
             'expiration_date': 'Термін дії', 
             'author__full_name': 'Автор',
@@ -2839,12 +2839,12 @@ def processing_control_view(request):
         document_type=attestation_act_type,
         dsszzi_registered_number__isnull=False,
         dsszzi_registered_date__isnull=False
-    ).order_by('-process_date').values('process_date')[:1]
+    ).order_by('-doc_process_date').values('doc_process_date')[:1]
 
     ik_date_subquery = Document.objects.filter(
         work_request_item=OuterRef('pk'),
         document_type=ik_conclusion_type
-    ).order_by('-process_date').values('process_date')[:1]
+    ).order_by('-doc_process_date').values('doc_process_date')[:1]
 
     # 2. Змінюємо головний фільтр: тепер ми шукаємо всі елементи, у яких
     #    батьківська заявка має хоча б одне відрядження.
@@ -3046,7 +3046,7 @@ def start_declaration_process_view(request):
                 # Можна встановити автора, якщо є логіка визначення поточного користувача
                 # author=request.user.person,
                 document_number=f"ДЕКЛ-{new_oid.cipher}", # Генерація унікального номера
-                process_date=datetime.date.today(),
+                doc_process_date=datetime.date.today(),
                 work_date=datetime.date.today(),
                 processing_status=DocumentProcessingStatusChoices.DRAFT # Початковий статус
             )
@@ -3110,15 +3110,15 @@ def azr_documents_list_view(request):
         # if filter_form.cleaned_data.get('registered_number'):
         #     queryset = queryset.filter(dsszzi_registered_number__icontains=filter_form.cleaned_data['registered_number'])
         # if filter_form.cleaned_data.get('date_from'):
-        #     queryset = queryset.filter(process_date__gte=filter_form.cleaned_data['date_from'])
+        #     queryset = queryset.filter(doc_process_date__gte=filter_form.cleaned_data['date_from'])
         # if filter_form.cleaned_data.get('date_to'):
-        #     queryset = queryset.filter(process_date__lte=filter_form.cleaned_data['date_to'])
+        #     queryset = queryset.filter(doc_process_date__lte=filter_form.cleaned_data['date_to'])
  
         pass
 
     # --- Сортування (залишається без змін) ---
-    sort_by = request.GET.get('sort', '-process_date')
-    valid_sort_fields = ['oid__unit__code', 'oid__cipher', 'document_number', 'process_date', 'dsszzi_registered_number', 'dsszzi_registered_date']
+    sort_by = request.GET.get('sort', '-doc_process_date')
+    valid_sort_fields = ['oid__unit__code', 'oid__cipher', 'document_number', 'doc_process_date', 'dsszzi_registered_number', 'dsszzi_registered_date']
     if sort_by.lstrip('-') in valid_sort_fields:
         queryset = queryset.order_by(sort_by)
 
@@ -3129,7 +3129,7 @@ def azr_documents_list_view(request):
             'oid__unit__code': 'ВЧ',
             'oid__cipher': 'Шифр ОІД',
             'document_number': 'Підг. №',
-            'process_date': 'Від',
+            'doc_process_date': 'Від',
             'dsszzi_registered_number': 'Зареєстрований № АЗР',
             'dsszzi_registered_date': 'Від якого числа',
         }

@@ -70,7 +70,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigIntegerField(auto_created=True, blank=True, db_index=True, verbose_name='ID')),
                 ('document_number', models.CharField(default='27/14-', max_length=50, verbose_name='Підготовлений № документа')),
-                ('process_date', models.DateField(verbose_name='Дата опрацювання')),
+                ('doc_process_date', models.DateField(verbose_name='Дата опрацювання')),
                 ('work_date', models.DateField(verbose_name='Дата проведення робіт')),
                 ('attachment', models.TextField(blank=True, max_length=100, null=True, verbose_name='Прикріплений файл (Опційно)')),
                 ('note', models.TextField(blank=True, null=True, verbose_name='Примітки')),
@@ -182,7 +182,7 @@ class Migration(migrations.Migration):
                 ('id', models.BigIntegerField(auto_created=True, blank=True, db_index=True, verbose_name='ID')),
                 ('outgoing_letter_number', models.CharField(max_length=50, verbose_name='Вих. номер супровідного листа')),
                 ('outgoing_letter_date', models.DateField(verbose_name='Вих. дата супровідного листа')),
-                ('process_date', models.DateField(verbose_name='Дата відправки до частини')),
+                ('doc_process_date', models.DateField(verbose_name='Дата відправки до частини')),
                 ('note', models.TextField(blank=True, null=True, verbose_name='Примітка')),
                 ('created_at', models.DateTimeField(blank=True, editable=False, verbose_name='Дата створення запису')),
                 ('updated_at', models.DateTimeField(blank=True, editable=False, verbose_name='Дата останнього оновлення')),

@@ -296,12 +296,12 @@ class Command(BaseCommand):
                     author_instance = Person.objects.get(full_name=row['author_full_name'])
 
                     # --- 2. Парсинг дат (без змін) ---
-                    process_date = self._parse_date(row.get('process_date'))
+                    doc_process_date = self._parse_date(row.get('doc_process_date'))
                     work_date = self._parse_date(row.get('work_date'))
                     dsszzi_registered_date = self._parse_date(row.get('dsszzi_registered_date'))
                     
-                    if not process_date or not work_date:
-                        raise ValueError(f"Обов'язкові дати (process_date, work_date) не можуть бути порожніми.")
+                    if not doc_process_date or not work_date:
+                        raise ValueError(f"Обов'язкові дати (doc_process_date, work_date) не можуть бути порожніми.")
 
                     # --- 3. Зв'язок з WorkRequestItem (без змін) ---
                     wri_instance = None
@@ -324,19 +324,20 @@ class Command(BaseCommand):
                         oid=oid_instance,
                         defaults={
                             'document_type': doc_type_instance,
-                            'process_date': process_date,
+                            'doc_process_date': doc_process_date,
                             'work_date': work_date,
                             'author': author_instance,
                             'work_request_item': wri_instance,
                             'dsszzi_registered_number': row.get('dsszzi_registered_number') or None,
                             'dsszzi_registered_date': dsszzi_registered_date,
+                            'expiration_date': None
                         }
                     )
                     print(f"DEBUG: self.document_type {doc_type_instance}  ")
                     print(f"DEBUG: self.document_type {row.get('document_type_name')}  ")
                     print(f"DEBUG: self.document_type {row.get('document_type_oid_type')}  ")
                     print(f"DEBUG: self.document_type {row.get('document_type_work_type')}  ")
-                    print(f"DEBUG: self.document_type {row.get('process_date')}  ")
+                    print(f"DEBUG: self.document_type {row.get('doc_process_date')}  ")
                     print(f"DEBUG: self.document_type {row.get('work_date')}  ")
                     print(f"DEBUG: self.document_type {row.get('author')}  ")
                     print(f"DEBUG: self.document_type {row.get('work_request_item')}  ")

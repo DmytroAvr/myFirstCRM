@@ -68,7 +68,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AlterField(
             model_name='document',
-            name='process_date',
+            name='doc_process_date',
             field=models.DateField(verbose_name='Дата опрацювання документу (Підг.№ від)'),
         ),
         migrations.AlterField(
@@ -103,7 +103,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AlterField(
             model_name='historicaldocument',
-            name='process_date',
+            name='doc_process_date',
             field=models.DateField(verbose_name='Дата опрацювання документу (Підг.№ від)'),
         ),
         migrations.AlterField(

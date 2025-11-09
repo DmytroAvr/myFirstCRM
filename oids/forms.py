@@ -207,11 +207,11 @@ class DocumentForm(forms.ModelForm):
         model = Document
         fields = [
             'oid', 'work_request_item', 'document_type', 'document_number', 
-            'process_date', 'work_date', 'author', 'note', 'attachment' # Додав attachment
+            'doc_process_date', 'work_date', 'author', 'note', 'attachment' # Додав attachment
         ]
         widgets = {
             'oid': forms.Select(attrs={'class': 'form-select tomselect-field', 'id': 'id_document_oid'}), # ID для JS
-            'process_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'doc_process_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'work_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'author': forms.Select(attrs={'class': 'form-select tomselect-field'}),
             'note': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
@@ -221,7 +221,7 @@ class DocumentForm(forms.ModelForm):
         labels = {
             'oid': "Об'єкт інформаційної діяльності",
             'document_number': "Підг. № документа (наприклад, 27/14-XXXX)",
-            'process_date': "Дата створення документа (від)",
+            'doc_process_date': "Дата створення документа (від)",
             'work_date': "Дата фактичного проведення робіт на ОІД",
             'author': "Автор/Виконавець документа",
             'note': "Примітки до документа",
@@ -297,7 +297,7 @@ class DocumentItemForm(forms.ModelForm):
     class Meta:
         model = Document
         fields = ['document_type', 'document_number', 'note']
-        # Поля oid, work_request_item, process_date, work_date, author будуть з головної форми
+        # Поля oid, work_request_item, doc_process_date, work_date, author будуть з головної форми
 
 # Головна форма для сторінки "Опрацювання документів"
 class DocumentProcessingMainForm(forms.Form):
@@ -318,7 +318,7 @@ class DocumentProcessingMainForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-select tomselect-field', 'id': 'id_proc_form_work_request_item'}),
         required=False 
     )
-    process_date = forms.DateField(
+    doc_process_date = forms.DateField(
         label="Дата опрацювання документів (підг. від)",
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         required=True

@@ -1,5 +1,5 @@
-unit_code,oid_cipher,document_type_name,document_type_oid_type,document_type_work_type,document_number,process_date,work_date,author_full_name,wri_request_number,wri_oid_cipher,dsszzi_registered_number,dsszzi_registered_date
-1241,ЗККС 1241,Акт атестації комплексу ТЗІ,СПІЛЬНИЙ,Атестація,227т,2025-01-31,2025-01-31,уточнити,,,уточнити,2025-01-31
-1241,КЧ 1241,Акт атестації комплексу ТЗІ,СПІЛЬНИЙ,Атестація,225т,2025-01-31,2025-01-31,уточнити,,,уточнити,2025-01-31
-1241,ОЧ 1241,Акт атестації комплексу ТЗІ,СПІЛЬНИЙ,Атестація,226т,2025-01-31,2025-01-31,уточнити,,,уточнити,2025-01-31
+unit_code,oid_cipher,document_type_name,document_type_oid_type,document_type_work_type,document_number,doc_process_date,work_date,author_full_name,wri_request_number,wri_oid_cipher,dsszzi_registered_number,dsszzi_registered_date
+1241,ЗККС 1241,Акт атестації комплексу ТЗІ,СПІЛЬНИЙ,Атестація,227т,2025-03-02,2025-01-30,уточнити,,,уточнити,2025-01-31
+1241,КЧ 1241,Акт атестації комплексу ТЗІ,СПІЛЬНИЙ,Атестація,226т,2025-03-02,2025-01-29,уточнити,,,уточнити,2025-01-31
+1241,ОЧ 1241,Акт атестації комплексу ТЗІ,СПІЛЬНИЙ,Атестація,225т,2025-03-02,2025-01-28,уточнити,,,уточнити,2025-01-31
 1241,ОЧ 1241,Висновок ІК,СПІЛЬНИЙ,СПІЛЬНИЙ,226т,2025-01-31,2025-01-31,уточнити,,,уточнити,2025-01-31
