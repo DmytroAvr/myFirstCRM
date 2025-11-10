@@ -59,7 +59,7 @@
                 <ul id="oidsActiveList">
                     {% for oid_data in oids_active %}
                         <li class="oid-item">
-                            <a href="{{ oid_data.detail_url }}">{{ oid_data.cipher }} - {{ oid_data.full_name }} ({{ oid_data.oid_type_display }})</a>
+                            <a href="{{ oid_data.detail_url }}">{{ oid_data.cipher }} - {{ oid_data.full_name }} ({{ oid_data.oid_type_display }}) (статус: {{ oid_data.status_display }})</a>
                             <div class="expirations" style="font-size: 0.8em; color: grey; margin-left: 10px;">
                                 {% if oid_data.ik_expiration_date %}ІК до: {{ oid_data.ik_expiration_date|date:"d.m.Y" }}<br>{% endif %}
                                 {% if oid_data.attestation_expiration_date %}Атестація до: {{ oid_data.attestation_expiration_date|date:"d.m.Y" }}<br>{% endif %}

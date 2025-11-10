@@ -50,6 +50,9 @@ class OIDStatusChoices(models.TextChoices):
     RECEIVED_TZ_REPEAT = 'очікуємо ТЗ/МЗ(повторно)', 'Очікуємо ТЗ/МЗ(повторно)'
     RECEIVED_TZ_APPROVE = 'ТЗ/МЗ погоджено', 'ТЗ/МЗ Погоджено' 
     RECEIVED_REQUEST = 'отримано заявку', 'Отримано Заявку' 
+    RECEIVED_REQUEST_IK = 'отримано заявку ІК', 'Отримано Заявку ІК' 
+    RECEIVED_REQUEST_ATTESTATION = 'отримано заявку Атестація', 'Отримано Заявку Атестація' 
+    RECEIVED_REQUEST_PLAND_ATTESTATION = 'отримано заявку Чергова Атестація', 'Отримано Заявку Чергова Атестація' 
     ATTESTED = 'атестовано', 'атестовано'
     AZR_SEND = 'АЗР відправлено до ДССЗЗІ', 'АЗР відправлено до ДССЗЗІ' 
     RECEIVED_DECLARATION = 'отримано Декларацію', 'Отримано Декларацію' 
@@ -79,6 +82,7 @@ class OIDTypeChoices(models.TextChoices):
 
 class WorkTypeChoices(models.TextChoices):
     ATTESTATION = 'Атестація', 'Атестація'
+    PLAND_ATTESTATION = 'Чергова Атестація', 'Чергова Атестація' 
     IK = 'ІК', 'ІК'
     
 class DocumentReviewResultChoices(models.TextChoices): 
@@ -200,7 +204,7 @@ class OID(models.Model):
     sec_level = models.CharField(max_length=15, choices=SecLevelChoices.choices, verbose_name="Гриф")
     full_name = models.CharField(max_length=255, verbose_name="Повна назва ОІД", blank=True, null=True) # Змінив name на full_name
     room = models.CharField(max_length=255, verbose_name="Приміщення №")
-    status = models.CharField(max_length=30, choices=OIDStatusChoices.choices, default=OIDStatusChoices.NEW, verbose_name="Поточний стан ОІД")
+    status = models.CharField(max_length=35, choices=OIDStatusChoices.choices, default=OIDStatusChoices.NEW, verbose_name="Поточний стан ОІД")
     note = models.TextField(verbose_name="Примітка", blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення ОІД")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
@@ -1073,7 +1077,9 @@ class Document(models.Model):
                                         OIDStatusChoices.RECEIVED_TZ, 
                                         OIDStatusChoices.RECEIVED_TZ_REPEAT,
                                         OIDStatusChoices.RECEIVED_TZ_APPROVE,
-                                        OIDStatusChoices.RECEIVED_REQUEST,
+                                        OIDStatusChoices.RECEIVED_REQUEST_ATTESTATION,
+                                        OIDStatusChoices.RECEIVED_REQUEST_IK,
+                                        OIDStatusChoices.RECEIVED_REQUEST_PLAND_ATTESTATION,
                                         OIDStatusChoices.TERMINATED
                                 ]
                                 

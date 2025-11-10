@@ -542,12 +542,15 @@ def main_dashboard(request):
                     OIDStatusChoices.RECEIVED_TZ_REPEAT,
                     OIDStatusChoices.RECEIVED_TZ_APPROVE,
                     OIDStatusChoices.RECEIVED_REQUEST,
+                    OIDStatusChoices.RECEIVED_REQUEST_ATTESTATION,
                     OIDStatusChoices.ATTESTED,
                     OIDStatusChoices.AZR_SEND , 
                     OIDStatusChoices.RECEIVED_DECLARATION
                     ]
                 OID_to_show_main_dashboard_active = [
-                    OIDStatusChoices.ACTIVE
+                    OIDStatusChoices.ACTIVE,
+                    OIDStatusChoices.RECEIVED_REQUEST_IK,
+                    OIDStatusChoices.RECEIVED_REQUEST_PLAND_ATTESTATION,
 				]
                 OID_to_show_main_dashboard_cancel = [
                     OIDStatusChoices.CANCELED,
