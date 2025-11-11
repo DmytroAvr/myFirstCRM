@@ -556,8 +556,8 @@ class WorkRequestItem(models.Model):
     
     class Meta:
         unique_together = ('request', 'oid', 'work_type') # Один ОІД не може мати двічі одну і ту ж роботу в одній заявці
-        verbose_name = "Заявки: Елемент заявки"
-        verbose_name_plural = "Заявки: Елементи заявки"
+        verbose_name = "Заявки: Елемент заявки (ОІД)"
+        verbose_name_plural = "Заявки: Елементи заявки (ОІД)"
         # ordering = ['request', 'oid'] # Додано сортування
         ordering = ['request', 'request__incoming_date' ] # Додав сортування за замовчуванням
 
