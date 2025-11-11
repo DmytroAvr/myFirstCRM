@@ -93,9 +93,10 @@ def ajax_load_oids_for_unit_categorized(request):
                     'detail_url': reverse('oids:oid_detail_view_name', args=[oid_instance.id])
                 }
 
-                if oid_instance.status in [OIDStatusChoices.NEW, OIDStatusChoices.RECEIVED_REQUEST, OIDStatusChoices.RECEIVED_TZ]:
+                if oid_instance.status in [OIDStatusChoices.NEW, OIDStatusChoices.RECEIVED_REQUEST, OIDStatusChoices.RECEIVED_REQUEST_ATTESTATION, OIDStatusChoices.RECEIVED_TZ]:
                     data['creating'].append(oid_item)
-                elif oid_instance.status == OIDStatusChoices.ACTIVE:
+                # elif oid_instance.status == OIDStatusChoices.ACTIVE:
+                elif oid_instance.status in [OIDStatusChoices.ACTIVE, OIDStatusChoices.RECEIVED_REQUEST_IK, OIDStatusChoices.RECEIVED_REQUEST_PLAND_ATTESTATION,]:
                     # Тепер передаємо повний екземпляр oid_instance
                     oid_item['ik_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Висновок')
                     oid_item['attestation_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Акт атестації')
@@ -1158,9 +1159,9 @@ def send_azr_for_registration_view(request):
             )
 
             try:
-                azr_doc_type = DocumentType.objects.get(name__icontains="АЗР")
+                azr_doc_type = DocumentType.objects.get(name__icontains="Акт завершення")
             except DocumentType.DoesNotExist:
-                messages.error(request, "Критична помилка: Тип документу 'АЗР' не знайдено.")
+                messages.error(request, "Критична помилка: Тип документу 'Акт завершення робіт' не знайдено.")
                 return redirect('oids:main_dashboard') # Або на сторінку помилки
 
             docs_to_create = []
@@ -1206,7 +1207,7 @@ def send_azr_for_registration_view(request):
 @login_required
 def record_azr_response_view(request, registration_id):
     """
-    Обробляє сторінку "Внесення відповіді по АЗР".
+    Обробляє сторінку "Внесення відповіді по 'Акт завершення робіт' ".
     """
     registration_request = get_object_or_404(WorkCompletionRegistration, pk=registration_id)
     # Отримуємо queryset тільки тих АЗР, які були в цій конкретній відправці
@@ -1229,7 +1230,7 @@ def record_azr_response_view(request, registration_id):
             # оновлення статусів OID та WorkRequestItem, якщо вона там є.
             formset.save()
 
-            messages.success(request, "Відповідь по АЗР успішно внесено.")
+            messages.success(request, "Відповідь по 'Акт завершення робіт' успішно внесено.")
             return redirect('oids:list_azr_documents')
     else:
         response_form = WorkCompletionResponseForm()
@@ -2834,7 +2835,7 @@ def processing_control_view(request):
         ).order_by('-end_date').values('end_date')[:1]
     )
 
-    attestation_act_type = DocumentType.objects.filter(name__icontains="Атестація").first()
+    attestation_act_type = DocumentType.objects.filter(name__icontains="Акт атестації").first()
     ik_conclusion_type = DocumentType.objects.filter(duration_months=20).first()
 
     attestation_date_subquery = Document.objects.filter(
@@ -3084,9 +3085,9 @@ def azr_documents_list_view(request):
     Також обробляє експорт в Excel.
     """
     try:
-        azr_doc_type = DocumentType.objects.get(name="АЗР")
+        azr_doc_type = DocumentType.objects.get(name__icontains="Акт завершення")
     except DocumentType.DoesNotExist:
-        messages.error(request, "Тип документу 'АЗР' не знайдено.")
+        messages.error(request, "Тип документу 'Акт завершення111' не знайдено.")
         return redirect('oids:main_dashboard')
 
     queryset = Document.objects.filter(document_type=azr_doc_type).select_related('oid__unit')

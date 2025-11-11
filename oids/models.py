@@ -49,7 +49,8 @@ class OIDStatusChoices(models.TextChoices):
     RECEIVED_TZ = 'отримано ТЗ/МЗ', 'Отримано ТЗ/МЗ'
     RECEIVED_TZ_REPEAT = 'очікуємо ТЗ/МЗ(повторно)', 'Очікуємо ТЗ/МЗ(повторно)'
     RECEIVED_TZ_APPROVE = 'ТЗ/МЗ погоджено', 'ТЗ/МЗ Погоджено' 
-    RECEIVED_REQUEST = 'отримано заявку', 'Отримано Заявку' 
+    RECEIVED_REQUEST = 'отримано заявку', 'Отримано   f Заявку'
+    # RECEIVED_REQUEST = 'отримано заявку RECEIVED_REQUEST', 'Отримано Заявку RECEIVED_REQUEST'
     RECEIVED_REQUEST_IK = 'отримано заявку ІК', 'Отримано Заявку ІК' 
     RECEIVED_REQUEST_ATTESTATION = 'отримано заявку Атестація', 'Отримано Заявку Атестація' 
     RECEIVED_REQUEST_PLAND_ATTESTATION = 'отримано заявку Чергова Атестація', 'Отримано Заявку Чергова Атестація' 
@@ -990,7 +991,7 @@ class Document(models.Model):
         try:
                 attestation_doc_type = DocumentType.objects.get(name__icontains='Акт атестації')
                 ik_conclusion_doc_type = DocumentType.objects.get(name__icontains='Висновок')
-                azr_act_doc_type = DocumentType.objects.get(name__icontains='АЗР')
+                azr_act_doc_type = DocumentType.objects.get(name__icontains='Акт завершення')
                 declaration_doc_type = DocumentType.objects.get(name__icontains='Декларація')  # НОВИЙ ТИП
         except DocumentType.DoesNotExist:
                 # Якщо ключові типи документів не знайдено в базі, нічого не робимо
@@ -1078,7 +1079,6 @@ class Document(models.Model):
                                         OIDStatusChoices.RECEIVED_TZ_REPEAT,
                                         OIDStatusChoices.RECEIVED_TZ_APPROVE,
                                         OIDStatusChoices.RECEIVED_REQUEST_ATTESTATION,
-                                        OIDStatusChoices.RECEIVED_REQUEST_IK,
                                         OIDStatusChoices.RECEIVED_REQUEST_PLAND_ATTESTATION,
                                         OIDStatusChoices.TERMINATED
                                 ]

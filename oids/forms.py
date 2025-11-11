@@ -171,9 +171,12 @@ class TripForm(forms.ModelForm):
                     status__in=[
                         OIDStatusChoices.NEW,
                         OIDStatusChoices.RECEIVED_REQUEST,
+                        OIDStatusChoices.RECEIVED_REQUEST_IK,
+                        OIDStatusChoices.RECEIVED_REQUEST_ATTESTATION,
+                        OIDStatusChoices.RECEIVED_REQUEST_PLAND_ATTESTATION,
                         OIDStatusChoices.RECEIVED_TZ,
                         OIDStatusChoices.ACTIVE,
-                        OIDStatusChoices.TERMINATED
+                        OIDStatusChoices.TERMINATED    
                         ] 
                 ).distinct().order_by('unit__code', 'cipher')
 
