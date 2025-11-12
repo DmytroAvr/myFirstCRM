@@ -798,9 +798,23 @@ DeclarationUpdateFormSet = forms.modelformset_factory(
 
 
 ALLOWED_STATUS_CHOICES = [
-    (OIDStatusChoices.CANCELED, OIDStatusChoices.CANCELED.label),
-    (OIDStatusChoices.TERMINATED, OIDStatusChoices.TERMINATED.label),
+    # було 
+    # (OIDStatusChoices.CANCELED, OIDStatusChoices.CANCELED.label),
+    # (OIDStatusChoices.TERMINATED, OIDStatusChoices.TERMINATED.label),
+    # (OIDStatusChoices.ACTIVE, OIDStatusChoices.ACTIVE.label),
+    (OIDStatusChoices.NEW, OIDStatusChoices.NEW.label),
+    (OIDStatusChoices.RECEIVED_TZ, OIDStatusChoices.RECEIVED_TZ.label),
+    (OIDStatusChoices.RECEIVED_TZ_REPEAT, OIDStatusChoices.RECEIVED_TZ_REPEAT.label),
+    (OIDStatusChoices.RECEIVED_TZ_APPROVE, OIDStatusChoices.RECEIVED_TZ_APPROVE.label),
+    (OIDStatusChoices.RECEIVED_REQUEST_ATTESTATION, OIDStatusChoices.RECEIVED_REQUEST_ATTESTATION.label),
+    (OIDStatusChoices.RECEIVED_REQUEST_IK, OIDStatusChoices.RECEIVED_REQUEST_IK.label),
+    (OIDStatusChoices.RECEIVED_REQUEST_PLAND_ATTESTATION, OIDStatusChoices.RECEIVED_REQUEST_PLAND_ATTESTATION.label),
+    (OIDStatusChoices.ATTESTED, OIDStatusChoices.ATTESTED.label),
+    (OIDStatusChoices.AZR_SEND, OIDStatusChoices.AZR_SEND.label),
+    (OIDStatusChoices.RECEIVED_DECLARATION, OIDStatusChoices.RECEIVED_DECLARATION.label),
     (OIDStatusChoices.ACTIVE, OIDStatusChoices.ACTIVE.label),
+    (OIDStatusChoices.TERMINATED, OIDStatusChoices.TERMINATED.label),
+    (OIDStatusChoices.CANCELED, OIDStatusChoices.CANCELED.label),
 ]
 
 class OIDStatusUpdateForm(forms.Form):

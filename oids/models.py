@@ -52,7 +52,7 @@ class OIDStatusChoices(models.TextChoices):
     RECEIVED_REQUEST = 'отримано заявку', 'Отримано   f Заявку'
     # RECEIVED_REQUEST = 'отримано заявку RECEIVED_REQUEST', 'Отримано Заявку RECEIVED_REQUEST'
     RECEIVED_REQUEST_IK = 'отримано заявку ІК', 'Отримано Заявку ІК' 
-    RECEIVED_REQUEST_ATTESTATION = 'отримано заявку Атестація', 'Отримано Заявку Атестація' 
+    RECEIVED_REQUEST_ATTESTATION = 'отримано заявку Первинна Атестація', 'Отримано Заявку Первинна Атестація' 
     RECEIVED_REQUEST_PLAND_ATTESTATION = 'отримано заявку Чергова Атестація', 'Отримано Заявку Чергова Атестація' 
     ATTESTED = 'атестовано', 'атестовано'
     AZR_SEND = 'АЗР відправлено до ДССЗЗІ', 'АЗР відправлено до ДССЗЗІ' 
@@ -392,7 +392,8 @@ class WorkRequestItem(models.Model):
         existing_docs_for_item = Document.objects.filter(work_request_item=self)
 
         # --- Логіка для Атестації ---
-        if self.work_type == WorkTypeChoices.ATTESTATION:
+        # if self.work_type == WorkTypeChoices.ATTESTATION:
+        if self.work_type in [WorkTypeChoices.PLAND_ATTESTATION, WorkTypeChoices.ATTESTATION]:
             # Шукаємо тип документа "Акт атестації"
             attestation_act_type = DocumentType.objects.filter(name__icontains="Акт атестації").first()
              # document_type_act_att = DocumentType.objects.filter(duration_months=60).first() # Ваш спосіб ідентифікації "Акту атестації"
