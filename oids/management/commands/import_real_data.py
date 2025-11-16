@@ -101,7 +101,7 @@ class Command(BaseCommand):
         except FileNotFoundError:
             self.stdout.write(self.style.ERROR(f"Помилка: файл '{file_path}' не знайдено. Перевірте шлях."))
             raise
-
+ 
     def _import_units(self, file_path):
         self.stdout.write(f"Імпорт військових частин з {file_path}...")
         try:

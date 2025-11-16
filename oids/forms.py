@@ -12,7 +12,18 @@ from .models import (
 )
 from django_tomselect.forms import TomSelectModelChoiceField, TomSelectConfig
 from django.utils import timezone
+import datetime
 
+
+def get_last_week_date():
+    """Повертає дату 'сьогодні мінус 7 днів'."""
+    return datetime.date.today() - datetime.timedelta(weeks=1)
+
+# initial=datetime.date.today
+# ставить дату СЬОГОДНІ
+
+# initial=get_last_week_date
+# дата СЬОГОДНІ - 1 тиждень
 
 class WorkRequestForm(forms.ModelForm):
     unit = forms.ModelChoiceField(
@@ -324,11 +335,13 @@ class DocumentProcessingMainForm(forms.Form):
     doc_process_date = forms.DateField(
         label="Дата опрацювання документів (підг. від)",
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        initial=datetime.date.today,
         required=True
     )
     work_date = forms.DateField(
         label="Дата виконання робіт на ОІД (для відстежування терміну дії)",
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        initial=get_last_week_date,
         required=True
     )
     author = forms.ModelChoiceField(
@@ -571,7 +584,8 @@ class AttestationActUpdateForm(forms.ModelForm):
     dsszzi_registered_date = forms.DateField(
         label="Дата реєстрації ДССЗЗІ", 
         required=False,
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-sm'})
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-sm'}),
+        initial=get_last_week_date
     )
     # Можна додати поле для коментаря/статусу саме цього акту з відповіді, якщо потрібно
 
@@ -591,6 +605,12 @@ AttestationActUpdateFormSet = modelformset_factory(
     edit_only=True                                # Тільки редагування, не створення нових
 )
 
+
+# ========================================================
+# 
+# AZR AZR AZR  відповідь
+# 
+# ========================================================
 
 class WorkCompletionSendForm(forms.ModelForm):
     """
@@ -622,9 +642,13 @@ class WorkCompletionSendForm(forms.ModelForm):
             'outgoing_letter_date': "4. Дата вихідного листа",
             'note': "5. Примітки до відправки"
         }
-        widgets = {
-            'outgoing_letter_date': forms.DateInput(attrs={'type': 'date'}),
+        widgets = {        
+			'outgoing_letter_number': forms.TextInput(attrs={'class': 'form-control'}),
+			'outgoing_letter_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+			'note': forms.Textarea(attrs={'rows': 1, 'class': 'form-control'}),
+
         }
+
 
 
 class WorkCompletionResponseForm(forms.ModelForm):
@@ -642,8 +666,9 @@ class WorkCompletionResponseForm(forms.ModelForm):
         }
 
         widgets = {
-            'response_letter_date': forms.DateInput(attrs={'type': 'date'}),
-            'note': forms.Textarea(attrs={'rows': 1})
+            'response_letter_number': forms.DateInput(attrs={'class': 'form-control'}),
+            'response_letter_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'note': forms.Textarea(attrs={'rows': 1, 'class': 'form-control'})
         }
 
 
@@ -656,16 +681,16 @@ class WorkCompletionResponseForm(forms.ModelForm):
 
 # Форма для "шапки" сторінки - дані супровідного листа
 class AzrSubmissionForm(forms.Form):
-    outgoing_letter_number = forms.CharField(label="Вихідний номер супровідного листа", max_length=50, required=True)
-    outgoing_letter_date = forms.DateField(label="Дата вихідного листа", widget=forms.DateInput(attrs={'type': 'date'}), required=True)
-    note = forms.CharField(label="Примітки до відправки", widget=forms.Textarea(attrs={'rows': 1}), required=False)
+    outgoing_letter_number = forms.CharField(label="Вихідний номер супровідного листа", widget=forms.DateInput(attrs={'class': 'form-control'}), max_length=50, required=True)
+    outgoing_letter_date = forms.DateField(label="Дата вихідного листа", widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}), required=True, initial=get_last_week_date)
+    note = forms.CharField(label="Примітки до відправки", widget=forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'твій текст', 'rows': 2}), required=False)
 
 # Форма для одного рядка в нашому динамічному списку.
 # Вона не прив'язана до моделі, бо ми створюємо об'єкти вручну.
 class AzrItemForm(forms.Form):
     oid = forms.IntegerField(widget=forms.HiddenInput()) # Приховане поле для ID ОІДа
-    prepared_number = forms.CharField(label="Підготовлений № АЗР", max_length=50, required=True)
-    prepared_date = forms.DateField(label="Дата опрацювання АЗР", widget=forms.DateInput(attrs={'type': 'date'}), required=True)
+    prepared_number = forms.CharField(label="Підготовлений № АЗР", widget=forms.DateInput(attrs={'class': 'form-control'}), max_length=50, required=True)
+    prepared_date = forms.DateField(label="Дата опрацювання АЗР", widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}), required=True, initial=get_last_week_date)
 
 # Створюємо FormSet на основі нашої форми для одного рядка
 AzrItemFormSet = forms.formset_factory(AzrItemForm, extra=0)
@@ -692,9 +717,9 @@ class AzrUpdateForm(forms.ModelForm):
             'dsszzi_registered_date': "Дата реєстрації"
         }
         widgets = {
-            'dsszzi_registered_date': forms.DateInput(attrs={'type': 'date'})
+            'dsszzi_registered_number': forms.DateInput(attrs={'class': 'form-control'}),
+            'dsszzi_registered_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'})
         }
-
 
 # Створюємо формсет на основі нашої форми для одного рядка
 AzrUpdateFormSet = forms.modelformset_factory(
@@ -721,9 +746,9 @@ class DeclarationSubmissionForm(forms.ModelForm):
             'note': "Примітки до відправки"
         }
         widgets = {
+            'outgoing_letter_number': forms.TextInput(attrs={'class': 'form-control'}),
             'outgoing_letter_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'note': forms.Textarea(attrs={'rows': 2, 'class': 'form-control'}),
-            'outgoing_letter_number': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
 
@@ -733,8 +758,8 @@ class DskEotItemForm(forms.ModelForm):
     Використовується як шаблон у нашому динамічному формсеті.
     """
     # Додаємо поля для створення пов'язаної Декларації
-    prepared_number = forms.CharField(label="Підготовлений № Декларації", required=True)
-    prepared_date = forms.DateField(label="Дата опрацювання", widget=forms.DateInput(attrs={'type': 'date'}), required=True)
+    prepared_number = forms.CharField(label="Підготовлений № Декларації",widget=forms.DateInput(attrs={'class': 'form-control'}), required=True)
+    prepared_date = forms.DateField(label="Дата опрацювання", widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}), required=True, initial=get_last_week_date)
     
     class Meta:
         model = DskEot
@@ -743,6 +768,12 @@ class DskEotItemForm(forms.ModelForm):
         # Поле 'unit' буде прихованим, оскільки воно визначається блоком, в якому знаходиться форма
         widgets = {
             'unit': forms.HiddenInput(),
+            
+			'cipher': forms.TextInput(attrs={'class': 'form-control'}),
+			'serial_number': forms.TextInput(attrs={'class': 'form-control'}),
+			'inventory_number': forms.TextInput(attrs={'class': 'form-control'}),
+			'room': forms.TextInput(attrs={'class': 'form-control'}),
+
         }
 
 # Створюємо FormSet на основі нашої форми. `formset_factory` краще підходить,
@@ -765,9 +796,9 @@ class DeclarationResponseForm(forms.ModelForm):
             'response_note': "Примітки до відповіді"
         }
         widgets = {
+             'response_letter_number': forms.TextInput(attrs={'class': 'form-control'}),
              'response_letter_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
              'response_note': forms.Textarea(attrs={'rows': 2, 'class': 'form-control'}),
-             'response_letter_number': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
 
@@ -784,7 +815,10 @@ class DeclarationUpdateForm(forms.ModelForm):
             'registered_date': "Дата реєстрації"
         }
         widgets = {
-            'registered_date': forms.DateInput(attrs={'type': 'date'})
+                
+			'registered_number': forms.TextInput(attrs={'class': 'form-control'}),
+			'registered_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+
         }
 
 # Створюємо modelformset, який буде працювати з моделлю Declaration
@@ -902,7 +936,7 @@ class TripResultSendForm(forms.ModelForm):
         label="1. Оберіть Відрядження",
         widget=forms.Select(attrs={'class': 'form-select tomselect-field', 'id': 'id_trip_result_trip'}),
         empty_label="Оберіть відрядження...",
-        help_text="Відрядження, результати якого відправляються."
+        help_text="Відрядження, результати опрацювання якого (документи) відправляються."
     )
     
     # Це поле буде заповнюватися динамічно на основі обраного відрядження
@@ -1156,6 +1190,12 @@ class OIDCreateForm(forms.ModelForm):
             'pemin_sub_type', 'serial_number', 'inventory_number',
             'note'
         ]
+        
+        # Додаємо словник help_texts
+        help_texts = {
+            'cipher': 'Шифр ОІД має бути !унікальним. --- Порада: додайте номер військової частини після шифру. ОЧ 3001, КЧ 3002 ...',
+        }
+        
         widgets = {
             'oid_type': forms.Select(attrs={'class': 'form-select'}),
             'cipher': forms.TextInput(attrs={'class': 'form-control'}),

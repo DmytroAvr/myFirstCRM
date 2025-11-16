@@ -159,3 +159,37 @@ RECEIVED_REQUEST_ACTIVE = 'отримано заявку (активний ОІ�
 			# інші налаштування
 		}
     }
+
+
+Згенерувати під на сторінці. Декілька методів
+<!-- 
+						додає текст підказку до цього поля відповідно до forms.py
+						class ///
+						# Додаємо словник help_texts
+						help_texts = {
+							'cipher': 'Шифр ОІД має бути унікальним і не повторюватись. Порада: додайте номер військової частини вкінці',
+						}
+
+						<div class="col-sm-9">
+                            {{ field }}
+                            {% if field.help_text %}<small class="form-text text-muted d-block">{{ field.help_text }}</small>{% endif %}
+                            {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                        </div> 
+
+
+						
+						цей код генерує підказку зі сторінки, без додавання в forms.py 
+
+						<div class="col-sm-9">
+                            {{ field }}                            
+                            {% if field.name == 'cipher' %}
+                                <small class="form-text text-muted d-block">
+                                    Шифр ОІД має бути унікальним і не повторюватись. Порада: додайте номер військової частини
+                                </small>
+                            {% elif field.help_text %}
+                                <small class="form-text text-muted d-block">{{ field.help_text }}</small>
+                            {% endif %}
+                                                       
+                            {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                        </div> 
+						-->

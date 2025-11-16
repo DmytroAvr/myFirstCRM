@@ -49,8 +49,7 @@ class OIDStatusChoices(models.TextChoices):
     RECEIVED_TZ = 'отримано ТЗ/МЗ', 'Отримано ТЗ/МЗ'
     RECEIVED_TZ_REPEAT = 'очікуємо ТЗ/МЗ(повторно)', 'Очікуємо ТЗ/МЗ(повторно)'
     RECEIVED_TZ_APPROVE = 'ТЗ/МЗ погоджено', 'ТЗ/МЗ Погоджено' 
-    RECEIVED_REQUEST = 'отримано заявку', 'Отримано   f Заявку'
-    # RECEIVED_REQUEST = 'отримано заявку RECEIVED_REQUEST', 'Отримано Заявку RECEIVED_REQUEST'
+    RECEIVED_REQUEST = 'отримано заявку', 'Отримано Заявку уточнити'
     RECEIVED_REQUEST_IK = 'отримано заявку ІК', 'Отримано Заявку ІК' 
     RECEIVED_REQUEST_ATTESTATION = 'отримано заявку Первинна Атестація', 'Отримано Заявку Первинна Атестація' 
     RECEIVED_REQUEST_PLAND_ATTESTATION = 'отримано заявку Чергова Атестація', 'Отримано Заявку Чергова Атестація' 
@@ -441,6 +440,7 @@ class WorkRequestItem(models.Model):
         # Якщо ключовий документ не виконано, статус WorkRequestItem не змінюється цим методом.
         # Логіка повернення статусу (наприклад, якщо документ видалено) тут не розглядається.
 
+
     def save(self, *args, **kwargs):
         is_new = self._state.adding
 
@@ -451,7 +451,22 @@ class WorkRequestItem(models.Model):
         if is_new and self.oid:
             oid_to_update = self.oid
             old_status = oid_to_update.get_status_display()
-            new_status_enum = OIDStatusChoices.RECEIVED_REQUEST
+            
+            # --- ПОЧАТОК ЗМІН ---
+            # Визначаємо новий статус ОІД на основі типу робіт у заявці
+            new_status_enum = None
+            if self.work_type == WorkTypeChoices.IK:
+                new_status_enum = OIDStatusChoices.RECEIVED_REQUEST_IK
+            elif self.work_type == WorkTypeChoices.ATTESTATION:
+                new_status_enum = OIDStatusChoices.RECEIVED_REQUEST_ATTESTATION
+            elif self.work_type == WorkTypeChoices.PLAND_ATTESTATION:
+                new_status_enum = OIDStatusChoices.RECEIVED_REQUEST_PLAND_ATTESTATION
+            else:
+                # Залишаємо загальний статус, якщо тип робіт не визначено
+                # або для нього немає спеціального статусу "отримано заявку"
+                new_status_enum = OIDStatusChoices.RECEIVED_REQUEST 
+            
+            # --- КІНЕЦЬ ЗМІН ---
 
             if oid_to_update.status != new_status_enum:
                 oid_to_update.status = new_status_enum
@@ -462,12 +477,15 @@ class WorkRequestItem(models.Model):
                     oid=oid_to_update,
                     old_status=old_status,
                     new_status=new_status_enum.label,
-                    reason=f"ОІД додано до заявки №{self.request.incoming_number}"
+                    # Додамо тип робіт до причини для ясності
+                    reason=f"ОІД додано до заявки №{self.request.incoming_number} (Тип робіт: {self.get_work_type_display()})"
                 )
        
         # Викликаємо існуючу логіку для оновлення статусу батьківської заявки
         self.update_parent_request_status()
-        
+    
+    # ... (решта методів моделі WorkRequestItem, наприклад update_parent_request_status) ...
+
     def update_parent_request_status(self):
         """
         Перевіряє статуси всіх елементів батьківської заявки і, якщо всі
@@ -1517,7 +1535,7 @@ class TechnicalTask(models.Model):
         on_delete=models.SET_NULL, 
         null=True, blank=True, 
         verbose_name="Хто ознайомився/опрацював", # Оновлено для ясності
-        related_name='processed_technical_tasks' # <--- ЗМІНЕНО ТУТ
+        related_name='processed_technical_tasks'
     )
     review_result = models.CharField(
         max_length=30, 
@@ -1697,5 +1715,3 @@ class OIDProcessStepInstance(models.Model):
         verbose_name = "Конкретні екземпляри кроків для процесу ОІД."
         verbose_name_plural = "БізнесПроцес: 4. Екземпляри кроку для процесу ОІД."
         ordering = ['-id']
-
-     
