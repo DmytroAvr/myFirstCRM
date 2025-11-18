@@ -34,13 +34,13 @@ yourapp/
 ```python
 INSTALLED_APPS = [
     # ...
-    'yourapp',  # Ваша app з Task Manager
+    'taskFlow',  # Ваша app з Task Manager
 ]
 ```
 
 ### 3. Підключення сигналів
 
-У файлі `yourapp/apps.py`:
+У файлі `taskFlow/apps.py`:
 
 ```python
 from django.apps import AppConfig
@@ -272,7 +272,7 @@ def clean(self):
 ### Допоміжні функції
 
 ```python
-from yourapp.signals import (
+from taskFlow.signals import (
     set_task_changed_by,           # Встановити автора змін
     bulk_update_task_status,       # Масове оновлення статусу
     get_overdue_tasks,             # Прострочені завдання
@@ -320,3 +320,45 @@ person.get_active_tasks_count()  # Активні завдання викона�
 ## 🤝 Підтримка
 
 Для питань та пропозицій створіть issue в репозиторії проєкту.
+
+
+
+
+
+
+
+
+
+python manage.py makemigrations taskFlow
+
+
+
+
+Врахуй зміни 
+Використовуйте префікс, наприклад, oids_.
+class Task(models.Model):
+    assignee = models.ForeignKey(
+    	...
+        related_name='oids_assigned_tasks',
+	created_by = models.ForeignKey(
+        ...
+        related_name='oids_created_tasks',
+
+
+код таким чином щоб я в своєму застосунку taskFlow використовував class Person(models.Model): 
+ імпортуючи їх з oids_person column (щоб не довилось кілька баз вести)
+from oids.models import Person
+
+також детально опиши імпорт сторінки TaskFlow до застосунку, з використанням наданих сигналів 
+from taskFlow.signals import (
+    set_task_changed_by,           # Встановити автора змін
+    bulk_update_task_status,       # Масове оновлення статусу
+    get_overdue_tasks,             # Прострочені завдання
+    get_tasks_due_soon,            # Завдання що скоро прострочаться
+    get_user_workload,             # Навантаження користувача
+    get_project_statistics,        # Статистика проєкту
+)
+
+
+workavr@gmail.com Основна
+workavr@gmail.com Додаткова

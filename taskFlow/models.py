@@ -6,76 +6,8 @@ Django Task Manager Models
 from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from oids.models import PersonGroup, Person
 
-
-class PersonGroup(models.TextChoices):
-    """Підрозділи організації"""
-    GOV = 'management', 'Управління'
-    ZBSI = 'zbsi', 'ЗБСІ'
-    IARM = 'iarm', 'ІАРМ'
-    SDKTK = 'sd_ktk', 'СД КТК'
-    REPAIR = 'workshop', 'Майстерня'
-    PDTR = 'pdtr', 'ПДТР'
-    SL = 'sl', 'Служба ТЗІ'
-
-
-class Person(models.Model):
-    """
-    Модель виконавця/користувача
-    Зберігає інформацію про працівників організації
-    """
-    full_name = models.CharField(
-        "Прізвище, ім'я",
-        max_length=255,
-        help_text="Введіть прізвище та ім'я працівника"
-    )
-    surname = models.CharField(
-        "Прізвище",
-        max_length=100,
-        blank=True,
-        help_text="Прізвище окремо (опціонально)"
-    )
-    position = models.CharField(
-        "Посада",
-        max_length=255,
-        help_text="Посада працівника"
-    )
-    group = models.CharField(
-        "Підрозділ",
-        max_length=20,
-        choices=PersonGroup.choices,
-        default=PersonGroup.GOV,
-        help_text="Підрозділ, до якого належить працівник"
-    )
-    is_active = models.BooleanField(
-        "Активний",
-        default=True,
-        help_text="Чи активний працівник"
-    )
-    created_at = models.DateTimeField(
-        "Дата створення",
-        auto_now_add=True
-    )
-    updated_at = models.DateTimeField(
-        "Дата оновлення",
-        auto_now=True
-    )
-
-    class Meta:
-        verbose_name = "Виконавець"
-        verbose_name_plural = "Виконавці"
-        ordering = ['full_name']
-        indexes = [
-            models.Index(fields=['group', 'is_active']),
-            models.Index(fields=['full_name']),
-        ]
-
-    def __str__(self):
-        return f"{self.full_name} ({self.get_group_display()})"
-
-    def get_active_tasks_count(self):
-        """Кількість активних завдань виконавця"""
-        return self.assigned_tasks.filter(is_completed=False).count()
 
 
 class Project(models.Model):
@@ -110,7 +42,7 @@ class Project(models.Model):
         "Підрозділ",
         max_length=20,
         choices=PersonGroup.choices,
-        default=PersonGroup.GOV,
+        default=PersonGroup.ZAG,
         help_text="Основний підрозділ проєкту"
     )
     use_custom_statuses = models.BooleanField(
@@ -272,12 +204,11 @@ class Task(models.Model):
         null=True,
         help_text="Детальний опис завдання"
     )
-    assignee = models.ForeignKey(
-        Person,
+    assignee = models.ForeignKey('oids.Person',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='assigned_tasks',
+        related_name='taskflow_assigned_tasks',
         verbose_name="Виконавець",
         help_text="Особа, відповідальна за виконання"
     )
@@ -296,11 +227,11 @@ class Task(models.Model):
         help_text="Дедлайн для виконання завдання"
     )
     created_by = models.ForeignKey(
-        Person,
+        'oids.Person',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='created_tasks',
+        related_name='taskflow_created_tasks',
         verbose_name="Автор",
         help_text="Хто створив завдання"
     )
@@ -418,7 +349,7 @@ class TaskComment(models.Model):
         verbose_name="Завдання"
     )
     author = models.ForeignKey(
-        Person,
+        'oids.Person',
         on_delete=models.SET_NULL,
         null=True,
         related_name='comments',
@@ -462,7 +393,7 @@ class TaskHistory(models.Model):
         verbose_name="Завдання"
     )
     changed_by = models.ForeignKey(
-        Person,
+        'oids.Person',
         on_delete=models.SET_NULL,
         null=True,
         verbose_name="Хто змінив"

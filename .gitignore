@@ -3,3 +3,7 @@ myApp/*
 oids/*.pyc
 oids/__pycache__/*.pyc
 .venv/*
+taskFlow/__pycache__/*
+myApp/*
+taskFlow/*.pyc
+taskFlow/__pycache__/*.pyc

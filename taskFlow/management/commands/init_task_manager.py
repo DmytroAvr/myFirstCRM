@@ -1,11 +1,11 @@
 """
 Management команди для Task Manager
-Розмістити: yourapp/management/commands/init_task_manager.py
+Розмістити: taskFlow/management/commands/init_task_manager.py
 """
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from yourapp.models import Person, Project, Status, Task, PersonGroup
+from taskFlow.models import Person, Project, Status, Task, PersonGroup
 
 
 class Command(BaseCommand):

@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'multiselectfield', # Якщо ви використовуєте multiselectfield
     'oids', # Ваш додаток
+    'taskFlow', # taskFlow
     'django_tomselect',
 	'simple_history',
     # 'import_export', #pip install django-import-export
