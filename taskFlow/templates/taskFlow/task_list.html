@@ -1,0 +1,286 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Список завдань - TaskFlow{% endblock %}
+
+{% block extra_css %}
+<style>
+    .task-card {
+        transition: all 0.2s;
+        border-left: 4px solid transparent;
+    }
+    .task-card:hover {
+        transform: translateX(4px);
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    }
+    .task-card.overdue {
+        border-left-color: #ef4444;
+        background-color: #fef2f2;
+    }
+    .task-card.due-today {
+        border-left-color: #f97316;
+        background-color: #fff7ed;
+    }
+    .priority-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.375rem;
+        font-weight: 600;
+    }
+    .priority-low { color: #6b7280; }
+    .priority-medium { color: #eab308; }
+    .priority-high { color: #f97316; }
+    .priority-critical { color: #dc2626; }
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.75rem;
+        border-radius: 1rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: white;
+    }
+    .filter-section {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+        margin-bottom: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-4">
+    <!-- Заголовок та кнопка створення -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-1">📋 Список завдань</h1>
+            <p class="text-muted mb-0">Управління всіма завданнями системи</p>
+        </div>
+        <a href="{% url 'taskFlow:task_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> Створити завдання
+        </a>
+    </div>
+
+    <!-- Фільтри та пошук -->
+    <div class="filter-section">
+        <form method="get" class="row g-3">
+            <!-- Пошук -->
+            <div class="col-md-4">
+                <label class="form-label small fw-semibold">🔍 Пошук</label>
+                <input type="text" 
+                       name="q" 
+                       class="form-control" 
+                       placeholder="Назва, опис або ключ..." 
+                       value="{{ request.GET.q }}">
+            </div>
+
+            <!-- Проєкт -->
+            <div class="col-md-2">
+                <label class="form-label small fw-semibold">📁 Проєкт</label>
+                <select name="project" class="form-select">
+                    <option value="">Всі проєкти</option>
+                    {% for project in projects %}
+                    <option value="{{ project.id }}" 
+                            {% if request.GET.project == project.id|stringformat:"s" %}selected{% endif %}>
+                        {{ project.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Статус -->
+            <div class="col-md-2">
+                <label class="form-label small fw-semibold">📊 Статус</label>
+                <select name="status" class="form-select">
+                    <option value="">Всі статуси</option>
+                    {% for status in statuses %}
+                    <option value="{{ status.id }}" 
+                            {% if request.GET.status == status.id|stringformat:"s" %}selected{% endif %}>
+                        {{ status.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Виконавець -->
+            <div class="col-md-2">
+                <label class="form-label small fw-semibold">👤 Виконавець</label>
+                <select name="assignee" class="form-select">
+                    <option value="">Всі виконавці</option>
+                    {% for person in persons %}
+                    <option value="{{ person.id }}" 
+                            {% if request.GET.assignee == person.id|stringformat:"s" %}selected{% endif %}>
+                        {{ person.full_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Пріоритет -->
+            <div class="col-md-2">
+                <label class="form-label small fw-semibold">⚡ Пріоритет</label>
+                <select name="priority" class="form-select">
+                    <option value="">Всі</option>
+                    <option value="low" {% if request.GET.priority == "low" %}selected{% endif %}>Низький</option>
+                    <option value="medium" {% if request.GET.priority == "medium" %}selected{% endif %}>Середній</option>
+                    <option value="high" {% if request.GET.priority == "high" %}selected{% endif %}>Високий</option>
+                    <option value="critical" {% if request.GET.priority == "critical" %}selected{% endif %}>Критичний</option>
+                </select>
+            </div>
+
+            <!-- Кнопки -->
+            <div class="col-12 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-funnel"></i> Застосувати
+                </button>
+                <a href="{% url 'taskFlow:task_list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-lg"></i> Скинути
+                </a>
+                <div class="form-check ms-auto d-flex align-items-center">
+                    <input class="form-check-input" 
+                           type="checkbox" 
+                           name="completed" 
+                           id="showCompleted"
+                           {% if request.GET.completed %}checked{% endif %}
+                           onchange="this.form.submit()">
+                    <label class="form-check-label ms-2" for="showCompleted">
+                        Показати виконані
+                    </label>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Список завдань -->
+    {% if tasks %}
+    <div class="row">
+        {% for task in tasks %}
+        <div class="col-12 mb-3">
+            <div class="task-card card {% if task.is_overdue %}overdue{% elif task.is_due_today %}due-today{% endif %}">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <!-- Ключ та назва -->
+                        <div class="col-md-5">
+                            <div class="d-flex align-items-start gap-3">
+                                <div>
+                                    <code class="badge bg-light text-dark border">{{ task.key }}</code>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <h5 class="mb-1">
+                                        <a href="{% url 'taskFlow:task_detail' task.pk %}" 
+                                           class="text-decoration-none text-dark">
+                                            {% if task.is_overdue %}
+                                                <i class="bi bi-exclamation-triangle-fill text-danger"></i>
+                                            {% elif task.is_due_today %}
+                                                <i class="bi bi-clock-fill text-warning"></i>
+                                            {% endif %}
+                                            {{ task.title }}
+                                        </a>
+                                    </h5>
+                                    <small class="text-muted">
+                                        <i class="bi bi-folder"></i> {{ task.project.name }}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Статус -->
+                        <div class="col-md-2 text-center">
+                            <span class="status-badge" 
+                                  style="background-color: {% if task.status.color == 'bg-gray-500' %}#6b7280{% elif task.status.color == 'bg-blue-500' %}#3b82f6{% elif task.status.color == 'bg-green-500' %}#10b981{% elif task.status.color == 'bg-yellow-500' %}#eab308{% elif task.status.color == 'bg-purple-500' %}#a855f7{% elif task.status.color == 'bg-red-500' %}#ef4444{% else %}#6b7280{% endif %}">
+                                {{ task.status.name }}
+                            </span>
+                        </div>
+
+                        <!-- Пріоритет -->
+                        <div class="col-md-1 text-center">
+                            <span class="priority-badge priority-{{ task.priority }}">
+                                {% if task.priority == 'low' %}Низький
+                                {% elif task.priority == 'medium' %}Середній
+                                {% elif task.priority == 'high' %}Високий
+                                {% elif task.priority == 'critical' %}Критичний
+                                {% endif %}
+                            </span>
+                        </div>
+
+                        <!-- Виконавець -->
+                        <div class="col-md-2 text-center">
+                            {% if task.assignee %}
+                                <div class="d-flex align-items-center justify-content-center gap-2">
+                                    <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" 
+                                         style="width: 32px; height: 32px; font-size: 0.875rem;">
+                                        {{ task.assignee.full_name|slice:":1" }}
+                                    </div>
+                                    <small>{{ task.assignee.full_name }}</small>
+                                </div>
+                            {% else %}
+                                <small class="text-muted">Не призначено</small>
+                            {% endif %}
+                        </div>
+
+                        <!-- Термін -->
+                        <div class="col-md-2 text-center">
+                            {% if task.due_date %}
+                                <small class="{% if task.is_overdue %}text-danger fw-bold{% elif task.is_due_today %}text-warning fw-bold{% else %}text-muted{% endif %}">
+                                    <i class="bi bi-calendar3"></i>
+                                    {{ task.due_date|date:"d.m.Y" }}
+                                </small>
+                            {% else %}
+                                <small class="text-muted">—</small>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Опис (якщо є) -->
+                    {% if task.description %}
+                    <div class="row mt-2">
+                        <div class="col-12">
+                            <small class="text-muted">{{ task.description|truncatewords:20 }}</small>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Пагінація (якщо потрібна) -->
+    <div class="d-flex justify-content-center mt-4">
+        <p class="text-muted">Знайдено завдань: <strong>{{ tasks.count }}</strong></p>
+    </div>
+
+    {% else %}
+    <!-- Порожній список -->
+    <div class="text-center py-5">
+        <i class="bi bi-inbox" style="font-size: 4rem; color: #cbd5e1;"></i>
+        <h3 class="mt-3 text-muted">Завдань не знайдено</h3>
+        <p class="text-muted">Спробуйте змінити фільтри або створіть нове завдання</p>
+        <a href="{% url 'taskFlow:task_create' %}" class="btn btn-primary mt-3">
+            <i class="bi bi-plus-lg"></i> Створити завдання
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Автоматичне підсвічування рядків при наведенні
+    document.querySelectorAll('.task-card').forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.cursor = 'pointer';
+        });
+        
+        // Клік по всій картці відкриває деталі
+        card.addEventListener('click', function(e) {
+            if (e.target.tagName !== 'A') {
+                const link = this.querySelector('a[href*="task_detail"]');
+                if (link) link.click();
+            }
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,267 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Проєкти - TaskFlow{% endblock %}
+
+{% block extra_css %}
+<style>
+    .hero-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 3rem 0;
+        border-radius: 0.5rem;
+        margin-bottom: 2rem;
+    }
+    .stats-card {
+        background: white;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+        text-align: center;
+        transition: all 0.2s;
+    }
+    .stats-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    }
+    .stats-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        line-height: 1;
+        margin-bottom: 0.5rem;
+    }
+    .stats-label {
+        color: #64748b;
+        font-size: 0.875rem;
+    }
+    .project-card {
+        background: white;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+        margin-bottom: 1.5rem;
+        transition: all 0.2s;
+        border-left: 4px solid transparent;
+    }
+    .project-card:hover {
+        transform: translateX(4px);
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        border-left-color: #3b82f6;
+    }
+    .project-key {
+        font-family: monospace;
+        font-weight: 700;
+        font-size: 0.875rem;
+        color: #3b82f6;
+    }
+    .project-stats {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+    .project-stat {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        color: #64748b;
+    }
+    .progress-bar-custom {
+        height: 8px;
+        border-radius: 4px;
+        background: #e2e8f0;
+        overflow: hidden;
+    }
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+        transition: width 0.3s;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-4">
+    <!-- Hero секція -->
+    <div class="hero-section">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-lg-8">
+                    <h1 class="display-4 mb-3">📋 TaskFlow</h1>
+                    <p class="lead mb-0">Система управління проєктами та завданнями</p>
+                </div>
+                <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+                    <a href="{% url 'taskFlow:task_create' %}" class="btn btn-light btn-lg">
+                        <i class="bi bi-plus-lg"></i> Створити завдання
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Статистика -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-number text-primary">{{ projects.count }}</div>
+                <div class="stats-label">Активних проєктів</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-number text-warning">{{ overdue_tasks }}</div>
+                <div class="stats-label">Прострочених завдань</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-number text-info">{{ due_soon_tasks }}</div>
+                <div class="stats-label">Завдань на цей тиждень</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-number text-success">
+                    {% widthratio projects.count 1 100 %}%
+                </div>
+                <div class="stats-label">Середня завершеність</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Швидкі дії -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="{% url 'taskFlow:task_list' %}" class="btn btn-outline-primary">
+                    <i class="bi bi-list-ul"></i> Всі завдання
+                </a>
+                <a href="{% url 'taskFlow:task_list' %}?completed=" class="btn btn-outline-secondary">
+                    <i class="bi bi-clock"></i> Активні завдання
+                </a>
+                <a href="{% url 'taskFlow:task_list' %}?completed=on" class="btn btn-outline-success">
+                    <i class="bi bi-check-circle"></i> Виконані
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Список проєктів -->
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="h4 mb-0">Проєкти</h2>
+            </div>
+        </div>
+    </div>
+
+    {% if projects %}
+        <div class="row">
+            {% for project in projects %}
+            <div class="col-lg-6 col-xl-4">
+                <div class="project-card">
+                    <!-- Заголовок -->
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="flex-grow-1">
+                            <div class="project-key mb-2">[{{ project.key }}]</div>
+                            <h5 class="mb-1">
+                                <a href="{% url 'taskFlow:project_detail' project.pk %}" 
+                                   class="text-decoration-none text-dark">
+                                    {{ project.name }}
+                                </a>
+                            </h5>
+                            {% if project.description %}
+                            <p class="text-muted small mb-0">{{ project.description|truncatewords:15 }}</p>
+                            {% endif %}
+                        </div>
+                        <span class="badge bg-primary">{{ project.get_group_display }}</span>
+                    </div>
+
+                    <!-- Прогрес -->
+                    {% if project.task_count > 0 %}
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <small class="text-muted">Прогрес виконання</small>
+                            <small class="fw-semibold">
+                                {% widthratio project.task_count project.active_task_count 100 %}%
+                            </small>
+                        </div>
+                        <div class="progress-bar-custom">
+                            <div class="progress-fill" 
+                                 style="width: {% widthratio project.task_count project.active_task_count 100 %}%">
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Статистика -->
+                    <div class="project-stats">
+                        <div class="project-stat">
+                            <i class="bi bi-list-check"></i>
+                            <span>{{ project.task_count }} завдань</span>
+                        </div>
+                        <div class="project-stat">
+                            <i class="bi bi-hourglass-split text-warning"></i>
+                            <span>{{ project.active_task_count }} активних</span>
+                        </div>
+                    </div>
+
+                    <!-- Дії -->
+                    <div class="d-flex gap-2 mt-3 pt-3 border-top">
+                        <a href="{% url 'taskFlow:project_board' project.pk %}" 
+                           class="btn btn-sm btn-primary flex-grow-1">
+                            <i class="bi bi-kanban"></i> Дошка
+                        </a>
+                        <a href="{% url 'taskFlow:task_list' %}?project={{ project.pk }}" 
+                           class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-list-ul"></i> Список
+                        </a>
+                        <a href="{% url 'taskFlow:project_detail' project.pk %}" 
+                           class="btn btn-sm btn-outline-info">
+                            <i class="bi bi-info-circle"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <!-- Порожній стан -->
+        <div class="text-center py-5">
+            <i class="bi bi-folder-x" style="font-size: 4rem; color: #cbd5e1;"></i>
+            <h3 class="mt-3 text-muted">Проєктів поки немає</h3>
+            <p class="text-muted">Створіть свій перший проєкт через адмін-панель</p>
+            <a href="/admin/taskFlow/project/add/" class="btn btn-primary mt-3">
+                <i class="bi bi-plus-lg"></i> Створити проєкт
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Анімація чисел при завантаженні
+    document.addEventListener('DOMContentLoaded', function() {
+        const statsNumbers = document.querySelectorAll('.stats-number');
+        
+        statsNumbers.forEach(element => {
+            const target = parseInt(element.textContent);
+            let current = 0;
+            const increment = target / 20;
+            
+            const updateNumber = () => {
+                if (current < target) {
+                    current += increment;
+                    element.textContent = Math.ceil(current);
+                    requestAnimationFrame(updateNumber);
+                } else {
+                    element.textContent = target;
+                }
+            };
+            
+            updateNumber();
+        });
+    });
+</script>
+{% endblock %}

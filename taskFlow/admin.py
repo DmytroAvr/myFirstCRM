@@ -6,7 +6,9 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.db.models import Count, Q
 from django.utils import timezone
-from .models import Person, Project, Status, Task, TaskComment, TaskHistory
+from oids.models import Person, PersonGroup  # Імпорт з oids
+from .models import Project, Status, Task, TaskComment, TaskHistory
+
 
 # @admin.register(Person)
 # class PersonAdmin(admin.ModelAdmin):

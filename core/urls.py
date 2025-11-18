@@ -20,7 +20,8 @@ from oids.views import main_dashboard
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-	path('oids/', include('oids.urls')),
     path('', main_dashboard, name='home'),  # ⬅ Головна сторінка
+	path('oids/', include('oids.urls')),
+	path('tasks/', include('taskFlow.urls')),
 	path('accounts/', include('django.contrib.auth.urls')),
 ]

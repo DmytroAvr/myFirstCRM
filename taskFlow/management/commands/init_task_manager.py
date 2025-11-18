@@ -5,8 +5,8 @@ Management команди для Task Manager
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from taskFlow.models import Person, Project, Status, Task, PersonGroup
-
+from oids.models import Person, PersonGroup  # Імпорт з oids
+from taskFlow.models import Project, Status, Task
 
 class Command(BaseCommand):
     help = 'Ініціалізація Task Manager з демо-даними'
@@ -70,13 +70,6 @@ class Command(BaseCommand):
                 'order': 5,
                 'is_default': False,
                 'is_final': True,
-            },
-            {
-                'name': 'Заблоковано',
-                'color': 'bg-red-500',
-                'order': 6,
-                'is_default': False,
-                'is_final': False,
             },
         ]
         

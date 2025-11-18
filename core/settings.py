@@ -38,7 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'multiselectfield', # Якщо ви використовуєте multiselectfield
-    'oids', # Ваш додаток
+    'oids', # основний додаток
     'taskFlow', # taskFlow
     'django_tomselect',
 	'simple_history',

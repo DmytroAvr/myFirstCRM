@@ -1,0 +1,398 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if is_edit %}Редагування{% else %}Створення{% endif %} завдання - TaskFlow{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-container {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+    .form-card {
+        background: white;
+        border-radius: 0.5rem;
+        box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+        padding: 2rem;
+    }
+    .form-section {
+        margin-bottom: 2rem;
+        padding-bottom: 2rem;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .form-section:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+    .section-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #1e293b;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .required-field::after {
+        content: '*';
+        color: #dc2626;
+        margin-left: 0.25rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-4">
+    <!-- Навігація -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'taskFlow:project_list' %}">Проєкти</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'taskFlow:task_list' %}">Завдання</a></li>
+            {% if is_edit %}
+                <li class="breadcrumb-item"><a href="{% url 'taskFlow:task_detail' task.pk %}">{{ task.key }}</a></li>
+                <li class="breadcrumb-item active">Редагування</li>
+            {% else %}
+                <li class="breadcrumb-item active">Нове завдання</li>
+            {% endif %}
+        </ol>
+    </nav>
+
+    <div class="form-container">
+        <!-- Заголовок -->
+        <div class="mb-4">
+            <h1 class="h2">
+                {% if is_edit %}
+                    <i class="bi bi-pencil-square text-primary"></i>
+                    Редагування завдання {{ task.key }}
+                {% else %}
+                    <i class="bi bi-plus-circle text-primary"></i>
+                    Створення нового завдання
+                {% endif %}
+            </h1>
+            <p class="text-muted">
+                {% if is_edit %}
+                    Внесіть необхідні зміни та збережіть завдання
+                {% else %}
+                    Заповніть форму для створення нового завдання
+                {% endif %}
+            </p>
+        </div>
+
+        <!-- Форма -->
+        <form method="post" class="form-card">
+            {% csrf_token %}
+
+            <!-- Основна інформація -->
+            <div class="form-section">
+                <h3 class="section-title">
+                    <i class="bi bi-info-circle"></i>
+                    Основна інформація
+                </h3>
+
+                <div class="row g-3">
+                    <!-- Проєкт -->
+                    <div class="col-md-6">
+                        <label for="project" class="form-label required-field">Проєкт</label>
+                        <select class="form-select" 
+                                id="project" 
+                                name="project" 
+                                required
+                                {% if is_edit %}disabled{% endif %}>
+                            <option value="">Оберіть проєкт...</option>
+                            {% for project in projects %}
+                            <option value="{{ project.id }}" 
+                                    {% if is_edit and task.project.id == project.id %}selected
+                                    {% elif not is_edit and selected_project == project.id|stringformat:"s" %}selected
+                                    {% endif %}>
+                                {{ project.name }} ({{ project.key }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                        {% if is_edit %}
+                            <input type="hidden" name="project" value="{{ task.project.id }}">
+                            <small class="text-muted">Проєкт не можна змінити після створення</small>
+                        {% endif %}
+                    </div>
+
+                    <!-- Статус -->
+                    <div class="col-md-6">
+                        <label for="status" class="form-label">Статус</label>
+                        <select class="form-select" id="status" name="status">
+                            <option value="">Стандартний</option>
+                            {% for status in statuses %}
+                            <option value="{{ status.id }}"
+                                    {% if is_edit and task.status.id == status.id %}selected
+                                    {% elif not is_edit and selected_status == status.id|stringformat:"s" %}selected
+                                    {% endif %}>
+                                {{ status.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">Якщо не обрано - буде встановлено стандартний статус</small>
+                    </div>
+
+                    <!-- Назва -->
+                    <div class="col-12">
+                        <label for="title" class="form-label required-field">Назва завдання</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="title" 
+                               name="title" 
+                               value="{% if is_edit %}{{ task.title }}{% endif %}"
+                               placeholder="Введіть коротку назву завдання..."
+                               required
+                               maxlength="255">
+                    </div>
+
+                    <!-- Опис -->
+                    <div class="col-12">
+                        <label for="description" class="form-label">Опис</label>
+                        <textarea class="form-control" 
+                                  id="description" 
+                                  name="description" 
+                                  rows="6"
+                                  placeholder="Детальний опис завдання...">{% if is_edit %}{{ task.description }}{% endif %}</textarea>
+                        <small class="text-muted">Опишіть завдання детально</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Призначення та виконання -->
+            <div class="form-section">
+                <h3 class="section-title">
+                    <i class="bi bi-people"></i>
+                    Призначення та виконання
+                </h3>
+
+                <div class="row g-3">
+                    <!-- Виконавець -->
+                    <div class="col-md-6">
+                        <label for="assignee" class="form-label">
+                            <i class="bi bi-person"></i>
+                            Виконавець
+                        </label>
+                        <select class="form-select" id="assignee" name="assignee">
+                            <option value="">Не призначено</option>
+                            {% for person in persons %}
+                            <option value="{{ person.id }}"
+                                    {% if is_edit and task.assignee and task.assignee.id == person.id %}selected{% endif %}>
+                                {{ person.full_name }} - {{ person.get_group_display }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Підрозділ -->
+                    <div class="col-md-6">
+                        <label for="department" class="form-label">
+                            <i class="bi bi-building"></i>
+                            Підрозділ
+                        </label>
+                        <select class="form-select" id="department" name="department">
+                            <option value="">Не обрано</option>
+                            {% for value, label in departments %}
+                            <option value="{{ value }}"
+                                    {% if is_edit and task.department == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Пріоритет -->
+                    <div class="col-md-6">
+                        <label for="priority" class="form-label">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            Пріоритет
+                        </label>
+                        <select class="form-select" id="priority" name="priority">
+                            {% for value, label in priorities %}
+                            <option value="{{ value }}"
+                                    {% if is_edit and task.priority == value %}selected
+                                    {% elif not is_edit and value == 'medium' %}selected
+                                    {% endif %}>
+                                {% if value == 'low' %}🟢 {{ label }}
+                                {% elif value == 'medium' %}🟡 {{ label }}
+                                {% elif value == 'high' %}🟠 {{ label }}
+                                {% elif value == 'critical' %}🔴 {{ label }}
+                                {% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Термін виконання -->
+                    <div class="col-md-6">
+                        <label for="due_date" class="form-label">
+                            <i class="bi bi-calendar-event"></i>
+                            Термін виконання
+                        </label>
+                        <input type="date" 
+                               class="form-control" 
+                               id="due_date" 
+                               name="due_date"
+                               value="{% if is_edit and task.due_date %}{{ task.due_date|date:'Y-m-d' }}{% endif %}"
+                               min="{{ today|date:'Y-m-d' }}">
+                        <small class="text-muted">Дедлайн для виконання завдання</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Кнопки -->
+            <div class="d-flex gap-2 justify-content-between align-items-center">
+                <a href="{% if is_edit %}{% url 'taskFlow:task_detail' task.pk %}{% else %}{% url 'taskFlow:task_list' %}{% endif %}" 
+                   class="btn btn-outline-secondary">
+                    <i class="bi bi-x-lg"></i>
+                    Скасувати
+                </a>
+                
+                <div class="d-flex gap-2">
+                    {% if is_edit %}
+                    <button type="button" 
+                            class="btn btn-outline-danger"
+                            data-bs-toggle="modal" 
+                            data-bs-target="#deleteModal">
+                        <i class="bi bi-trash"></i>
+                        Видалити
+                    </button>
+                    {% endif %}
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg"></i>
+                        {% if is_edit %}Зберегти зміни{% else %}Створити завдання{% endif %}
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        <!-- Підказки -->
+        <div class="alert alert-info mt-4">
+            <h6 class="alert-heading">
+                <i class="bi bi-lightbulb"></i>
+                Підказки
+            </h6>
+            <ul class="mb-0 small">
+                <li>Поля відмічені <span class="text-danger">*</span> є обов'язковими</li>
+                <li>Ключ завдання (наприклад, PROJ-123) генерується автоматично</li>
+                <li>Ви зможете додати коментарі після створення завдання</li>
+                <li>Всі зміни автоматично записуються в історію</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Modal видалення (тільки для редагування) -->
+{% if is_edit %}
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Підтвердження видалення</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Ви впевнені, що хочете видалити завдання <strong>{{ task.key }}</strong>?</p>
+                <p class="text-danger mb-0">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    Цю дію не можна буде скасувати! Всі коментарі та історія також будуть видалені.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    Скасувати
+                </button>
+                <form method="post" action="{% url 'taskFlow:task_delete' task.pk %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i>
+                        Видалити назавжди
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Валідація форми
+    document.querySelector('form').addEventListener('submit', function(e) {
+        const title = document.getElementById('title').value.trim();
+        const project = document.getElementById('project').value;
+        
+        if (!title) {
+            e.preventDefault();
+            alert('Будь ласка, введіть назву завдання');
+            document.getElementById('title').focus();
+            return false;
+        }
+        
+        if (!project) {
+            e.preventDefault();
+            alert('Будь ласка, оберіть проєкт');
+            document.getElementById('project').focus();
+            return false;
+        }
+    });
+
+    // Автоматичне встановлення мінімальної дати (сьогодні)
+    const dueDateInput = document.getElementById('due_date');
+    const today = new Date().toISOString().split('T')[0];
+    dueDateInput.setAttribute('min', today);
+
+    // Попередження при виборі минулої дати
+    dueDateInput.addEventListener('change', function() {
+        const selectedDate = new Date(this.value);
+        const todayDate = new Date(today);
+        
+        if (selectedDate < todayDate) {
+            if (!confirm('Ви обрали дату в минулому. Продовжити?')) {
+                this.value = '';
+            }
+        }
+    });
+
+    // Автозбереження в localStorage (опціонально)
+    const formFields = ['title', 'description', 'priority'];
+    const formKey = 'taskflow_draft_task';
+
+    // Завантаження збереженого драфту
+    {% if not is_edit %}
+    window.addEventListener('load', function() {
+        const draft = localStorage.getItem(formKey);
+        if (draft) {
+            const data = JSON.parse(draft);
+            if (confirm('Знайдено незбережений драфт. Відновити?')) {
+                formFields.forEach(field => {
+                    if (data[field]) {
+                        document.getElementById(field).value = data[field];
+                    }
+                });
+            } else {
+                localStorage.removeItem(formKey);
+            }
+        }
+    });
+
+    // Збереження драфту
+    formFields.forEach(field => {
+        const element = document.getElementById(field);
+        element.addEventListener('input', function() {
+            const draft = {};
+            formFields.forEach(f => {
+                draft[f] = document.getElementById(f).value;
+            });
+            localStorage.setItem(formKey, JSON.stringify(draft));
+        });
+    });
+
+    // Очищення драфту після відправки
+    document.querySelector('form').addEventListener('submit', function() {
+        localStorage.removeItem(formKey);
+    });
+    {% endif %}
+</script>
+{% endblock %}

@@ -6,8 +6,8 @@ Django Signals для Task Manager
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
+from oids.models import PersonGroup  # Імпорт з oids
 from .models import Task, TaskHistory, TaskComment, Status, Project
-
 
 @receiver(pre_save, sender=Task)
 def track_task_changes(sender, instance, **kwargs):
