@@ -117,6 +117,17 @@ class ProcessStepStatusChoices(models.TextChoices):
     PENDING = 'очікує', 'Очікує'
     COMPLETED = 'виконано', 'Виконано'
     SKIPPED = 'пропущено', 'Пропущено'
+    
+class PersonGroup(models.TextChoices):
+    ZAG = 'Загальна', 'Загальна'
+    GOV = 'Управління', 'Управління'
+    ZBSI = 'ЗБСІ', 'ЗБСІ'
+    IARM = 'ІАРМ', 'ІАРМ'
+    SDKTK = 'СД КТК', 'СД КТК'
+    REPAIR = 'Майстерня', 'Майстерня'
+    PDTR = 'ПДТР', 'ПДТР'
+    SL = 'СлужбаТЗІ', 'Служба ТЗІ'
+    # OAB = 'ОАБ', 'ОАБ'
 
 # --- Models ---
 
@@ -246,11 +257,13 @@ class OID(models.Model):
 class Person(models.Model):
     """
     Виконавець
-    Атрибути: ПІБ, Посада, Активність, Історія участі у відрядженнях / роботах / документах
+    Атрибути: ПІБ, Посада, Активність, Група, Історія участі у відрядженнях / роботах / документах
     Зв'язки: Може бути учасником відрядження, Може бути виконавцем роботи, Може бути автором документа
     """
     full_name = models.CharField(max_length=255, verbose_name="Прізвище, ім'я") # Змінив name на full_name
     position = models.CharField(max_length=255, verbose_name="Посада")
+    group = models.CharField("Група", max_length=20, choices=PersonGroup.choices, default=PersonGroup.GOV)
+
     is_active = models.BooleanField(default=True, verbose_name="Активний")
     history = HistoricalRecords()
     def __str__(self):
@@ -1715,3 +1728,49 @@ class OIDProcessStepInstance(models.Model):
         verbose_name = "Конкретні екземпляри кроків для процесу ОІД."
         verbose_name_plural = "БізнесПроцес: 4. Екземпляри кроку для процесу ОІД."
         ordering = ['-id']
+
+
+# tast manager 
+# Припускаємо, що модель Person імпортована або знаходиться в цьому ж файлі
+# from .models import Person 
+
+# --- Модель Проєкту (Project) ---
+class Project(models.Model):
+    name = models.CharField("Назва проєкту", max_length=255)
+    description = models.TextField("Опис", blank=True, null=True)
+    is_active = models.BooleanField("Активний", default=True)
+    group = models.CharField("Відділ/Група", max_length=20, choices=PersonGroup.choices, default=PersonGroup.ZAG)
+    class Meta:
+        verbose_name = "Проєкт"
+        verbose_name_plural = "Проєкти"
+
+# --- Модель Статусу (Status) ---
+# Статуси можуть бути глобальними або прив'язаними до проєкту. 
+# Зробимо їх глобальними з можливістю прив'язати до проєкту
+class Status(models.Model):
+    name = models.CharField("Назва статусу", max_length=50)
+    color = models.CharField("Колір (HEX або назва)", max_length=20, default="#d1d5db") # Приклад: сірий
+    is_default = models.BooleanField("Стандартний", default=False)
+    # Якщо status прив'язаний до певного проекту, він буде відображатися тільки там
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, null=True, blank=True, related_name='custom_statuses')
+
+    class Meta:
+        verbose_name = "Статус завдання"
+        verbose_name_plural = "Статуси завдання"
+        unique_together = ('name', 'project') # Статус має бути унікальним в рамках проєкту
+
+# --- Модель Завдання (Task) ---
+class Task(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='tasks', verbose_name="Проєкт")
+    title = models.CharField("Заголовок", max_length=255)
+    description = models.TextField("Опис", blank=True, null=True)
+    assignee = models.ForeignKey(Person, on_delete=models.SET_NULL, null=True, related_name='assigned_tasks', verbose_name="Виконавець")
+    due_date = models.DateField("Термін виконання", null=True, blank=True)
+    created_by = models.ForeignKey(Person, on_delete=models.SET_NULL, null=True, related_name='created_tasks', verbose_name="Автор")
+    status = models.ForeignKey(Status, on_delete=models.PROTECT, related_name='tasks', verbose_name="Поточний статус")
+    is_completed = models.BooleanField("Виконано", default=False)
+    completed_at = models.DateTimeField("Дата виконання", null=True, blank=True)
+    
+    class Meta:
+        verbose_name = "Завдання"
+        verbose_name_plural = "Завдання"

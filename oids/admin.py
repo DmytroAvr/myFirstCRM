@@ -41,7 +41,7 @@ class OIDAdmin(SimpleHistoryAdmin):
 
 @admin.register(Person)
 class PersonAdmin(SimpleHistoryAdmin):
-    list_display = ('full_name', 'position', 'is_active')
+    list_display = ('full_name', 'position', 'group', 'is_active')
     list_filter = ('is_active',)
     search_fields = ('full_name', 'position')
 

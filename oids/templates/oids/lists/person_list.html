@@ -13,6 +13,7 @@
                 <tr>
                     <th>ПІБ</th>
                     <th>Посада</th>
+                    <th>Група</th>
                     <th>Активний</th>
                     {# <th>Дії</th> #}
                 </tr>
@@ -22,6 +23,7 @@
                     <tr>
                         <td>{{ person.full_name }}</td>
                         <td>{{ person.position }}</td>
+                        <td>{{ person.group }}</td>
                         <td>{% if person.is_active %}Так{% else %}Ні{% endif %}</td>
                         {# <td><a href="#" class="btn btn-sm btn-warning">Редагувати</a></td> #}
                     </tr>

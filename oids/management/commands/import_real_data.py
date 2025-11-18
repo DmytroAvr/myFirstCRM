@@ -135,6 +135,7 @@ class Command(BaseCommand):
                     full_name=row['full_name'],
                     defaults={
                         'position': row['position'],
+                        'group': row['group'],
                         'is_active': row['is_active'].upper() == 'TRUE'
                     }
                 )
