@@ -260,18 +260,34 @@ class Person(models.Model):
     Атрибути: ПІБ, Посада, Активність, Група, Історія участі у відрядженнях / роботах / документах
     Зв'язки: Може бути учасником відрядження, Може бути виконавцем роботи, Може бути автором документа
     """
-    full_name = models.CharField(max_length=255, verbose_name="Прізвище, ім'я") # Змінив name на full_name
-    position = models.CharField(max_length=255, verbose_name="Посада")
-    group = models.CharField("Група", max_length=20, choices=PersonGroup.choices, default=PersonGroup.GOV)
-
-    is_active = models.BooleanField(default=True, verbose_name="Активний")
-    history = HistoricalRecords()
-    def __str__(self):
-        return self.full_name
+    """
+    Модель виконавця/користувача
+    Зберігає інформацію про працівників організації
+    """
+    full_name = models.CharField("Прізвище, ім'я",max_length=255,help_text="Введіть прізвище та ім'я працівника")
+    surname = models.CharField("Прізвище",max_length=100,blank=True,help_text="Прізвище окремо (опціонально)")
+    position = models.CharField("Посада",max_length=255,help_text="Посада працівника")
+    group = models.CharField("Підрозділ",max_length=20,choices=PersonGroup.choices,default=PersonGroup.GOV,help_text="Підрозділ, до якого належить працівник")
+    is_active = models.BooleanField("Активний",default=True,help_text="Чи активний працівник")
+    created_at = models.DateTimeField("Дата створення",auto_now_add=True)
+    updated_at = models.DateTimeField("Дата оновлення", auto_now=True)
 
     class Meta:
-        verbose_name = "Довідково: Виконавець"
+        verbose_name = "Виконавець"
         verbose_name_plural = "Довідково: Виконавці"
+        ordering = ['full_name']
+        indexes = [
+            models.Index(fields=['group', 'is_active']),
+            models.Index(fields=['full_name']),
+        ]
+
+    def __str__(self):
+        return f"{self.full_name} ({self.get_group_display()})"
+
+    def get_active_tasks_count(self):
+        """Кількість активних завдань виконавця"""
+        return self.assigned_tasks.filter(is_completed=False).count()
+
 
 class WorkRequest(models.Model):
     """

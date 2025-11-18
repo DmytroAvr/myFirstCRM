@@ -1,5 +1,8 @@
 from django.contrib import admin
 from simple_history.admin import SimpleHistoryAdmin 
+from django.utils.html import format_html
+from django.db.models import Count, Q
+from django.utils import timezone
 from .models import (
     TerritorialManagement, UnitGroup, Unit, OID,
     Person, WorkRequest, WorkRequestItem,
@@ -39,11 +42,91 @@ class OIDAdmin(SimpleHistoryAdmin):
     # history_list_display = ["status"]
 
 
+# @admin.register(Person)
+# class PersonAdmin(SimpleHistoryAdmin):
+#     list_display = ('full_name', 'position', 'group', 'is_active')
+#     list_filter = ('is_active',)
+#     search_fields = ('full_name', 'position')
 @admin.register(Person)
-class PersonAdmin(SimpleHistoryAdmin):
-    list_display = ('full_name', 'position', 'group', 'is_active')
-    list_filter = ('is_active',)
-    search_fields = ('full_name', 'position')
+class PersonAdmin(admin.ModelAdmin):
+    """Адміністрування виконавців"""
+    list_display = [
+        'full_name', 'position', 'group_badge', 
+        'active_tasks_count', 'is_active_badge', 'created_at'
+    ]
+    list_filter = ['group', 'is_active', 'created_at']
+    search_fields = ['full_name', 'surname', 'position']
+    list_per_page = 50
+    date_hierarchy = 'created_at'
+    
+    fieldsets = (
+        ('Основна інформація', {
+            'fields': ('full_name', 'surname', 'position')
+        }),
+        ('Організаційна структура', {
+            'fields': ('group', 'is_active')
+        }),
+        ('Метадані', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    readonly_fields = ['created_at', 'updated_at']
+    
+    def group_badge(self, obj):
+        """Відображення підрозділу з кольоровим бейджем"""
+        colors = {
+            'management': '#3b82f6',
+            'zbsi': '#10b981',
+            'iarm': '#f59e0b',
+            'sd_ktk': '#8b5cf6',
+            'workshop': '#ef4444',
+            'pdtr': '#ec4899',
+            'sl': '#06b6d4',
+        }
+        color = colors.get(obj.group, '#6b7280')
+        return format_html(
+            '<span style="background-color: {}; color: white; '
+            'padding: 3px 10px; border-radius: 12px; font-size: 12px;">{}</span>',
+            color, obj.get_group_display()
+        )
+    group_badge.short_description = 'Підрозділ'
+    
+    def is_active_badge(self, obj):
+        """Відображення статусу активності"""
+        if obj.is_active:
+            return format_html(
+                '<span style="color: green;">✓ Активний</span>'
+            )
+        return format_html(
+            '<span style="color: red;">✗ Неактивний</span>'
+        )
+    is_active_badge.short_description = 'Статус'
+    
+    def active_tasks_count(self, obj):
+        """Кількість активних завдань"""
+        count = obj.get_active_tasks_count()
+        if count > 0:
+            return format_html(
+                '<strong style="color: #f59e0b;">{}</strong>', count
+            )
+        return count
+    active_tasks_count.short_description = 'Активні завдання'
+    
+    actions = ['activate_persons', 'deactivate_persons']
+    
+    def activate_persons(self, request, queryset):
+        """Активувати виконавців"""
+        updated = queryset.update(is_active=True)
+        self.message_user(request, f'Активовано {updated} виконавців')
+    activate_persons.short_description = 'Активувати виконавців'
+    
+    def deactivate_persons(self, request, queryset):
+        """Деактивувати виконавців"""
+        updated = queryset.update(is_active=False)
+        self.message_user(request, f'Деактивовано {updated} виконавців')
+    deactivate_persons.short_description = 'Деактивувати виконавців'
 
 
 @admin.register(WorkRequest)
