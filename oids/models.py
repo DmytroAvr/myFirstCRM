@@ -198,62 +198,210 @@ class Unit(models.Model):
         verbose_name = "Структура: Військова частина"
         verbose_name_plural = "Структура: Військові частини"
 
-class OID(models.Model): 
+class OID(models.Model):
     """
     Об'єкт інформаційної діяльності (ОІД)
-    Атрибути: Тип (МОВНА або ПЕМІН), Шифр, Повна назва, Приміщення, Стан, Має загальну історію робіт (агрегація)
-    Зв'язки: Прив'язаний до частини ТУ, Має історію робіт, Має історію відрядження, Має опрацьовані документи
-    Додатково - привязка атетсація, стан,
     """
     unit = models.ForeignKey(
         Unit, 
-        on_delete=models.CASCADE, 
+        on_delete=models.PROTECT,  # ✅ PROTECT замість CASCADE - безпечніше
         verbose_name="Військова частина",
-        related_name='oids' # Дозволить отримати всі ОІД для частини: `unit_instance.oids.all()`
+        related_name='oids',
+        db_index=True  # ✅ Індекс для швидкого пошуку
     )
-    oid_type = models.CharField(max_length=10, choices=OIDTypeChoices.choices, verbose_name="Тип ОІД")
-    cipher = models.CharField(max_length=100, verbose_name="Шифр ОІД", unique=False) # Додав шифр, як вказано в описі
-    sec_level = models.CharField(max_length=15, choices=SecLevelChoices.choices, verbose_name="Гриф")
-    full_name = models.CharField(max_length=255, verbose_name="Повна назва ОІД", blank=True, null=True) # Змінив name на full_name
-    room = models.CharField(max_length=255, verbose_name="Приміщення №")
-    status = models.CharField(max_length=35, choices=OIDStatusChoices.choices, default=OIDStatusChoices.NEW, verbose_name="Поточний стан ОІД")
-    note = models.TextField(verbose_name="Примітка", blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення ОІД")
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
+    oid_type = models.CharField(
+        max_length=10, 
+        choices=OIDTypeChoices.choices, 
+        verbose_name="Тип ОІД",
+        db_index=True,  # ✅ Часто фільтруємо по типу
+        help_text="Оберіть тип об'єкта: МОВНА або ПЕМІН"
+    )
+    cipher = models.CharField(
+        max_length=100, 
+        verbose_name="Шифр ОІД",
+        db_index=True,  # ✅ Часто шукаємо по шифру
+        help_text="Унікальний шифр в межах частини"
+    )
+    sec_level = models.CharField(
+        max_length=15, 
+        choices=SecLevelChoices.choices, 
+        verbose_name="Гриф",
+        db_index=True
+    )
+    full_name = models.CharField(
+        max_length=255, 
+        verbose_name="Повна назва ОІД", 
+        blank=True
+    )
+    room = models.CharField(
+        max_length=255, 
+        verbose_name="Приміщення №",
+        help_text="Номер приміщення де розташований ОІД"
+    )
+    status = models.CharField(
+        max_length=35, 
+        choices=OIDStatusChoices.choices, 
+        default=OIDStatusChoices.NEW, 
+        verbose_name="Поточний стан ОІД",
+        db_index=True  # ✅ Часто фільтруємо по статусу
+    )
+    note = models.TextField(
+        verbose_name="Примітка", 
+        blank=True,
+        default=""  # ✅ Краще default="" ніж null=True для TextField
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True, 
+        verbose_name="Дата створення ОІД",
+        db_index=True
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True, 
+        verbose_name="Дата останнього оновлення"
+    )
     pemin_sub_type = models.CharField(
         max_length=25, 
         choices=PeminSubTypeChoices.choices, 
         verbose_name="Тип ЕОТ",
-        blank=True, # Дозволяє бути порожнім у формах
-        null=True   # Дозволяє бути NULL в базі даних (для МОВНА ОІД)
+        blank=True,
+        null=True,
+        help_text="Тільки для ПЕМІН типу"
     )
     serial_number = models.CharField(
         max_length=20, 
-        verbose_name="s/n", 
-        blank=True, 
-        null=True
+        verbose_name="Серійний номер", 
+        blank=True,
+        default=""
     )
     inventory_number = models.CharField(
         max_length=20, 
-        verbose_name="Інв. №", 
-        blank=True, 
-        null=True
+        verbose_name="Інвентарний №", 
+        blank=True,
+        default=""
     )
+    
+    # ✅ Додаткові корисні поля
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="Активний",
+        help_text="Чи використовується ОІД наразі",
+        db_index=True
+    )
+    
     history = HistoricalRecords()
 
-	# Прив'язка до першого та останнього документа для відстеження
-    # OneToOneField для created_by_document може бути проблематичним, якщо один документ може "створити" кілька ОІД.
-    # Краще використовувати ForeignKey, і вже на рівні логіки (service/views) забезпечувати, що це перший документ.
-    # Я видалив created_by_document і latest_document, оскільки їх можна отримати через related_name
-    # Це зменшує дублювання даних і забезпечує узгодженість.
+    class Meta:
+        verbose_name = "Об'єкт інформаційної діяльності (ОІД)"
+        verbose_name_plural = "Об'єкти інформаційної діяльності (ОІД)"
+        unique_together = ('unit', 'cipher')
+        ordering = ['-created_at']  # ✅ За замовчуванням - нові зверху
+        indexes = [
+            models.Index(fields=['unit', 'status']),  # ✅ Складений індекс
+            models.Index(fields=['oid_type', 'is_active']),
+            models.Index(fields=['-created_at']),
+        ]
+        permissions = [  # ✅ Кастомні права доступу
+            ("can_approve_oid", "Може затверджувати ОІД"),
+            ("can_archive_oid", "Може архівувати ОІД"),
+        ]
 
     def __str__(self):
-        return f"{self.cipher} ({self.get_oid_type_display()}) - {self.unit.code}"
+        return f"{self.cipher} | {self.get_oid_type_display()} | {self.unit.code}"
 
-    class Meta:
-        verbose_name = "Об’єкт інформаційної діяльності (ОІД)"
-        verbose_name_plural = "Об’єкти інформаційної діяльності (ОІД)"
-        unique_together = ('unit', 'cipher')
+    # ✅ Валідація даних
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        
+        # Перевірка: pemin_sub_type має бути тільки для ПЕМІН
+        if self.oid_type == OIDTypeChoices.MOVNA and self.pemin_sub_type:
+            raise ValidationError({
+                'pemin_sub_type': 'Тип ЕОТ може бути тільки для ПЕМІН об\'єктів'
+            })
+        
+        # Перевірка: для ПЕМІН обов'язково вказати підтип
+        if self.oid_type == OIDTypeChoices.PEMIN and not self.pemin_sub_type:
+            raise ValidationError({
+                'pemin_sub_type': 'Для ПЕМІН об\'єктів обов\'язково вказати тип ЕОТ'
+            })
+
+    def save(self, *args, **kwargs):
+        self.full_clean()  # ✅ Викликаємо валідацію перед збереженням
+        super().save(*args, **kwargs)
+
+    # ✅ Корисні методи
+    @property
+    def display_name(self):
+        """Зручне відображення назви"""
+        return self.full_name or self.cipher
+
+    @property
+    def is_pemin(self):
+        """Чи є це ПЕМІН об'єкт"""
+        return self.oid_type == OIDTypeChoices.PEMIN
+
+    @property
+    def documents_count(self):
+        """Кількість пов'язаних документів"""
+        return self.documents.count()  # Потрібен related_name='documents' в моделі Document
+
+    def get_absolute_url(self):
+        """URL для детального перегляду"""
+        from django.urls import reverse
+        return reverse('oid-detail', kwargs={'pk': self.pk})
+
+    # ✅ Кастомні методи для бізнес-логіки
+    def activate(self):
+        """Активувати ОІД"""
+        self.is_active = True
+        self.status = OIDStatusChoices.ACTIVE  # припустимо є такий статус
+        self.save()
+
+    def deactivate(self, reason=""):
+        """Деактивувати ОІД"""
+        self.is_active = False
+        if reason:
+            self.note += f"\nДеактивовано: {reason}"
+        self.save()
+
+
+# ✅ Кастомний менеджер для зручних запитів
+class OIDQuerySet(models.QuerySet):
+    def active(self):
+        """Тільки активні ОІД"""
+        return self.filter(is_active=True)
+    
+    def by_type(self, oid_type):
+        """Фільтр по типу"""
+        return self.filter(oid_type=oid_type)
+    
+    def pemin(self):
+        """Тільки ПЕМІН"""
+        return self.filter(oid_type=OIDTypeChoices.PEMIN)
+    
+    def movna(self):
+        """Тільки МОВНА"""
+        return self.filter(oid_type=OIDTypeChoices.MOVNA)
+    
+    def by_unit(self, unit):
+        """По конкретній частині"""
+        return self.filter(unit=unit)
+    
+    def with_documents(self):
+        """З підрахунком документів"""
+        return self.annotate(docs_count=models.Count('documents'))
+
+class OIDManager(models.Manager):
+    def get_queryset(self):
+        return OIDQuerySet(self.model, using=self._db)
+    
+    def active(self):
+        return self.get_queryset().active()
+    
+    def pemin(self):
+        return self.get_queryset().pemin()
+    
+    def movna(self):
+        return self.get_queryset().movna()
 
 class Person(models.Model):
     """
@@ -1246,6 +1394,7 @@ class Document(models.Model):
         verbose_name_plural = "Опрацьовані документи"
         ordering = ['-doc_process_date', '-work_date']
             
+
 
 # --------------------------------------------------------------------------
 # ## МОДЕЛІ ДЛЯ ПРОЦЕСУ РЕЄСТРАЦІЇ ДЕКЛАРАЦІЙ ВІДПОВІДНОСТІ ##

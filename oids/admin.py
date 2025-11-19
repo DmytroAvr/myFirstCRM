@@ -11,8 +11,10 @@ from .models import (
     AttestationRegistration, AttestationResponse,
     WorkCompletionRegistration, WorkCompletionResponse,
     Declaration, DeclarationRegistration,
-    OIDProcess, OIDProcessStepInstance, ProcessTemplate, ProcessStep, 
+    OIDProcess, OIDProcessStepInstance, ProcessTemplate, ProcessStep, OIDStatusChoices
 )
+
+
 
 @admin.register(TerritorialManagement)
 class TerritorialManagementAdmin(admin.ModelAdmin):
@@ -33,14 +35,198 @@ class UnitAdmin(SimpleHistoryAdmin):
     list_filter = ('territorial_management', 'unit_groups')
 
 
+
 @admin.register(OID)
 class OIDAdmin(SimpleHistoryAdmin):
-    list_display = ('cipher', 'oid_type', 'unit', 'room', 'status', 'created_at') # Додав created_at для інформації
-    list_filter = ('oid_type', 'status', 'unit__territorial_management')
-    search_fields = ('cipher', 'full_name', 'room')
-    date_hierarchy = 'created_at' # Дозволяє навігацію по даті створення
-    # history_list_display = ["status"]
-
+    # ✅ Покращене відображення списку
+    list_display = (
+        'cipher', 
+        'colored_status',  # Кастомний метод з кольорами
+        'oid_type', 
+        'unit_link',  # Клікабельне посилання
+        'room', 
+        'sec_level',
+        'is_active',
+        'documents_count_display',  # Кількість документів
+        'created_at_short'
+    )
+    
+    # ✅ Можливість швидкого редагування зі списку
+    list_editable = ('is_active',)
+    
+    # ✅ Розширені фільтри
+    list_filter = (
+        'is_active',
+        'oid_type',
+        'status',
+        'sec_level',
+        ('unit', admin.RelatedOnlyFieldListFilter),  # Тільки частини що мають ОІД
+        ('created_at', admin.DateFieldListFilter),
+        'pemin_sub_type',
+    )
+    
+    # ✅ Покращений пошук
+    search_fields = (
+        'cipher', 
+        'full_name', 
+        'room',
+        'serial_number',
+        'inventory_number',
+        'unit__code',
+        'unit__name'
+    )
+    
+    # ✅ Автозаповнення для ForeignKey (швидше ніж dropdown)
+    autocomplete_fields = ['unit']
+    
+    # ✅ Організація полів у вкладки
+    fieldsets = (
+        ('Основна інформація', {
+            'fields': (
+                'unit',
+                ('cipher', 'is_active'),
+                'full_name',
+                ('oid_type', 'pemin_sub_type'),
+            )
+        }),
+        ('Класифікація та розташування', {
+            'fields': (
+                ('sec_level', 'room'),
+                ('serial_number', 'inventory_number'),
+            )
+        }),
+        ('Статус та примітки', {
+            'fields': (
+                'status',
+                'note',
+            )
+        }),
+        ('Системна інформація', {
+            'fields': (
+                'created_at',
+                'updated_at',
+            ),
+            'classes': ('collapse',),  # Згорнуто за замовчуванням
+        }),
+    )
+    
+    # ✅ Поля тільки для читання
+    readonly_fields = ('created_at', 'updated_at', 'documents_count_display')
+    
+    # ✅ Сортування за замовчуванням
+    ordering = ('-created_at',)
+    
+    # ✅ Навігація по датах
+    date_hierarchy = 'created_at'
+    
+    # ✅ Кількість записів на сторінці
+    list_per_page = 50
+    
+    # ✅ Пошук в історії
+    history_list_display = ["status", "is_active", "room"]
+    
+    # ✅ Оптимізація запитів
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        # Завантажуємо пов'язані об'єкти одним запитом
+        return qs.select_related('unit').annotate(
+            docs_count=Count('documents')  # Припускаємо related_name='documents'
+        )
+    
+    # ✅ Кастомні методи відображення
+    @admin.display(description='Статус', ordering='status')
+    def colored_status(self, obj):
+        """Статус з кольоровим індикатором"""
+        colors = {
+            OIDStatusChoices.NEW: '#FFA500',  # Помаранчевий
+            OIDStatusChoices.ACTIVE: '#28a745',  # Зелений
+            OIDStatusChoices.INACTIVE: '#6c757d',  # Сірий
+            # Додайте інші статуси
+        }
+        color = colors.get(obj.status, '#000000')
+        return format_html(
+            '<span style="color: {}; font-weight: bold;">⬤ {}</span>',
+            color,
+            obj.get_status_display()
+        )
+    
+    @admin.display(description='Частина', ordering='unit__code')
+    def unit_link(self, obj):
+        """Клікабельне посилання на частину"""
+        from django.urls import reverse
+        from django.utils.safestring import mark_safe
+        
+        url = reverse('admin:your_app_unit_change', args=[obj.unit.pk])
+        return mark_safe(f'<a href="{url}">{obj.unit.code}</a>')
+    
+    @admin.display(description='Документів', ordering='docs_count')
+    def documents_count_display(self, obj):
+        """Кількість документів з іконкою"""
+        count = getattr(obj, 'docs_count', 0)
+        if count > 0:
+            return format_html(
+                '<span style="background-color: #007bff; color: white; '
+                'padding: 2px 6px; border-radius: 3px;">📄 {}</span>',
+                count
+            )
+        return '—'
+    
+    @admin.display(description='Створено', ordering='created_at')
+    def created_at_short(self, obj):
+        """Коротке відображення дати"""
+        from django.utils import timezone
+        if timezone.now().date() == obj.created_at.date():
+            return format_html(
+                '<span style="color: green;">Сьогодні {}</span>',
+                obj.created_at.strftime('%H:%M')
+            )
+        return obj.created_at.strftime('%d.%m.%Y')
+    
+    # ✅ Масові дії (actions)
+    actions = ['activate_oids', 'deactivate_oids', 'export_to_excel']
+    
+    @admin.action(description='✅ Активувати вибрані ОІД')
+    def activate_oids(self, request, queryset):
+        updated = queryset.update(is_active=True)
+        self.message_user(request, f'Активовано {updated} ОІД')
+    
+    @admin.action(description='❌ Деактивувати вибрані ОІД')
+    def deactivate_oids(self, request, queryset):
+        updated = queryset.update(is_active=False)
+        self.message_user(request, f'Деактивовано {updated} ОІД', level='warning')
+    
+    @admin.action(description='📊 Експорт в Excel')
+    def export_to_excel(self, request, queryset):
+        import openpyxl
+        from django.http import HttpResponse
+        from openpyxl.utils import get_column_letter
+        
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "ОІД"
+        
+        # Заголовки
+        headers = ['Шифр', 'Тип', 'Частина', 'Приміщення', 'Статус', 'Створено']
+        ws.append(headers)
+        
+        # Дані
+        for obj in queryset:
+            ws.append([
+                obj.cipher,
+                obj.get_oid_type_display(),
+                obj.unit.code,
+                obj.room,
+                obj.get_status_display(),
+                obj.created_at.strftime('%d.%m.%Y')
+            ])
+        
+        # Відповідь
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename=oid_export.xlsx'
+        wb.save(response)
+        return response
 
 # @admin.register(Person)
 # class PersonAdmin(SimpleHistoryAdmin):
