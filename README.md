@@ -203,11 +203,10 @@ RECEIVED_REQUEST_ACTIVE = 'отримано заявку (активний ОІ�
 
 
 
+workavr@gmail.com
 
 
-https://claude.ai/chat/6bc792ec-5319-4fd4-ba83-797610dce92c?artifactId=remixed-2f872578
-onvix80@gmail.com
+# TODO: Замініть на вашу логіку отримання Person з User
+person = Person.objects.first()  # Тимчасове рішення
 
-
-smt8096@gmail.com
-https://gemini.google.com/u/3/app/363239d5ea671694?utm_source=app_launcher&utm_medium=owned&utm_campaign=base_all&pageId=none
+потрібно замінити на код який буде виконувати дії від імені облікового запису який було залоговано в систему
