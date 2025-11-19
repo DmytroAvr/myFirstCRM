@@ -152,15 +152,25 @@ def task_detail(request, pk):
         pk=pk
     )
     
+    # Отримання поточного користувача
+    person = request.person
+    
+    # Перевірка чи є зв'язок
+    if not person:
+        messages.error(request, 'Ваш обліковий запис не зв\'язано з виконавцем')
+        return redirect('taskFlow:project_list')
+        
+
     # Обробка POST запитів
     if request.method == 'POST':
         # Додавання коментаря
         if 'add_comment' in request.POST:
             comment_text = request.POST.get('comment_text', '').strip()
             if comment_text:
-                # Отримуємо поточного користувача (Person)
-                # TODO: Замініть на вашу логіку отримання Person з User
-                person = Person.objects.first()  # Тимчасове рішення
+                TaskComment.objects.create(task=task, author=person, text=comment_text, is_system=False)
+                messages.success(request, 'Коментар додано')
+                return redirect('taskFlow:task_detail', pk=pk)
+
                 
 # 
 # 
@@ -186,7 +196,7 @@ def task_detail(request, pk):
         
         # Позначити як виконане
         if 'mark_completed' in request.POST:
-            person = Person.objects.first()  # TODO: Ваша логіка
+            person = request.person  
             set_task_changed_by(task, person)
             
             # Знаходимо фінальний статус
@@ -313,7 +323,7 @@ def task_edit(request, pk):
     
     if request.method == 'POST':
         # Отримуємо поточного користувача
-        person = Person.objects.first()  # TODO: Ваша логіка
+        person = request.person  # TODO: Ваша логіка
         set_task_changed_by(task, person)
         
         # Оновлюємо поля
@@ -402,7 +412,7 @@ def task_update_status(request, pk):
         new_status = Status.objects.get(pk=new_status_id)
         
         # Отримуємо поточного користувача (Person)
-        person = Person.objects.first()  # TODO: Ваша логіка отримання Person з User
+        person = request.person  # TODO: Ваша логіка отримання Person з User
         
         if person:
             set_task_changed_by(task, person)
@@ -441,7 +451,7 @@ def task_assign(request, pk):
         assignee = Person.objects.get(pk=assignee_id) if assignee_id else None
         
         # Отримуємо поточного користувача
-        person = Person.objects.first()  # TODO: Ваша логіка
+        person = request.person  # TODO: Ваша логіка
         
         if person:
             set_task_changed_by(task, person)
@@ -474,7 +484,7 @@ def task_assign(request, pk):
 def dashboard(request):
     """Головна дашборд сторінка"""
     # TODO: Отримати поточного користувача (Person)
-    person = Person.objects.first()
+    person = request.person
     
     # Статистика користувача
     workload = get_user_workload(person) if person else {}

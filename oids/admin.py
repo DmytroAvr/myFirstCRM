@@ -50,27 +50,34 @@ class OIDAdmin(SimpleHistoryAdmin):
 @admin.register(Person)
 class PersonAdmin(admin.ModelAdmin):
     """Адміністрування виконавців"""
+       
     list_display = [
         'full_name', 'position', 'group_badge', 
-        'active_tasks_count', 'is_active_badge', 'created_at'
+        'active_tasks_count', 'is_active_badge', 'created_at',
+        'group', 'user', 'is_active',
     ]
     list_filter = ['group', 'is_active', 'created_at']
-    search_fields = ['full_name', 'surname', 'position']
+    search_fields = ['full_name', 'user__username', 'surname', 'position']
     list_per_page = 50
     date_hierarchy = 'created_at'
     
     fieldsets = (
         ('Основна інформація', {
-            'fields': ('full_name', 'surname', 'position')
+            'fields': ('full_name', 'surname', 'position', 'group')
         }),
-        ('Організаційна структура', {
-            'fields': ('group', 'is_active')
+        ('Обліковий запис', {
+            'fields': ('user',)
         }),
-        ('Метадані', {
+
+        ('Статус', {
+            'fields': ('is_active',)
+        }),
+			('Метадані', {
             'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
         }),
     )
+
     
     readonly_fields = ['created_at', 'updated_at']
     

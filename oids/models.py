@@ -5,6 +5,7 @@ import datetime
 from django.db.models import Q
 from simple_history.models import HistoricalRecords
 from dateutil.relativedelta import relativedelta
+from django.contrib.auth.models import User
 	
 # --- CONSTANTS / CHOICES ---
 # Краще зберігати вибори в окремих файлах або в самих моделях, якщо вони специфічні для моделі.
@@ -271,7 +272,15 @@ class Person(models.Model):
     is_active = models.BooleanField("Активний",default=True,help_text="Чи активний працівник")
     created_at = models.DateTimeField("Дата створення",auto_now_add=True)
     updated_at = models.DateTimeField("Дата оновлення", auto_now=True)
-
+    user = models.OneToOneField(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='person',
+        verbose_name="Обліковий запис",
+        help_text="Зв'язок з обліковим записом користувача"
+    )
     class Meta:
         verbose_name = "Виконавець"
         verbose_name_plural = "Довідково: Виконавці"
