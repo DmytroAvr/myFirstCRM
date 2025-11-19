@@ -91,6 +91,26 @@
     .task-card.due-today {
         border-left-color: #f97316;
     }
+    .task-card.completed {
+        opacity: 0.7;
+        background: #f0fdf4;
+        border-left-color: #10b981;
+    }
+    .task-card.completed .task-title {
+        text-decoration: line-through;
+        color: #6b7280;
+    }
+    .completed-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        background: #10b981;
+        color: white;
+        padding: 0.125rem 0.375rem;
+        border-radius: 0.25rem;
+        font-size: 0.625rem;
+        font-weight: 600;
+    }
     .task-key {
         font-size: 0.75rem;
         color: #64748b;
@@ -239,7 +259,13 @@
                 <div class="form-check form-check-inline">
                     <input class="form-check-input" type="checkbox" id="showOverdue" checked>
                     <label class="form-check-label small" for="showOverdue">
-                        Показати прострочені
+                        Прострочені
+                    </label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" id="showCompleted" checked>
+                    <label class="form-check-label small" for="showCompleted">
+                        Виконані
                     </label>
                 </div>
             </div>
@@ -270,7 +296,7 @@
                  ondragover="allowDrop(event)"
                  ondragleave="dragLeave(event)">
                 {% for task in column.tasks %}
-                <div class="task-card {% if task.is_overdue %}overdue{% elif task.is_due_today %}due-today{% endif %}" 
+                <div class="task-card {% if task.is_overdue %}overdue{% elif task.is_due_today %}due-today{% endif %} {% if task.is_recently_completed %}completed{% endif %}" 
                      draggable="true" 
                      ondragstart="drag(event)"
                      ondragend="dragEnd(event)"
@@ -278,12 +304,17 @@
                      data-assignee-id="{{ task.assignee.id|default:'' }}"
                      data-priority="{{ task.priority }}"
                      data-overdue="{% if task.is_overdue %}true{% else %}false{% endif %}"
+                     data-completed="{% if task.is_recently_completed %}true{% else %}false{% endif %}"
                      onclick="window.location='{% url 'taskFlow:task_detail' task.pk %}'">
                     
                     <!-- Ключ -->
                     <div class="task-key">
                         {{ task.key }}
-                        {% if task.is_overdue %}
+                        {% if task.is_recently_completed %}
+                            <span class="completed-badge">
+                                <i class="bi bi-check-circle-fill"></i> Виконано
+                            </span>
+                        {% elif task.is_overdue %}
                             <i class="bi bi-exclamation-triangle-fill text-danger ms-1"></i>
                         {% elif task.is_due_today %}
                             <i class="bi bi-clock-fill text-warning ms-1"></i>
@@ -429,6 +460,7 @@
         const assigneeFilter = document.getElementById('filterAssignee').value;
         const priorityFilter = document.getElementById('filterPriority').value;
         const showOverdue = document.getElementById('showOverdue').checked;
+        const showCompleted = document.getElementById('showCompleted').checked;
 
         document.querySelectorAll('.task-card').forEach(card => {
             let show = true;
@@ -442,6 +474,10 @@
             }
 
             if (!showOverdue && card.dataset.overdue === 'true') {
+                show = false;
+            }
+
+            if (!showCompleted && card.dataset.completed === 'true') {
                 show = false;
             }
 
@@ -463,12 +499,14 @@
         document.getElementById('filterAssignee').value = '';
         document.getElementById('filterPriority').value = '';
         document.getElementById('showOverdue').checked = true;
+        document.getElementById('showCompleted').checked = true;
         filterTasks();
     }
 
     document.getElementById('filterAssignee').addEventListener('change', filterTasks);
     document.getElementById('filterPriority').addEventListener('change', filterTasks);
     document.getElementById('showOverdue').addEventListener('change', filterTasks);
+    document.getElementById('showCompleted').addEventListener('change', filterTasks);
 
     function getCookie(name) {
         let cookieValue = null;

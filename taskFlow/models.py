@@ -335,6 +335,44 @@ class Task(models.Model):
             'critical': 'text-red-600',
         }
         return colors.get(self.priority, 'text-gray-600')
+    
+    def should_be_archived(self):
+        """
+        Перевіряє чи завдання має бути заархівоване
+        Завдання архівується якщо воно виконане та пройшло 8:10 наступного дня
+        """
+        if not self.is_completed or not self.completed_at:
+            return False
+        
+        # Отримуємо дату та час виконання
+        completed_datetime = self.completed_at
+        
+        # Обчислюємо наступний день о 8:10
+        archive_time = completed_datetime.replace(
+            hour=8, 
+            minute=10, 
+            second=0, 
+            microsecond=0
+        )
+        
+        # Якщо виконано після 8:10, то архівація буде наступного дня о 8:10
+        if completed_datetime.hour >= 8 and completed_datetime.minute >= 10:
+            archive_time = archive_time + timezone.timedelta(days=1)
+        # Якщо виконано до 8:10, то архівація буде сьогодні о 8:10
+        # але якщо зараз вже після 8:10, то наступного дня
+        else:
+            if timezone.now() >= archive_time:
+                archive_time = archive_time + timezone.timedelta(days=1)
+        
+        # Перевіряємо чи настав час архівації
+        return timezone.now() >= archive_time
+    
+    def is_recently_completed(self):
+        """
+        Перевіряє чи завдання щойно виконане (ще не архівоване)
+        """
+        return self.is_completed and not self.should_be_archived()
+
 
 
 class TaskComment(models.Model):
