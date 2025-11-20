@@ -43,7 +43,6 @@ class OIDAdmin(SimpleHistoryAdmin):
         'cipher', 
         'colored_status',  # Кастомний метод з кольорами
         'oid_type', 
-        'unit_link',  # Клікабельне посилання
         'room', 
         'sec_level',
         'is_active',
@@ -149,16 +148,7 @@ class OIDAdmin(SimpleHistoryAdmin):
             color,
             obj.get_status_display()
         )
-    
-    @admin.display(description='Частина', ordering='unit__code')
-    def unit_link(self, obj):
-        """Клікабельне посилання на частину"""
-        from django.urls import reverse
-        from django.utils.safestring import mark_safe
         
-        url = reverse('admin:your_app_unit_change', args=[obj.unit.pk])
-        return mark_safe(f'<a href="{url}">{obj.unit.code}</a>')
-    
     @admin.display(description='Документів', ordering='docs_count')
     def documents_count_display(self, obj):
         """Кількість документів з іконкою"""

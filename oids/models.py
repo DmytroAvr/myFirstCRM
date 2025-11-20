@@ -46,6 +46,7 @@ class SecLevelChoices(models.TextChoices):
     DSK = 'ДСК', 'ДСК'
  
 class OIDStatusChoices(models.TextChoices):
+    INACTIVE = 'неактивний', 'Неактивний'
     NEW = 'створюється', 'Створюється'
     RECEIVED_TZ = 'отримано ТЗ/МЗ', 'Отримано ТЗ/МЗ'
     RECEIVED_TZ_REPEAT = 'очікуємо ТЗ/МЗ(повторно)', 'Очікуємо ТЗ/МЗ(повторно)'

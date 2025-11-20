@@ -187,7 +187,8 @@ class TripForm(forms.ModelForm):
                         OIDStatusChoices.RECEIVED_REQUEST_PLAND_ATTESTATION,
                         OIDStatusChoices.RECEIVED_TZ,
                         OIDStatusChoices.ACTIVE,
-                        OIDStatusChoices.TERMINATED    
+                        OIDStatusChoices.TERMINATED,
+                        OIDStatusChoices.INACTIVE    
                         ] 
                 ).distinct().order_by('unit__code', 'cipher')
 

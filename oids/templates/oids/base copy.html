@@ -14,21 +14,170 @@
 	<link rel="stylesheet" href="{% static 'oids/css/bootstrap.min.css' %}">
 	<link rel="stylesheet" href="{% static 'oids/css/tom-select.default.min.css' %}">
 	<link rel="stylesheet" href="{% static 'oids/css/style.css' %}">
-	{# TODO: Додайте сюди посилання на CSS для Tom Select, коли будете його інтегрувати #}
-	{# #}
-	<!-- <script src="{% static 'oids/js/jquery-3.7.1.min.js' %}"></script> -->
+	
 	<script src="{% static 'oids/js/bootstrap.bundle.min' %}"></script>
 	<script src="{% static 'oids/js/tom-select.complete.min.js' %}"></script>
 
 	<style>
+		:root {
+			--primary-color: #2563eb;
+			--primary-hover: #1d4ed8;
+			--secondary-color: #10b981;
+			--danger-color: #ef4444;
+			--warning-color: #f59e0b;
+			--dark-bg: #1e293b;
+			--light-bg: #f1f5f9;
+			--border-color: #cbd5e1;
+			--taskflow-color: #8b5cf6;
+		}
+
+		body {
+			min-height: 100vh;
+			display: flex;
+			flex-direction: column;
+			background: linear-gradient(to bottom right, #f8fafc, #e0e7ff);
+		}
+
+		/* Header Improvements */
+		.header {
+			background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+			color: white;
+			box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+			border-bottom: none !important;
+		}
+
+		.header h1 {
+			color: white;
+			font-weight: 700;
+			text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+		}
+
+		/* Navigation Menu */
+		.nav-pills {
+			gap: 8px;
+			flex-wrap: wrap;
+			margin-bottom: 1rem;
+		}
+
+		.nav-item .menu__link {
+			background: rgba(255, 255, 255, 0.95);
+			color: var(--primary-color);
+			padding: 10px 20px;
+			border-radius: 8px;
+			text-decoration: none;
+			font-weight: 600;
+			transition: all 0.3s ease;
+			display: inline-block;
+			box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+		}
+
+		.nav-item .menu__link:hover {
+			background: white;
+			transform: translateY(-2px);
+			box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+		}
+
+		/* Dropdown Menu */
+		.menu {
+			position: relative;
+			display: inline-block;
+		}
+
+		.menu__button {
+			background: rgba(255, 255, 255, 0.95);
+			color: var(--primary-color);
+			border: none;
+			padding: 10px 20px;
+			border-radius: 8px;
+			cursor: pointer;
+			font-weight: 600;
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			transition: all 0.3s ease;
+			box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+		}
+
+		.menu__button:hover {
+			background: white;
+			transform: translateY(-2px);
+			box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+		}
+
+		.menu__button-icon {
+			width: 20px;
+			height: 20px;
+			transition: transform 0.3s ease;
+		}
+
+		.menu:hover .menu__button-icon {
+			transform: rotate(180deg);
+		}
+
+		.menu__content {
+			display: none;
+			position: absolute;
+			top: 100%;
+			left: 0;
+			background: white;
+			min-width: 250px;
+			box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+			border-radius: 8px;
+			z-index: 1000;
+			margin-top: 8px;
+			padding: 8px;
+			animation: slideDown 0.3s ease;
+		}
+
+		@keyframes slideDown {
+			from {
+				opacity: 0;
+				transform: translateY(-10px);
+			}
+			to {
+				opacity: 1;
+				transform: translateY(0);
+			}
+		}
+
+		.menu:hover .menu__content {
+			display: block;
+		}
+
+		.menu__content .nav-link {
+			color: #475569;
+			padding: 10px 16px;
+			border-radius: 6px;
+			transition: all 0.2s ease;
+			display: block;
+		}
+
+		.menu__content .nav-link:hover {
+			background: var(--light-bg);
+			color: var(--primary-color);
+			transform: translateX(5px);
+		}
+
+		.menu__content h5 {
+			color: var(--primary-color);
+			font-size: 0.875rem;
+			font-weight: 700;
+			text-transform: uppercase;
+			margin: 12px 16px 8px;
+			letter-spacing: 0.5px;
+		}
+
+		.menu__content ul {
+			list-style: none;
+			padding: 0;
+			margin: 0;
+		}
+
+		/* TaskFlow Special Link */
 		.taskflow-link {
 			background: linear-gradient(135deg, var(--taskflow-color) 0%, #a78bfa 100%) !important;
+			color: white !important;
 			box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
-		}
-		.taskflow-link__header {
-			padding-top: 10px ;
-			padding-bottom: 5px ;
-			margin-bottom: 10px;
 		}
 
 		.taskflow-link:hover {
@@ -36,25 +185,140 @@
 			box-shadow: 0 6px 16px rgba(139, 92, 246, 0.5);
 		}
 
-</style>
+		/* Content Container */
+		.container {
+			flex: 1;
+		}
+
+		/* Messages */
+		.messages-container {
+			margin-top: 1.5rem;
+		}
+
+		.alert {
+			border-radius: 10px;
+			border-left: 4px solid;
+			animation: slideIn 0.3s ease;
+		}
+
+		@keyframes slideIn {
+			from {
+				opacity: 0;
+				transform: translateX(-20px);
+			}
+			to {
+				opacity: 1;
+				transform: translateX(0);
+			}
+		}
+
+		/* Content Area */
+		.content {
+			background: white;
+			padding: 2rem;
+			border-radius: 12px;
+			box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+			margin: 2rem 0;
+			min-height: 400px;
+		}
+
+		/* Footer Improvements */
+		.footer {
+			background: linear-gradient(135deg, var(--dark-bg) 0%, #334155 100%);
+			color: white;
+			margin-top: auto;
+			box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
+		}
+
+		.footer .nav {
+			gap: 1rem;
+		}
+
+		.footer .btn-primary {
+			background: linear-gradient(135deg, var(--primary-color), #3b82f6);
+			border: none;
+			padding: 12px 24px;
+			border-radius: 8px;
+			font-weight: 600;
+			transition: all 0.3s ease;
+			box-shadow: 0 4px 6px rgba(37, 99, 235, 0.3);
+		}
+
+		.footer .btn-primary:hover {
+			transform: translateY(-2px);
+			box-shadow: 0 6px 12px rgba(37, 99, 235, 0.4);
+		}
+
+		.footer .text-muted {
+			color: #94a3b8 !important;
+			margin-top: 1rem;
+		}
+
+		/* User Navigation */
+		.user-nav {
+			background: rgba(255, 255, 255, 0.1);
+			border-radius: 8px;
+			padding: 1rem !important;
+			margin-top: 1.5rem;
+			backdrop-filter: blur(10px);
+		}
+
+		.user-nav .btn {
+			border-radius: 6px;
+			font-weight: 600;
+			transition: all 0.3s ease;
+		}
+
+		.user-nav .btn:hover {
+			transform: translateY(-2px);
+		}
+
+		/* Responsive */
+		@media (max-width: 768px) {
+			.nav-pills {
+				flex-direction: column;
+			}
+
+			.menu__content {
+				position: fixed;
+				left: 50%;
+				transform: translateX(-50%);
+				width: 90%;
+				max-width: 300px;
+			}
+
+			.footer .nav {
+				flex-direction: column;
+			}
+		}
+	</style>
 </head>
 
 <body>
 	<div class="container">
-		<header class="header py-3 mb-4 border-bottom">
+		<header class="header py-3 mb-4">
 			<nav class="mb-3">
-				<a href="{% url 'taskFlow:project_list' %}" class="menu__link taskflow-link taskflow-link__header">
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-					</svg>
-					TaskFlow
-				</a>
-			<ul class="nav nav-pills">
-				<li class="nav-item">
-					<a href="{% url 'oids:main_dashboard' %}" class="menu__link">ГОЛОВНА</a>					
-				</li>
-				
-				<li class="nav-item">					
+				<ul class="nav nav-pills">
+					<li class="nav-item">
+						<a href="{% url 'oids:main_dashboard' %}" class="menu__link">
+							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+							</svg>
+							ГОЛОВНА
+						</a>					
+					</li>
+
+					{# TaskFlow Link - НОВИНКА! #}
+					<li class="nav-item">
+						<a href="{% url 'taskFlow:task_list' %}" class="menu__link taskflow-link">
+							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+							</svg>
+							TaskFlow
+						</a>
+					</li>
+
+					<li class="nav-item">					
 						<div class="menu">
 							<button class="menu__button">
 								<svg class="menu__button-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 24"
@@ -68,9 +332,10 @@
 								<a href="{% url 'oids:technical_task_process_select' %}" class="nav-link">Відправити ТЗ (опрацювати)</a>
 							</div>
 						</div>
-				</li>
-				<li>
-					<div class="menu">
+					</li>
+
+					<li>
+						<div class="menu">
 							<button class="menu__button">
 								<svg class="menu__button-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 24"
 									stroke-width="1.5" stroke="currentColor">
@@ -78,36 +343,39 @@
 								</svg>
 								Заявки / Планування
 							</button>
-								<div class="menu__content">
-									<a href="{% url 'oids:add_work_request' %}" class="nav-link">Додати заявку</a>
-									<a href="{% url 'oids:plan_trip_view_name' %}" class="nav-link">Запланувати відрядження</a>
-									<a href="{% url 'oids:technical_task_control' %}" class="nav-link">Контроль опрацювання ТЗ</a>
-									<a href="{% url 'oids:processing_control_dashboard' %}" class="nav-link">Контроль опрацювання Документів</a>
-								</div>
-							
-						</div></li>
-				<li><div class="menu">
+							<div class="menu__content">
+								<a href="{% url 'oids:add_work_request' %}" class="nav-link">Додати заявку</a>
+								<a href="{% url 'oids:plan_trip_view_name' %}" class="nav-link">Запланувати відрядження</a>
+								<a href="{% url 'oids:technical_task_control' %}" class="nav-link">Контроль опрацювання ТЗ</a>
+								<a href="{% url 'oids:processing_control_dashboard' %}" class="nav-link">Контроль опрацювання Документів</a>
+							</div>
+						</div>
+					</li>
+
+					<li>
+						<div class="menu">
 							<button class="menu__button">
 								<svg class="menu__button-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 24"
 									stroke-width="1.5" stroke="currentColor">
 									<path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
 								</svg>
-								опрацювання документів / відправка в частину
+								Опрацювання документів / відправка в частину
 							</button>
 							<div class="menu__content">
 								<a href="{% url 'oids:add_document_processing_view_name' %}" class="nav-link">Додати опрацювання документів</a>
 								<a href="{% url 'oids:send_trip_results_form' %}" class="nav-link">Відправити документи в частину</a> 
-
 							</div>
 						</div>
 					</li>
-				<li><div class="menu">
+
+					<li>
+						<div class="menu">
 							<button class="menu__button">
 								<svg class="menu__button-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 24"
 									stroke-width="1.5" stroke="currentColor">
 									<path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
 								</svg>
-								до ДССЗЗІ
+								До ДССЗЗІ
 							</button>
 							<div class="menu__content">
 								<a href="{% url 'oids:update_oid_status' %}" class="nav-link">Змінити статус ОІД</a>
@@ -128,15 +396,13 @@
 									</ul>
 								</div>
 							</div>
-						</div></li>
-
-			</ul>
-		</nav>
+						</div>
+					</li>
+				</ul>
+			</nav>
 
 			<h1 class="h3">{% block page_title %}Панель керування ОІД{% endblock %}</h1>
 		</header>
-
-		
 
 		{% if messages %}
 		<div id="messages" class="messages-container">
@@ -155,7 +421,7 @@
 		</main>
 	</div>
 
-	<footer class="footer mt-auto py-3 bg-light">
+	<footer class="footer mt-auto py-3">
 		<div class="container text-center">
 			<nav class="mb-2">
 				<ul class="nav justify-content-center">
@@ -177,7 +443,7 @@
 						</a>
 					</li>
 					<li class="nav-item px-2">
-						<a href="{% url 'taskFlow:project_list' %}" class="nav-link px-2 btn taskflow-link" >
+						<a href="{% url 'taskFlow:task_list' %}" class="nav-link px-2 btn taskflow-link" style="padding: 12px 24px;">
 							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 18px; height: 18px; display: inline-block; vertical-align: middle; margin-right: 6px;">
 								<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
 							</svg>
@@ -186,51 +452,41 @@
 					</li>
 				</ul>
 			</nav>
-			<div class="text-muted"><div>&copy; {% now "Y" %} TZIFlow. Всі права захищені.
-							<p>Дмитро АВРАЩЕНКО</p>
-						</div></div>
+			<span class="text-muted">&copy; {% now "Y" %} Управління ОІД</span>
 		</div>
 
-	<div class="user-nav" style="text-align: center; padding: 10px;">
-    {% if user.is_authenticated %}
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+		<div class="user-nav">
+			{% if user.is_authenticated %}
+				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
 					<path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z" />
 				</svg>
 				Вітаємо, <strong>{{ user.username }}</strong>!
 		  
-  
 				<form method="post" action="{% url 'logout' %}" style="display: inline; margin-left: 10px;">
 					{% csrf_token %}
-					<button type="submit" class="btn btn-sm btn-outline-dark">
+					<button type="submit" class="btn btn-sm btn-outline-light">
 						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 4px;">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
 						</svg>
 						Вийти
 					</button>
 				</form>
-        
-        {# Посилання на зміну пароля (якщо потрібно) #}
-        <a href="{% url 'password_change' %}" class="btn btn-sm btn-outline-dark ms-2">
+				
+				<a href="{% url 'password_change' %}" class="btn btn-sm btn-outline-light ms-2">
 					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 4px;">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
 					</svg>
 					Змінити пароль
 				</a>
-    {% else %}
-        <a href="{% url 'login' %}" class="btn btn-sm btn-outline-light">Увійти</a>
-        {# Якщо є реєстрація: #}
-        {# <a href="{% url 'oids:register' %}" class="btn btn-sm btn-primary ms-2">Реєстрація</a> #}
-    {% endif %}
-	</div>
+			{% else %}
+				<a href="{% url 'login' %}" class="btn btn-sm btn-outline-light">Увійти</a>
+			{% endif %}
+		</div>
 	</footer>
-
-
 
 	<script src="{% static 'oids/js/main.js' %}"></script>
 
-	{% block extra_js %}
-
-{% endblock %}
+	{% block extra_js %}{% endblock %}
 
 </body>
 

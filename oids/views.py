@@ -102,7 +102,7 @@ def ajax_load_oids_for_unit_categorized(request):
                     oid_item['attestation_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Акт атестації')
                     oid_item['prescription_expiration_date'] = get_last_document_expiration_date(oid_instance, 'Припис')
                     data['active'].append(oid_item)
-                elif oid_instance.status in [OIDStatusChoices.CANCELED, OIDStatusChoices.TERMINATED]:
+                elif oid_instance.status in [OIDStatusChoices.CANCELED, OIDStatusChoices.TERMINATED, OIDStatusChoices.INACTIVE]:
                     data['cancelled'].append(oid_item)
         
         except ValueError:
@@ -555,7 +555,8 @@ def main_dashboard(request):
 				]
                 OID_to_show_main_dashboard_cancel = [
                     OIDStatusChoices.CANCELED,
-                    OIDStatusChoices.TERMINATED
+                    OIDStatusChoices.TERMINATED,
+                    OIDStatusChoices.INACTIVE
 				]
                 if oid_instance.status in OID_to_show_main_dashboard_creating:
                     oids_creating_list.append(oid_item_data)
