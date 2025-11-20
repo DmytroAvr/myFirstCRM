@@ -196,7 +196,7 @@ class Command(BaseCommand):
         # Отримання даних, створених раніше
         unit_3030 = Unit.objects.get(code="3030")
         oid_pemin_101 = OID.objects.get(cipher="101/01-ПЕМІН")
-        oid_movna_101 = OID.objects.get(cipher="101/02-МОВНА")
+        oid_speak_101 = OID.objects.get(cipher="101/02-МОВНА")
 
         # --- Заявка 1: на атестацію та ІК для ВЧ 3030 ---
         wr1, created = WorkRequest.objects.get_or_create(
@@ -234,7 +234,7 @@ class Command(BaseCommand):
         if created:
              WorkRequestItem.objects.create(
                 request=wr2,
-                oid=oid_movna_101,
+                oid=oid_speak_101,
                 work_type=WorkTypeChoices.ATTESTATION
             )
             

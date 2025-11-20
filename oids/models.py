@@ -128,6 +128,7 @@ class PersonGroup(models.TextChoices):
     SDKTK = 'СД КТК', 'СД КТК'
     REPAIR = 'Майстерня', 'Майстерня'
     PDTR = 'ПДТР', 'ПДТР'
+    AUD = 'Аудит З ТЗІ', 'Аудит З ТЗІ'
     SL = 'СлужбаТЗІ', 'Служба ТЗІ'
     # OAB = 'ОАБ', 'ОАБ'
 
@@ -242,13 +243,14 @@ class OID(models.Model):
     status = models.CharField(
         max_length=35, 
         choices=OIDStatusChoices.choices, 
-        default=OIDStatusChoices.NEW, 
+        # default=OIDStatusChoices.NEW, 
         verbose_name="Поточний стан ОІД",
         db_index=True  # ✅ Часто фільтруємо по статусу
     )
     note = models.TextField(
         verbose_name="Примітка", 
         blank=True,
+        null=True,
         default=""  # ✅ Краще default="" ніж null=True для TextField
     )
     created_at = models.DateTimeField(
@@ -272,12 +274,14 @@ class OID(models.Model):
         max_length=20, 
         verbose_name="Серійний номер", 
         blank=True,
+        null=True,
         default=""
     )
     inventory_number = models.CharField(
         max_length=20, 
         verbose_name="Інвентарний №", 
         blank=True,
+        null=True,
         default=""
     )
     
@@ -313,11 +317,12 @@ class OID(models.Model):
     def clean(self):
         from django.core.exceptions import ValidationError
         
+		# TODO повернути після імпорту
         # Перевірка: pemin_sub_type має бути тільки для ПЕМІН
-        if self.oid_type == OIDTypeChoices.MOVNA and self.pemin_sub_type:
-            raise ValidationError({
-                'pemin_sub_type': 'Тип ЕОТ може бути тільки для ПЕМІН об\'єктів'
-            })
+        # if self.oid_type == OIDTypeChoices.SPEAK and self.pemin_sub_type:
+        #     raise ValidationError({
+        #         'pemin_sub_type': 'Тип ЕОТ може бути тільки для ПЕМІН об\'єктів'
+        #     })
         
         # Перевірка: для ПЕМІН обов'язково вказати підтип
         if self.oid_type == OIDTypeChoices.PEMIN and not self.pemin_sub_type:
@@ -379,9 +384,9 @@ class OIDQuerySet(models.QuerySet):
         """Тільки ПЕМІН"""
         return self.filter(oid_type=OIDTypeChoices.PEMIN)
     
-    def movna(self):
+    def speak(self):
         """Тільки МОВНА"""
-        return self.filter(oid_type=OIDTypeChoices.MOVNA)
+        return self.filter(oid_type=OIDTypeChoices.SPEAK)
     
     def by_unit(self, unit):
         """По конкретній частині"""
@@ -401,8 +406,8 @@ class OIDManager(models.Manager):
     def pemin(self):
         return self.get_queryset().pemin()
     
-    def movna(self):
-        return self.get_queryset().movna()
+    def speak(self):
+        return self.get_queryset().speak()
 
 class Person(models.Model):
     """
@@ -1148,7 +1153,7 @@ class Document(models.Model):
         if self.document_type and self.document_type.has_expiration and self.document_type.duration_months and self.work_date:
             try:
                 duration = int(self.document_type.duration_months)
-                print(f"DEBUG: duration (from document_type.duration_months): {duration}")
+                # print(f"DEBUG: duration (from document_type.duration_months): {duration}")
                 
                 if duration > 0:
                     delta = relativedelta(months=duration)
@@ -1172,7 +1177,7 @@ class Document(models.Model):
                     # --- Використовуємо об'єкт дати для розрахунку ---
                     self.expiration_date = work_date_obj + delta
     
-                    print(f"DEBUG: Calculated self.expiration_date object: {self.expiration_date}")
+                    # print(f"DEBUG: Calculated self.expiration_date object: {self.expiration_date}")
                 else:
                     self.expiration_date = None
                     
