@@ -4,6 +4,7 @@ Management команди для Task Manager
 """
 
 from django.core.management.base import BaseCommand
+from django.contrib.auth.models import User
 from django.db import transaction
 from oids.models import Person, PersonGroup  # Імпорт з oids
 from taskFlow.models import Project, Status, Task
@@ -97,31 +98,78 @@ class Command(BaseCommand):
         # 1. Створення виконавців
         self.stdout.write('\n1. Створення виконавців...')
         persons_data = [
-            {
-                'full_name': 'Іваненко Іван',
-                'surname': 'Іваненко',
-                'position': 'Керівник проєкту',
-                'group': PersonGroup.GOV,
-            },
             # {
-            #     'full_name': 'Петренко Петро',
-            #     'surname': 'Петренко',
-            #     'position': 'Розробник',
-            #     'group': PersonGroup.IARM,
+            #     'full_name': 'Іваненко Іван',
+            #     'surname': 'Іваненко',
+            #     'position': 'Керівник проєкту',
+            #     'group': PersonGroup.GOV,
             # },
+            {
+                'full_name': 'Петренко Петро',
+                'surname': 'Петренко',
+                'position': 'Розробник',
+                'group': PersonGroup.IARM,
+                'username': 'petrenko',
+                'email': '',
+                'password': 'demo123',
+            },
         ]
         
         persons = {}
         for person_data in persons_data:
-            person, created = Person.objects.get_or_create(
+            # Витягуємо дані для User
+            username = person_data.pop('username')
+            email = person_data.pop('email')
+            password = person_data.pop('password')
+            
+            # Створюємо або отримуємо User
+            user, user_created = User.objects.get_or_create(
+                username=username,
+                defaults={
+                    'email': email,
+                    'first_name': person_data.get('full_name', '').split()[1] if len(person_data.get('full_name', '').split()) > 1 else '',
+                    'last_name': person_data.get('surname', ''),
+                }
+            )
+            
+            # Встановлюємо пароль якщо користувач щойно створений
+            if user_created:
+                user.set_password(password)
+                user.save()
+                self.stdout.write(
+                    self.style.SUCCESS(f'  ✓ Створено User: {username} (пароль: {password})')
+                )
+            else:
+                self.stdout.write(
+                    self.style.WARNING(f'  ⚠ User вже існує: {username}')
+                )
+            
+            # Створюємо або отримуємо Person
+            person, person_created = Person.objects.get_or_create(
                 full_name=person_data['full_name'],
                 defaults=person_data
             )
-            persons[person_data['surname']] = person
-            if created:
+            
+            # Прив'язуємо User до Person
+            if not person.user:
+                person.user = user
+                person.save()
                 self.stdout.write(
-                    self.style.SUCCESS(f'  ✓ Створено: {person.full_name}')
+                    self.style.SUCCESS(f'  ✓ Створено Person: {person.full_name} → {username}')
                 )
+            elif person.user != user:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f'  ⚠ Person {person.full_name} вже прив\'язаний до {person.user.username}'
+                    )
+                )
+            else:
+                self.stdout.write(
+                    self.style.SUCCESS(f'  ✓ Person існує: {person.full_name} → {username}')
+                )
+            
+            persons[person_data['surname']] = person
+        
         
         # 2. Створення проєктів
         self.stdout.write('\n2. Створення проєктів...')
