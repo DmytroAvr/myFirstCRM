@@ -29,46 +29,6 @@ yourapp/
         └── init_task_manager.py  # Команда ініціалізації
 ```
 
-### 2. Налаштування settings.py
-
-```python
-INSTALLED_APPS = [
-    # ...
-    'taskFlow',  # Ваша app з Task Manager
-]
-```
-
-### 3. Підключення сигналів
-
-У файлі `taskFlow/apps.py`:
-
-```python
-from django.apps import AppConfig
-
-class YourAppConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'yourapp'
-    
-    def ready(self):
-        import yourapp.signals  # Імпортуємо сигнали
-```
-
-У файлі `yourapp/__init__.py`:
-
-```python
-default_app_config = 'yourapp.apps.YourAppConfig'
-```
-
-### 4. Міграції
-
-```bash
-# Створення міграцій
-python manage.py makemigrations
-
-# Застосування міграцій
-python manage.py migrate
-```
-
 ### 5. Ініціалізація даних
 
 ```bash
