@@ -1168,25 +1168,45 @@ def send_azr_for_registration_view(request):
             docs_to_create = []
             oids_for_m2m = []
             # 2. Проходимо по даних з формсету і створюємо документи
-            for form in item_formset:
-                oid_id = form.cleaned_data.get('oid')
-                oid_instance = OID.objects.get(pk=oid_id)
-                
-                docs_to_create.append(
-                    Document(
+            with transaction.atomic():
+                for form in item_formset:
+                    oid_id = form.cleaned_data.get('oid')
+                    oid_instance = OID.objects.get(pk=oid_id)
+                    # Створюємо документ стандартним способом (викличеться save())
+                    doc = Document(
                         oid=oid_instance,
                         document_type=azr_doc_type,
                         document_number=form.cleaned_data.get('prepared_number'),
                         doc_process_date=form.cleaned_data.get('prepared_date'),
-                        work_date=form.cleaned_data.get('prepared_date'), # Можна використовувати одну дату
+                        work_date=form.cleaned_data.get('prepared_date'),
                         wcr_submission=registration_request,
-                        # author=request.user.person
                     )
-                )
-                oids_for_m2m.append(oid_instance)
+                    doc.save() # <--- ВАЖЛИВО: Це запустить логіку оновлення статусів в models.py
+                
+                    oids_for_m2m.append(oid_instance)
+            #! fix from gemini раніше було
+            # for form in item_formset:
+            #     oid_id = form.cleaned_data.get('oid')
+            #     oid_instance = OID.objects.get(pk=oid_id)
+                
+                # docs_to_create.append(
+                #     Document(
+                #         oid=oid_instance,
+                #         document_type=azr_doc_type,
+                #         document_number=form.cleaned_data.get('prepared_number'),
+                #         doc_process_date=form.cleaned_data.get('prepared_date'),
+                #         work_date=form.cleaned_data.get('prepared_date'), # Можна використовувати одну дату
+                #         wcr_submission=registration_request,
+                #         # author=request.user.person
+                #     )
+                # )
+                # oids_for_m2m.append(oid_instance)
 
             # 3. Ефективно створюємо всі документи
-            Document.objects.bulk_create(docs_to_create)
+    			# було Document.objects.bulk_create(docs_to_create)
+            # for doc in docs_to_create:
+            #     doc.save() # Це запустить всю логіку оновлення статусів 
+            
             # Додаємо ОІДи до m2m поля "конверта"
             registration_request.oids.set(oids_for_m2m)
 

@@ -1911,8 +1911,6 @@ class OIDProcessStepInstance(models.Model):
 
 
 # tast manager 
-# Припускаємо, що модель Person імпортована або знаходиться в цьому ж файлі
-# from .models import Person 
 
 # --- Модель Проєкту (Project) ---
 class Project(models.Model):
