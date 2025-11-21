@@ -17,7 +17,8 @@ import datetime
 
 def get_last_week_date():
     """Повертає дату 'сьогодні мінус 7 днів'."""
-    return datetime.date.today() - datetime.timedelta(weeks=1)
+    todayDate = datetime.date.today() - datetime.timedelta(weeks=1)
+    return todayDate.strftime("%Y-%m-%d")
 
 # initial=datetime.date.today
 # ставить дату СЬОГОДНІ
@@ -336,7 +337,8 @@ class DocumentProcessingMainForm(forms.Form):
     doc_process_date = forms.DateField(
         label="Дата опрацювання документів (підг. від)",
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-        initial=datetime.date.today,
+        # initial=datetime.date.today,
+        initial=datetime.date.today().strftime("%Y-%m-%d"),
         required=True
     )
     work_date = forms.DateField(

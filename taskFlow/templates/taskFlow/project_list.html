@@ -8,7 +8,7 @@
     .hero-section {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
-        padding: 3rem 0;
+        padding: 1rem 0;
         border-radius: 0.5rem;
         margin-bottom: 2rem;
     }
@@ -86,8 +86,8 @@
     <div class="hero-section">
         <div class="container">
             <div class="row align-items-center">
-                <div class="col-lg-8">
-                    <h1 class="display-4 mb-3">📋 TaskFlow</h1>
+                <div class="col-lg-8 d-flex align-items-center">
+                    <h1 class="display-4 me-4">📋 TaskFlow</h1>
                     <p class="lead mb-0">Система управління проєктами та завданнями</p>
                 </div>
                 <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
@@ -123,7 +123,7 @@
             <div class="stats-card">
                 <div class="stats-number text-success">
                     <!-- {% widthratio projects.count 1 100 %}% -->
-					{{ projects.count}}
+					{{ projects.count}} 
                 </div>
                 <div class="stats-label">Середня завершеність</div>
             </div>
@@ -178,22 +178,6 @@
                         <span class="badge bg-primary">{{ project.get_group_display }}</span>
                     </div>
 
-                    <!-- Прогрес -->
-                    {% if project.task_count > 0 %}
-                    <div class="mb-2">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <small class="text-muted">Прогрес виконання</small>
-                            <small class="fw-semibold">
-                                {% widthratio project.task_count project.active_task_count 100 %}%
-                            </small>
-                        </div>
-                        <div class="progress-bar-custom">
-                            <div class="progress-fill" 
-                                 style="width: {% widthratio project.task_count project.active_task_count 100 %}%">
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
 
                     <!-- Статистика -->
                     <div class="project-stats">

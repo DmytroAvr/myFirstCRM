@@ -2820,7 +2820,8 @@ def processing_control_view(request):
     Сторінка "Контроль опрацювання документів".
     Тепер тут тільки логіка для WorkRequestItem.
     """
-    today_date = datetime.date.today()
+    # today_date = datetime.date.today()
+    today_date = datetime.date.today().strftime("%Y-%m-%d")
 # --- ОНОВЛЕНА ЛОГІКА ---
 
     # 1. Створюємо підзапити, щоб "дістати" дати ОСТАННЬОГО відрядження,

@@ -5,40 +5,6 @@
 
 {% block extra_css %}
 <style>
-    .form-container {
-        max-width: 900px;
-        margin: 0 auto;
-    }
-    .form-card {
-        background: white;
-        border-radius: 0.5rem;
-        box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
-        padding: 2rem;
-    }
-    .form-section {
-        margin-bottom: 2rem;
-        padding-bottom: 2rem;
-        border-bottom: 1px solid #e2e8f0;
-    }
-    .form-section:last-child {
-        border-bottom: none;
-        margin-bottom: 0;
-        padding-bottom: 0;
-    }
-    .section-title {
-        font-size: 1.125rem;
-        font-weight: 600;
-        color: #1e293b;
-        margin-bottom: 1rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-    .required-field::after {
-        content: '*';
-        color: #dc2626;
-        margin-left: 0.25rem;
-    }
 </style>
 {% endblock %}
 
@@ -119,7 +85,7 @@
                     <div class="col-md-6">
                         <label for="status" class="form-label">Статус</label>
                         <select class="form-select" id="status" name="status">
-                            <option value="">Стандартний</option>
+                            <option value="">Усталений статус</option>
                             {% for status in statuses %}
                             <option value="{{ status.id }}"
                                     {% if is_edit and task.status.id == status.id %}selected
@@ -129,7 +95,7 @@
                             </option>
                             {% endfor %}
                         </select>
-                        <small class="text-muted">Якщо не обрано - буде встановлено стандартний статус</small>
+                        <small class="text-muted">Усталений статус додає в БЕКЛОГ</small>
                     </div>
 
                     <!-- Назва -->
