@@ -45,6 +45,10 @@ from .forms_filters import (
 
 # def add_working_days(start_date, days_to_add): ... (якщо не в utils.py)
 
+def get_paginated_page(queryset, request, items_per_page=100):
+    paginator = Paginator(queryset, items_per_page)
+    page_number = request.GET.get('page')
+    return paginator.get_page(page_number)
  
 def ajax_get_oid_current_status(request):
     oid_id_str = request.GET.get('oid_id')
@@ -875,6 +879,7 @@ def plan_trip_view(request):
                         days_for_processing = 0
                         if item.work_type == WorkTypeChoices.IK: days_for_processing = 10 # налаштувати кількість днів для розрахунку часу на опрацювання   
                         elif item.work_type == WorkTypeChoices.ATTESTATION: days_for_processing = 15 # налаштувати кількість днів для розрахунку часу на опрацювання 
+                        elif item.work_type == WorkTypeChoices.PLAND_ATTESTATION: days_for_processing = 15 # налаштувати кількість днів для розрахунку часу на опрацювання 
                         
                         if days_for_processing > 0:
                            new_deadline = add_working_days(start_counting_from_date, days_for_processing)
@@ -1334,10 +1339,7 @@ def list_declaration_registrations_view(request):
     # prefetch_related('declarations') - оптимізація, щоб уникнути зайвих запитів до БД
     all_submissions = DeclarationRegistration.objects.prefetch_related('declarations').order_by('-outgoing_letter_date')
     
-    # Тут можна додати пагінацію, як на інших сторінках
-    paginator = Paginator(all_submissions, 20)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_paginated_page(all_submissions, request)    
 
     context = {
         'page_title': 'Декларації відправлені на реєстрацію до ДССЗЗІ',
@@ -1406,9 +1408,7 @@ def declaration_list_view(request):
             include_row_numbers=True 
             )
     # --- Пагінація ---
-    paginator = Paginator(queryset, 20)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_paginated_page(queryset, request)
     
     query_params = request.GET.copy()
     if 'sort' in query_params:
@@ -1691,9 +1691,7 @@ def document_list_view(request):
         )
 
     # --- Пагінація ---
-    paginator = Paginator(documents_list, 50)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_paginated_page(documents_list, request)
 
 	# Готуємо параметри для URL-адрес сортування
     query_params = request.GET.copy()
@@ -1756,11 +1754,8 @@ def unit_list_view(request):
     if sort_order == 'desc':
         order_by_field = f'-{order_by_field}'
     
-    units_list_qs = units_list_qs.order_by(order_by_field, 'name' if order_by_field != 'name' else 'code')
-
-    paginator = Paginator(units_list_qs, 25) 
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    units_list_qs = units_list_qs.order_by(order_by_field, 'code' if order_by_field != 'code' else 'name')
+    page_obj = get_paginated_page(units_list_qs, request)
 
     territorial_managements_for_filter = TerritorialManagement.objects.all().order_by('name')
 
@@ -1780,10 +1775,7 @@ def unit_list_view(request):
 @login_required 
 def territorial_management_list_view(request):
     tm_list_queryset = TerritorialManagement.objects.all().order_by('name')
-    
-    paginator = Paginator(tm_list_queryset, 25) # 25 записів на сторінку
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_paginated_page(tm_list_queryset, request)
     
     context = {
         'page_title': 'Список Територіальних Управлінь',
@@ -1795,10 +1787,7 @@ def territorial_management_list_view(request):
 @login_required 
 def unit_group_list_view(request):
     group_list_queryset = UnitGroup.objects.prefetch_related('units').order_by('name') # prefetch_related для units
-    
-    paginator = Paginator(group_list_queryset, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_paginated_page(group_list_queryset, request)
     
     context = {
         'page_title': 'Список Груп Військових Частин',
@@ -1810,10 +1799,8 @@ def unit_group_list_view(request):
 @login_required 
 def person_list_view(request):
     person_list_queryset = Person.objects.all().order_by('full_name')
-    
-    paginator = Paginator(person_list_queryset, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_paginated_page(person_list_queryset, request)
+
         
     context = {
         'page_title': 'Список Виконавців (Осіб)',
@@ -1825,10 +1812,7 @@ def person_list_view(request):
 @login_required 
 def document_type_list_view(request):
     doc_type_list_queryset = DocumentType.objects.all().order_by('oid_type', 'work_type', 'name')
-    
-    paginator = Paginator(doc_type_list_queryset, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_paginated_page(doc_type_list_queryset, request)
         
     context = {
         'page_title': 'Довідник: Типи документів',
@@ -1873,48 +1857,56 @@ def oid_list_view(request):
     # За замовчуванням сортуємо за датою створення (новіші спочатку), якщо поле created_at існує
     # Перевірте вашу модель OID на наявність поля created_at
     # Якщо у вас є поле created_at = models.DateTimeField(auto_now_add=True)
-    sort_by_param = request.GET.get('sort_by', '-created_at') # За замовчуванням - новіші ОІД
-    sort_order_from_request = request.GET.get('sort_order', '') # 'asc' або 'desc'
-
-    # Визначаємо напрямок сортування
-    # Якщо sort_by_param починається з '-', це вже desc. В іншому випадку дивимося на sort_order_from_request
-    actual_sort_order_is_desc = False
-    if sort_by_param.startswith('-'):
-        actual_sort_order_is_desc = True
-        sort_by_param_cleaned = sort_by_param[1:]
-    else:
-        sort_by_param_cleaned = sort_by_param
-        if sort_order_from_request == 'desc':
+# --- Сортування ---
+    sort_by_param = request.GET.get('sort_by') # Прибираємо дефолтне значення тут, тепер воно None
+    sort_order_from_request = request.GET.get('sort_order', '')
+    
+    if sort_by_param:
+        # === ВАРІАНТ 1: Користувач обрав конкретне поле для сортування ===
+        
+        actual_sort_order_is_desc = False
+        if sort_by_param.startswith('-'):
             actual_sort_order_is_desc = True
-    
-    valid_sort_fields = {
-        'city': 'unit__city',
-        'unit': 'unit__code',
-        'cipher': 'cipher',
-        'full_name': 'full_name',
-        'oid_type': 'oid_type',
-        'pemin_sub_type': 'pemin_sub_type',
-        'room': 'room',
-        'status': 'status',
-        'sec_level': 'sec_level',
-        'created_at': 'created_at' # Додаємо поле для сортування за датою створення
-    }
-    
-    order_by_field_key = valid_sort_fields.get(sort_by_param_cleaned, 'created_at')
+            sort_by_param_cleaned = sort_by_param[1:]
+        else:
+            sort_by_param_cleaned = sort_by_param
+            if sort_order_from_request == 'desc':
+                actual_sort_order_is_desc = True
+        
+        valid_sort_fields = {
+            'city': 'unit__city',
+            'unit': 'unit__code',
+            'cipher': 'cipher',
+            'full_name': 'full_name',
+            'oid_type': 'oid_type',
+            'pemin_sub_type': 'pemin_sub_type',
+            'room': 'room',
+            'status': 'status',
+            'sec_level': 'sec_level',
+            'created_at': 'created_at'
+        }
+        
+        # Якщо поле не знайдено, сортуємо за created_at як fallback
+        order_by_field_key = valid_sort_fields.get(sort_by_param_cleaned, 'created_at')
+        final_order_by_field = f"-{order_by_field_key}" if actual_sort_order_is_desc else order_by_field_key
+        
+        # Вторинне сортування для стабільності списку
+        if order_by_field_key == 'created_at':
+            secondary_sort = 'cipher'
+        elif order_by_field_key == 'cipher':
+            secondary_sort = '-created_at'
+        else:
+            secondary_sort = '-created_at'
 
-    final_order_by_field = f"-{order_by_field_key}" if actual_sort_order_is_desc else order_by_field_key
-    
-    # Додаємо вторинне сортування для стабільності
-    if order_by_field_key == 'created_at':
-        secondary_sort = 'cipher'
-    elif order_by_field_key == 'cipher':
-        secondary_sort = '-created_at'
+        oid_list_queryset = oid_list_queryset.order_by(final_order_by_field, secondary_sort)
+        
     else:
-        secondary_sort = '-created_at' # Загальне вторинне сортування
-
-    oid_list_queryset = oid_list_queryset.order_by(final_order_by_field, secondary_sort)
-
-
+        # === ВАРІАНТ 2: Сортування за замовчуванням (Первинне) ===
+        # 1 - за unit (використовуємо unit__code для сортування за номером/назвою, а не ID)
+        # 2 - за типом OID
+        # 3 - за шифром (cipher)
+        oid_list_queryset = oid_list_queryset.order_by('unit__code', 'oid_type', 'cipher')
+        
 	# --- ЕКСПОРТ В EXCEL ---
     if request.GET.get('export') == 'excel':
         # Стовпці для Excel, що відповідають таблиці на сторінці
@@ -1938,17 +1930,16 @@ def oid_list_view(request):
         )
     
     # --- Пагінація ---
-    paginator = Paginator(oid_list_queryset, 50) # 50 ОІД на сторінку
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_paginated_page(oid_list_queryset, request)
     
     context = {
         'page_title': 'Список Об\'єктів Інформаційної Діяльності (ОІД)',
         'object_list': page_obj,
         'page_obj': page_obj,
         'form': form, 
-        'current_sort_by': sort_by_param.lstrip('-'),
-        'current_sort_order_is_desc': sort_by_param.startswith('-'),
+        # Додаємо перевірку на None, щоб не виникала помилка при lstrip
+        'current_sort_by': sort_by_param.lstrip('-') if sort_by_param else '',
+        'current_sort_order_is_desc': sort_by_param.startswith('-') if sort_by_param else False,
     }
     return render(request, 'oids/lists/oid_list.html', context)
 
@@ -2033,9 +2024,7 @@ def work_request_list_view(request):
     # --- КІНЕЦЬ КОДУ імпорту excel ---
 
     # --- Пагінація ---
-    paginator = Paginator(work_request_list_queryset, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_paginated_page(work_request_list_queryset, request)
         
     context = {
         'page_title': 'Список Заявок на Проведення Робіт',
@@ -2135,9 +2124,7 @@ def trip_list_view(request):
     trip_list_queryset = trip_list_queryset.order_by(final_order_by_field, secondary_sort).distinct() # distinct тут теж може бути корисним
 
     # --- Пагінація ---
-    paginator = Paginator(trip_list_queryset, 15)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_paginated_page(trip_list_queryset, request)
         
     # Дані для фільтрів
     units_for_filter = Unit.objects.all().order_by('code')
@@ -2256,9 +2243,7 @@ def technical_task_list_view(request):
         )
 
     # --- Пагінація ---
-    paginator = Paginator(task_list_queryset, 50)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_paginated_page(task_list_queryset, request)
 
     context = {
         'page_title': 'Список опрацювання ТЗ/МЗ',
@@ -2290,9 +2275,7 @@ def attestation_response_list_view(request):
         current_filter_att_reg_id = int(filter_att_reg_id_str)
         response_list_queryset = response_list_queryset.filter(attestation_registration_sent__id=current_filter_att_reg_id)
 
-    paginator = Paginator(response_list_queryset, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_paginated_page(response_list_queryset, request)
     
     context = {
         'page_title': 'Відповіді від ДССЗЗІ на реєстрацію Актів',
@@ -2313,9 +2296,7 @@ def trip_result_for_unit_list_view(request):
         Prefetch('documents', queryset=Document.objects.select_related('document_type')) # Документи, що відправлені
     ).order_by('-outgoing_letter_date') # Сортуємо за датою відправки до частини
 
-    paginator = Paginator(result_list_queryset, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_paginated_page(result_list_queryset, request)
         
     context = {
         'page_title': 'Список Результатів Відряджень (відправка до ВЧ)',
@@ -2420,9 +2401,7 @@ def oid_status_change_list_view(request):
     status_change_list_queryset = status_change_list_queryset.order_by(final_order_by_field, secondary_sort).distinct()
 
     # --- Пагінація ---
-    paginator = Paginator(status_change_list_queryset, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_paginated_page(status_change_list_queryset, request)
         
     # Дані для фільтрів
     units_for_filter = Unit.objects.all().order_by('code')
@@ -2502,10 +2481,7 @@ def attestation_registration_list_view(request):
             include_row_numbers=True
         )
     # --- КІНЕЦЬ БЛОКУ ЕКСПОРТУ ---
-    
-    paginator = Paginator(registration_list_queryset, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_paginated_page(registration_list_queryset, request)
 
     context = {
         'page_title': 'Відправки Актів Атестації на реєстрацію (ДССЗЗІ)',
@@ -2567,10 +2543,7 @@ def attestation_response_list_view(request):
             filename='attestation_responses_export.xlsx', 
             include_row_numbers=True
         )
-
-    paginator = Paginator(response_list_queryset, 25)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_paginated_page(response_list_queryset, request)
 
     context = {
         'page_title': 'Відповіді від ДССЗЗІ на реєстрацію Актів',
@@ -2669,9 +2642,7 @@ def attestation_registered_acts_list_view(request):
         )
 
     # 5. Пагінація
-    paginator = Paginator(final_queryset, 50)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_paginated_page(final_queryset, request)
 
 	# Готуємо параметри для URL-адрес сортування
     query_params = request.GET.copy()
@@ -2824,9 +2795,7 @@ def list_azr_registrations_view(request):
     all_registrations = WorkCompletionRegistration.objects.all().order_by('-outgoing_letter_date')
 
     # Тут можна додати пагінацію, як на інших сторінках
-    paginator = Paginator(all_registrations, 20) # 20 записів на сторінку
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_paginated_page(all_registrations, request)
 
     context = {
         'page_title': 'Відправки АЗР на реєстрацію',
@@ -2962,10 +2931,7 @@ def processing_control_view(request):
     else: # За замовчуванням
         wri_queryset = wri_queryset.order_by('doc_processing_deadline', 'request__incoming_date', 'oid__cipher')
         current_wri_sort_order_for_template = 'asc' 
-
-    wri_paginator = Paginator(wri_queryset, 15) 
-    wri_page_number = request.GET.get('wri_page') 
-    wri_page_obj = wri_paginator.get_page(wri_page_number)
+    page_obj = get_paginated_page(wri_queryset, request)
 
     all_units = Unit.objects.all().order_by('code')
 
@@ -3017,10 +2983,8 @@ def technical_task_control_view(request):
         tt_order_by_field = f"-{tt_order_by_field}"
 
     tt_queryset = tt_queryset.order_by(tt_order_by_field, 'input_number')
-
-    tt_paginator = Paginator(tt_queryset, 15)
-    tt_page_number = request.GET.get('tt_page')
-    tt_page_obj = tt_paginator.get_page(tt_page_number)
+    
+    page_obj = get_paginated_page(tt_queryset, request)
     
     # Готуємо контекст для передачі в шаблон
     context = {
@@ -3167,9 +3131,7 @@ def azr_documents_list_view(request):
         )
     
     # --- Пагінація (залишається без змін) ---
-    paginator = Paginator(queryset, 20)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_paginated_page(queryset, request)
     
     # --- НОВА ЛОГІКА: Підготовка URL для сортування ---
     query_params = request.GET.copy()
