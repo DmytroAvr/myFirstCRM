@@ -1271,9 +1271,7 @@ def record_azr_response_view(request, registration_id):
     return render(request, 'oids/forms/record_azr_response.html', context)
 
 
-
 # view declaration
-
 
 @login_required
 @transaction.atomic
@@ -2256,37 +2254,6 @@ def technical_task_list_view(request):
     return render(request, 'oids/lists/technical_task_list.html', context)
 
 @login_required 
-def attestation_response_list_view(request):
-    """
-    Відображає список Отриманих відповідей від ДССЗЗІ.
-    """
-    response_list_queryset = AttestationResponse.objects.select_related(
-        'attestation_registration_sent__sent_by', 
-        'received_by'
-    ).prefetch_related(
-        'attestation_registration_sent__registered_documents__oid__unit', # Для доступу до ВЧ ОІДа
-        'attestation_registration_sent__registered_documents__document_type' # Для доступу до типу документа
-    ).order_by('-response_letter_date', '-id')
-
-    # --- Фільтрація (приклад, якщо потрібна) ---
-    filter_att_reg_id_str = request.GET.get('att_reg_id') 
-    current_filter_att_reg_id = None
-    if filter_att_reg_id_str and filter_att_reg_id_str.isdigit():
-        current_filter_att_reg_id = int(filter_att_reg_id_str)
-        response_list_queryset = response_list_queryset.filter(attestation_registration_sent__id=current_filter_att_reg_id)
-
-    page_obj = get_paginated_page(response_list_queryset, request)
-    
-    context = {
-        'page_title': 'Відповіді від ДССЗЗІ на реєстрацію Актів',
-        'object_list': page_obj,
-        'page_obj': page_obj,
-        'all_registrations_sent': AttestationRegistration.objects.order_by('-outgoing_letter_date'),
-        'current_filter_att_reg_id': current_filter_att_reg_id,
-    }
-    return render(request, 'oids/lists/attestation_response_list.html', context)
-
-@login_required 
 def trip_result_for_unit_list_view(request):
     result_list_queryset = TripResultForUnit.objects.select_related(
         'trip' # Якщо потрібно бачити деталі самого відрядження
@@ -2491,6 +2458,7 @@ def attestation_registration_list_view(request):
     }
     return render(request, 'oids/lists/attestation_registration_list.html', context)
 
+
 @login_required 
 def attestation_response_list_view(request):
     response_list_queryset = AttestationResponse.objects.select_related(
@@ -2499,8 +2467,20 @@ def attestation_response_list_view(request):
     ).prefetch_related(
         # Оптимізація для доступу до даних в шаблоні та експорті
         Prefetch('attestation_registration_sent__registered_documents', 
-                 queryset=Document.objects.select_related('oid__unit'))
+                 queryset=Document.objects.select_related('oid__unit')),
+        'attestation_registration_sent__registered_documents__oid__unit', # Для доступу до ВЧ ОІДа
+        'attestation_registration_sent__registered_documents__document_type' # Для доступу до типу документа
     ).order_by('-response_letter_date', '-id')
+    
+	
+    # --- Фільтрація (приклад, якщо потрібна) ---
+    # filter_att_reg_id_str = request.GET.get('att_reg_id') 
+    # current_filter_att_reg_id = None
+    # if filter_att_reg_id_str and filter_att_reg_id_str.isdigit():
+    #     current_filter_att_reg_id = int(filter_att_reg_id_str)
+    #     response_list_queryset = response_list_queryset.filter(attestation_registration_sent__id=current_filter_att_reg_id)
+
+    # page_obj = get_paginated_page(response_list_queryset, request)
 
     # --- НОВА ЛОГІКА ФІЛЬТРАЦІЇ ---
     form = AttestationResponseFilterForm(request.GET or None)
@@ -2543,13 +2523,17 @@ def attestation_response_list_view(request):
             filename='attestation_responses_export.xlsx', 
             include_row_numbers=True
         )
+    
     page_obj = get_paginated_page(response_list_queryset, request)
 
+   
     context = {
         'page_title': 'Відповіді від ДССЗЗІ на реєстрацію Актів',
         'object_list': page_obj,
         'page_obj': page_obj,
+        'all_registrations_sent': AttestationRegistration.objects.order_by('-outgoing_letter_date'),
         'form': form, # Передаємо форму в шаблон
+        'current_filter_att_reg_id': current_filter_att_reg_id,
     }
     return render(request, 'oids/lists/attestation_response_list.html', context)
 
@@ -2661,9 +2645,6 @@ def attestation_registered_acts_list_view(request):
         'sort_url_part': query_params.urlencode(),
     }
     return render(request, 'oids/lists/attestation_registered_num_list.html', context)
-
-
-# View для внесення "Відповіді від ДССЗЗІ"
 
 @login_required 
 @transaction.atomic
@@ -2938,7 +2919,7 @@ def processing_control_view(request):
     context = {
         'page_title': 'Контроль опрацювання',
         'wri_filter_form': wri_filter_form,
-        'work_request_items': wri_page_obj, 
+        'work_request_items': page_obj, 
         'all_units': all_units, 
         'today_date': today_date,
         'current_wri_sort_by': wri_sort_by.lstrip('-'), # Чисте ім'я поля для порівняння в шаблоні
@@ -2985,12 +2966,12 @@ def technical_task_control_view(request):
     tt_queryset = tt_queryset.order_by(tt_order_by_field, 'input_number')
     
     page_obj = get_paginated_page(tt_queryset, request)
-    
+
     # Готуємо контекст для передачі в шаблон
     context = {
         'page_title': 'Контроль опрацювання ТЗ/МЗ',
         'tt_filter_form': tt_filter_form,
-        'technical_tasks': tt_page_obj,
+        'technical_tasks': page_obj,
         'today_date': today_date,
         'current_tt_sort_by': tt_sort_by.lstrip('-'),
         'current_tt_sort_order': 'desc' if tt_sort_by.startswith('-') else tt_sort_order,
@@ -3073,7 +3054,7 @@ def azr_documents_list_view(request):
     try:
         azr_doc_type = DocumentType.objects.get(name__icontains="Акт завершення")
     except DocumentType.DoesNotExist:
-        messages.error(request, "Тип документу 'Акт завершення111' не знайдено.")
+        messages.error(request, "Тип документу 'Акт завершення' не знайдено.")
         return redirect('oids:main_dashboard')
 
     queryset = Document.objects.filter(document_type=azr_doc_type).select_related('oid__unit')

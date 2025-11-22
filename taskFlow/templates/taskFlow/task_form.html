@@ -284,7 +284,7 @@
 
 {% block extra_js %}
 <script>
-    // Валідація форми
+	// Валідація форми
     document.querySelector('form').addEventListener('submit', function(e) {
         const title = document.getElementById('title').value.trim();
         const project = document.getElementById('project').value;
@@ -304,61 +304,101 @@
         }
     });
 
-    // Автоматичне встановлення мінімальної дати (сьогодні)
-    const dueDateInput = document.getElementById('due_date');
-    const today = new Date().toISOString().split('T')[0];
-    dueDateInput.setAttribute('min', today);
-
-    // Попередження при виборі минулої дати
-    dueDateInput.addEventListener('change', function() {
-        const selectedDate = new Date(this.value);
-        const todayDate = new Date(today);
-        
-        if (selectedDate < todayDate) {
-            if (!confirm('Ви обрали дату в минулому. Продовжити?')) {
-                this.value = '';
-            }
-        }
-    });
-
-    // Автозбереження в localStorage (опціонально)
+    // Константи
     const formFields = ['title', 'description', 'priority'];
     const formKey = 'taskflow_draft_task';
+    
+    // Основні елементи
+    const form = document.querySelector('form.form-card');
+    const dueDateInput = document.getElementById('due_date');
 
-    // Завантаження збереженого драфту
+    // --- 1. Логіка дат ---
+    const today = new Date().toISOString().split('T')[0];
+    if (dueDateInput) {
+        dueDateInput.setAttribute('min', today);
+        dueDateInput.addEventListener('change', function() {
+            const selectedDate = new Date(this.value);
+            const todayDate = new Date(today);
+            if (selectedDate < todayDate) {
+                if (!confirm('Ви обрали дату в минулому. Продовжити?')) {
+                    this.value = '';
+                }
+            }
+        });
+    }
+
+    // --- 2. Логіка Драфтів (Тільки для створення) ---
     {% if not is_edit %}
+    
+    // Завантаження драфту
     window.addEventListener('load', function() {
         const draft = localStorage.getItem(formKey);
-        if (draft) {
+        // Перевіряємо, чи є драфт і чи поля форми порожні (щоб не перезаписати дані при помилці сервера)
+        const titleInput = document.getElementById('title');
+        const isFormEmpty = titleInput.value.trim() === '';
+
+        if (draft && isFormEmpty) {
             const data = JSON.parse(draft);
             if (confirm('Знайдено незбережений драфт. Відновити?')) {
                 formFields.forEach(field => {
-                    if (data[field]) {
-                        document.getElementById(field).value = data[field];
+                    const element = document.getElementById(field);
+                    if (element && data[field]) {
+                        element.value = data[field];
                     }
                 });
             } else {
+                // Якщо користувач відмовився - видаляємо старий драфт
                 localStorage.removeItem(formKey);
             }
         }
     });
 
-    // Збереження драфту
+    // Збереження драфту при введенні
     formFields.forEach(field => {
         const element = document.getElementById(field);
-        element.addEventListener('input', function() {
-            const draft = {};
-            formFields.forEach(f => {
-                draft[f] = document.getElementById(f).value;
+        if (element) {
+            element.addEventListener('input', function() {
+                const draft = {};
+                formFields.forEach(f => {
+                    const el = document.getElementById(f);
+                    if (el) draft[f] = el.value;
+                });
+                localStorage.setItem(formKey, JSON.stringify(draft));
             });
-            localStorage.setItem(formKey, JSON.stringify(draft));
-        });
-    });
-
-    // Очищення драфту після відправки
-    document.querySelector('form').addEventListener('submit', function() {
-        localStorage.removeItem(formKey);
+        }
     });
     {% endif %}
+
+    // --- 3. Єдина точка Валідації та Відправки ---
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const title = document.getElementById('title').value.trim();
+            const project = document.getElementById('project').value;
+            
+            // ВАЛІДАЦІЯ
+            if (!title) {
+                e.preventDefault();
+                alert('Будь ласка, введіть назву завдання');
+                document.getElementById('title').focus();
+                return false;
+            }
+            
+            if (!project) {
+                e.preventDefault();
+                alert('Будь ласка, оберіть проєкт');
+                document.getElementById('project').focus();
+                return false;
+            }
+
+            // ОЧИЩЕННЯ ДРАФТУ
+            // Виконується тільки якщо ми пройшли валідацію і дійсно відправляємо форму
+            {% if not is_edit %}
+                localStorage.removeItem(formKey);
+            {% endif %}
+            
+            // Форма відправляється далі...
+            return true;
+        });
+    }
 </script>
 {% endblock %}

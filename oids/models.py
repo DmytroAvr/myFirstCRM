@@ -578,61 +578,65 @@ class WorkRequestItem(models.Model):
             return
 
         key_document_fulfilled = False
-        
+        key_document_date = None  # ДОДАНО: зберігаємо дату документа
+         
         # Отримуємо всі документи, вже створені для цього WorkRequestItem.
         existing_docs_for_item = Document.objects.filter(work_request_item=self)
-
-        # --- Логіка для Атестації ---
-        # if self.work_type == WorkTypeChoices.ATTESTATION:
+        
+		# --- Логіка для Атестації ---
         if self.work_type in [WorkTypeChoices.PLAND_ATTESTATION, WorkTypeChoices.ATTESTATION]:
-            # Шукаємо тип документа "Акт атестації"
             attestation_act_type = DocumentType.objects.filter(name__icontains="Акт атестації").first()
-             # document_type_act_att = DocumentType.objects.filter(duration_months=60).first() # Ваш спосіб ідентифікації "Акту атестації"
-                    # attestation_act_type = DocumentType.objects.get(name__icontains="Акт атестації")
             if attestation_act_type:
-                # Перевіряємо, чи існує для цього WRI зареєстрований Акт Атестації
-                  if existing_docs_for_item.filter(
+                # ВИПРАВЛЕНО: отримуємо документ з датою реєстрації
+                attestation_doc = existing_docs_for_item.filter(
                     document_type=attestation_act_type,
                     dsszzi_registered_number__isnull=False
                 ).exclude(
-                    dsszzi_registered_number='' 
-                ).exists():
+                    dsszzi_registered_number=''
+                ).order_by('-dsszzi_registered_date').first()  # ДОДАНО: сортуємо і беремо перший
+                
+                if attestation_doc:
                     key_document_fulfilled = True
-                    print(f"[WRI_STATUS_CHECKER] Key document (Attestation Act REGISTERED) FOUND for WRI ID: {self.id}")
-
+                    key_document_date = attestation_doc.dsszzi_registered_date  # ДОДАНО: беремо дату реєстрації
+                    print(f"[WRI_STATUS_CHECKER] Key document (Attestation Act REGISTERED) FOUND for WRI ID: {self.id}, date: {key_document_date}")
+    
         # --- Логіка для ІК ---
         elif self.work_type == WorkTypeChoices.IK:
-            # Шукаємо тип документа "Висновок ІК"
             ik_conclusion_type = DocumentType.objects.filter(duration_months=20).first()
             if ik_conclusion_type:
-                # Перевіряємо, чи існує для цього WRI Висновок ІК
-                if existing_docs_for_item.filter(document_type=ik_conclusion_type).exists():
+                # ВИПРАВЛЕНО: отримуємо документ з датою
+                ik_doc = existing_docs_for_item.filter(
+                    document_type=ik_conclusion_type
+                ).order_by('-doc_process_date').first()  # ДОДАНО: сортуємо і беремо перший
+                
+                if ik_doc:
                     key_document_fulfilled = True
-                    print(f"[WRI_STATUS_CHECKER] Key document (IK Conclusion) FOUND for WRI ID: {self.id}")
-
+                    key_document_date = ik_doc.doc_process_date  # ДОДАНО: беремо дату опрацювання
+                    print(f"[WRI_STATUS_CHECKER] Key document (IK Conclusion) FOUND for WRI ID: {self.id}, date: {key_document_date}")
+    
         # --- Оновлюємо статус, якщо ключовий документ знайдено ---
         if key_document_fulfilled:
+            fields_to_update = []
+            
             if self.status != WorkRequestStatusChoices.COMPLETED:
                 self.status = WorkRequestStatusChoices.COMPLETED
-                if not self.docs_actually_processed_on:
-                    self.docs_actually_processed_on = timezone.now().date()
+                fields_to_update.append('status')
+            
+            if not self.docs_actually_processed_on:
+                self.docs_actually_processed_on = key_document_date or timezone.now().date()
+                fields_to_update.append('docs_actually_processed_on')
+            
+            if fields_to_update:
+                fields_to_update.append('updated_at')
+                self.save(update_fields=fields_to_update)
+                print(f"[WRI_STATUS_CHECKER] WRI ID {self.id} updated. Status: COMPLETED, Processed on: {self.docs_actually_processed_on}")
                 
-                self.save(update_fields=['status', 'docs_actually_processed_on', 'updated_at'])
-                print(f"[WRI_STATUS_CHECKER] Key document condition met for WRI ID {self.id}. Updating status to COMPLETED.")
+                # ДОДАНО: оновлюємо статус батьківської заявки
+                self.update_parent_request_status()
         else:
             print(f"[WRI_STATUS_CHECKER] Key document condition NOT met for WRI ID {self.id}. Status remains {self.status}.")
-
-        if key_document_fulfilled:
-            if self.status != WorkRequestStatusChoices.COMPLETED:
-                self.status = WorkRequestStatusChoices.COMPLETED
-                # Зберігаємо тільки якщо статус дійсно змінився, щоб уникнути рекурсії
-                # і викликати update_request_status (який вже є в save)
-                self.save(update_fields=['status', 'updated_at'])
-                print(f"DEBUG: WorkRequestItem ID {self.id} (OID: {self.oid.cipher}) статус оновлено на COMPLETED.")
-        # Якщо ключовий документ не виконано, статус WorkRequestItem не змінюється цим методом.
-        # Логіка повернення статусу (наприклад, якщо документ видалено) тут не розглядається.
-
-
+                    
+            
     def save(self, *args, **kwargs):
         is_new = self._state.adding
 

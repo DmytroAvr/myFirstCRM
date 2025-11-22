@@ -65,61 +65,114 @@
 			<thead class="thead-dark">
 				<tr>
 					{% url 'oids:list_oids' as list_url %}
-					{# Побудова базових параметрів для фільтрації, щоб не втрачати їх при сортуванні #}
+					{# Побудова базових параметрів для фільтрації #}
 					{% with unit_param=current_filter_unit_id|default_if_none:""|stringformat:"s" type_param=current_filter_oid_type|default_if_none:"" status_param=current_filter_status|default_if_none:"" sec_param=current_filter_sec_level|default_if_none:"" search_param=current_search_query|default_if_none:"" %}
 					{% with base_filter_params="filter_unit="|add:unit_param|add:"&filter_oid_type="|add:type_param|add:"&filter_status="|add:status_param|add:"&filter_sec_level="|add:sec_param|add:"&search_query="|add:search_param %}
+					
 					<th>№<br>з/п</th>
+					
+					{# Місто #}
 					<th>
-						<a href="{{ list_url }}?sort_by=city&sort_order={% if current_sort_by == 'city' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
-							Місто {% if current_sort_by == 'city' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+						<a href="{{ list_url }}?sort_by={% if current_sort_by == 'city' and not current_sort_order_is_desc %}-{% endif %}city&{{ base_filter_params }}" class="  text-decoration-none">
+							Місто 
+							{% if current_sort_by == 'city' %}
+								{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}
+							{% endif %}
 						</a>
 					</th>
+
+					{# ВЧ #}
 					<th>
-						<a href="{{ list_url }}?sort_by=unit&sort_order={% if current_sort_by == 'unit' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
-							ВЧ {% if current_sort_by == 'unit' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+						<a href="{{ list_url }}?sort_by={% if current_sort_by == 'unit' and not current_sort_order_is_desc %}-{% endif %}unit&{{ base_filter_params }}" class="  text-decoration-none">
+							ВЧ 
+							{% if current_sort_by == 'unit' %}
+								{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}
+							{% endif %}
 						</a>
 					</th>
+
+					{# Шифр #}
 					<th>
-						<a href="{{ list_url }}?sort_by=cipher&sort_order={% if current_sort_by == 'cipher' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
-							ОІД (Шифр) {% if current_sort_by == 'cipher' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+						<a href="{{ list_url }}?sort_by={% if current_sort_by == 'cipher' and not current_sort_order_is_desc %}-{% endif %}cipher&{{ base_filter_params }}" class="  text-decoration-none">
+							ОІД (Шифр) 
+							{% if current_sort_by == 'cipher' %}
+								{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}
+							{% endif %}
 						</a>
 					</th>
+
+					{# Повна назва #}
 					<th>
-						<a href="{{ list_url }}?sort_by=full_name&sort_order={% if current_sort_by == 'full_name' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
-							Повна назва {% if current_sort_by == 'full_name' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+						<a href="{{ list_url }}?sort_by={% if current_sort_by == 'full_name' and not current_sort_order_is_desc %}-{% endif %}full_name&{{ base_filter_params }}" class="  text-decoration-none">
+							Повна назва 
+							{% if current_sort_by == 'full_name' %}
+								{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}
+							{% endif %}
 						</a>
 					</th>
+
+					{# Тип #}
 					<th>
-						<a href="{{ list_url }}?sort_by=oid_type&sort_order={% if current_sort_by == 'oid_type' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
-							Тип {% if current_sort_by == 'oid_type' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+						<a href="{{ list_url }}?sort_by={% if current_sort_by == 'oid_type' and not current_sort_order_is_desc %}-{% endif %}oid_type&{{ base_filter_params }}" class="  text-decoration-none">
+							Тип 
+							{% if current_sort_by == 'oid_type' %}
+								{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}
+							{% endif %}
 						</a>
 					</th>
+
+					{# Клас #}
 					<th>
-						<a href="{{ list_url }}?sort_by=pemin_sub_type&sort_order={% if current_sort_by == 'pemin_sub_type' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
-							Клас {% if current_sort_by == 'pemin_sub_type' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+						<a href="{{ list_url }}?sort_by={% if current_sort_by == 'pemin_sub_type' and not current_sort_order_is_desc %}-{% endif %}pemin_sub_type&{{ base_filter_params }}" class="  text-decoration-none">
+							Клас 
+							{% if current_sort_by == 'pemin_sub_type' %}
+								{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}
+							{% endif %}
 						</a>
 					</th>
+
+					{# Приміщення #}
 					<th>
-						<a href="{{ list_url }}?sort_by=room&sort_order={% if current_sort_by == 'room' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
-							Приміщення {% if current_sort_by == 'room' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+						<a href="{{ list_url }}?sort_by={% if current_sort_by == 'room' and not current_sort_order_is_desc %}-{% endif %}room&{{ base_filter_params }}" class="  text-decoration-none">
+							Приміщення 
+							{% if current_sort_by == 'room' %}
+								{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}
+							{% endif %}
 						</a>
 					</th>
+
+					{# Стан #}
 					<th>
-						<a href="{{ list_url }}?sort_by=status&sort_order={% if current_sort_by == 'status' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
-							Стан {% if current_sort_by == 'status' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+						<a href="{{ list_url }}?sort_by={% if current_sort_by == 'status' and not current_sort_order_is_desc %}-{% endif %}status&{{ base_filter_params }}" class="  text-decoration-none">
+							Стан 
+							{% if current_sort_by == 'status' %}
+								{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}
+							{% endif %}
 						</a>
 					</th>
+
+					{# Гриф #}
 					<th>
-						<a href="{{ list_url }}?sort_by=sec_level&sort_order={% if current_sort_by == 'sec_level' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
-							Гриф {% if current_sort_by == 'sec_level' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+						<a href="{{ list_url }}?sort_by={% if current_sort_by == 'sec_level' and not current_sort_order_is_desc %}-{% endif %}sec_level&{{ base_filter_params }}" class="  text-decoration-none">
+							Гриф 
+							{% if current_sort_by == 'sec_level' %}
+								{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}
+							{% endif %}
 						</a>
 					</th>
+
 					<th>Примітки</th>
+
+					{# Дата внесення #}
 					<th>
-						<a href="{{ list_url }}?sort_by=created_at&sort_order={% if current_sort_by == 'created_at' and not current_sort_order_is_desc %}desc{% else %}asc{% endif %}&{{ base_filter_params }}">
-							Дата внесення ОІД {% if current_sort_by == 'created_at' %}{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}{% endif %}
+						<a href="{{ list_url }}?sort_by={% if current_sort_by == 'created_at' and not current_sort_order_is_desc %}-{% endif %}created_at&{{ base_filter_params }}" class="  text-decoration-none">
+							Дата внесення 
+							{% if current_sort_by == 'created_at' %}
+								{% if current_sort_order_is_desc %}▼{% else %}▲{% endif %}
+							{% endif %}
 						</a>
 					</th>
+
 					<th>Дії</th>
 					{% endwith %}
 					{% endwith %}

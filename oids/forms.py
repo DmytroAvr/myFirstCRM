@@ -597,6 +597,20 @@ class AttestationActUpdateForm(forms.ModelForm):
         fields = ['dsszzi_registered_number', 'dsszzi_registered_date']
         # Ми не хочемо, щоб користувач міг змінювати сам документ тут, тільки його реєстраційні дані.
         # Тому інші поля Document не включаємо.
+   
+    
+    def save(self, commit=True):
+        instance = super().save(commit=commit)
+        
+        if commit and instance.work_request_item:
+            # ДОДАНО: перевіряємо статус після збереження
+            print(f"[FORM] Attestation doc saved. Checking WRI ID {instance.work_request_item.id}")
+            instance.work_request_item.check_and_update_status_based_on_documents()
+        
+        return instance
+    
+# ========================================================
+# ========================================================
 
 # Формсет для оновлення Актів Атестації
 # Ми будемо використовувати modelformset_factory, оскільки ми працюємо з існуючими об'єктами Document
@@ -1211,6 +1225,22 @@ class OIDCreateForm(forms.ModelForm):
             'inventory_number': forms.TextInput(attrs={'class': 'form-control'}),
             'note': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
         }
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Получаем все варианты из модели
+        all_subtype_choices = PeminSubTypeChoices.choices
+        
+        # Фильтруем: оставляем только те, которые НЕ являются SPEAKSUBTYPE
+        # PeminSubTypeChoices.SPEAKSUBTYPE.value вернет само значение (например, 'МОВНА')
+        filtered_choices = [
+            choice for choice in all_subtype_choices 
+            if choice[0] != PeminSubTypeChoices.SPEAKSUBTYPE.value
+        ]
+        
+        # Применяем отфильтрованный список к полю формы
+        self.fields['pemin_sub_type'].choices = filtered_choices
+                
 
     def clean(self):
         cleaned_data = super().clean()
@@ -1221,6 +1251,7 @@ class OIDCreateForm(forms.ModelForm):
             pemin_sub_type = cleaned_data.get('pemin_sub_type')
             if not pemin_sub_type:
                 self.add_error('pemin_sub_type', 'Це поле є обов\'язковим для типу ОІД "ПЕМІН".')
+                
             elif pemin_sub_type == PeminSubTypeChoices.SPEAKSUBTYPE:
                 self.add_error('pemin_sub_type', 'нє є типу "ПЕМІН".')
                 

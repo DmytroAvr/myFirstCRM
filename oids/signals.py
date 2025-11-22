@@ -1,5 +1,5 @@
 # oids/signals.py
-from django.db.models.signals import m2m_changed
+from django.db.models.signals import m2m_changed, post_save
 from django.dispatch import receiver
 from django.utils import timezone
 import datetime 
@@ -84,7 +84,6 @@ def calculate_doc_processing_deadlines_on_trip_change(sender, instance, action, 
             print(f"SIGNAL: Trip ID {trip.pk} has no end_date. Deadlines not calculated by m2m_changed signal.")
 
 # Додатково, якщо ви хочете оновлювати дедлайни при зміні Trip.end_date (навіть якщо M2M не змінились):
-from django.db.models.signals import post_save
 
 @receiver(post_save, sender=Trip)
 def update_deadlines_on_trip_save(sender, instance, created, update_fields, **kwargs):
@@ -192,3 +191,17 @@ def update_process_step_on_document_change(sender, instance, created, **kwargs):
         oid_to_update.status = OIDStatusChoices.ACTIVE
         oid_to_update.save(update_fields=['status'])
         print(f"DEBUG: Статус ОІД {oid_to_update.cipher} змінено на Активний.")
+        
+
+@receiver(post_save, sender=Document)
+def check_work_request_item_completion_on_document_save(sender, instance, created, **kwargs):
+    """
+    Перевіряє завершеність WorkRequestItem при збереженні документа.
+    """
+    document = instance
+    
+    # Якщо документ пов'язаний з WorkRequestItem
+    if document.work_request_item:
+        wri = document.work_request_item
+        print(f"[SIGNAL] Document saved for WRI ID {wri.id}. Checking completion status...")
+        wri.check_and_update_status_based_on_documents()

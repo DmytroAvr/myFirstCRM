@@ -77,8 +77,14 @@
                     </thead>
              <tbody>
                         {% for item in work_request_items %}
-                            {% if item.work_type == 'Атестація' and item.final_attestation_date or item.work_type == 'ІК' and item.final_ik_date %}
-                                <tr class="table-success">
+                            {% if item.final_attestation_date and item.work_type in 'Атестація,Чергова Атестація' or item.work_type == 'ІК' and item.final_ik_date %}
+        						<tr class="table-success">
+
+									
+							<!-- !
+							 % if item.work_type == 'Атестація' and item.final_attestation_date or item.work_type == 'Чергова Атестація' and item.final_attestation_date or item.work_type == 'ІК' and item.final_ik_date %}
+                                <tr class="table-success"> 
+									-->
                             {% elif item.doc_processing_deadline and item.doc_processing_deadline < today_date %}
                                 <tr class="table-danger">
                             {% else %}
@@ -113,6 +119,8 @@
                                 <td>{{ item.doc_processing_deadline|date:"d.m.Y"|default:"-" }}</td>
                                 <td>
                                     {% if item.work_type == 'Атестація' and item.final_attestation_date %}
+                                        {{ item.final_attestation_date|date:"d.m.Y" }}
+                                    {% elif item.work_type == 'Чергова Атестація' and item.final_attestation_date %}
                                         {{ item.final_attestation_date|date:"d.m.Y" }}
                                     {% elif item.work_type == 'ІК' and item.final_ik_date %}
                                         {{ item.final_ik_date|date:"d.m.Y" }}
