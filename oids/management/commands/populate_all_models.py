@@ -217,7 +217,7 @@ def populate_all():
         if created:
             print(f"Created AttestationResponse: {resp}")
             # Оновлюємо документи реєстраційними даними (це має викликати оновлення статусу WRI)
-            docs_in_registration = reg_awaiting_response.registered_documents.all()
+            docs_in_registration = reg_awaiting_response.sent_documents.all()
             for doc in docs_in_registration:
                 doc.dsszzi_registered_number = f"D-{doc.id}-{FIXED_DATE.year}"
                 doc.dsszzi_registered_date = FIXED_DATE + datetime.timedelta(days=14)

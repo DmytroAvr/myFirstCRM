@@ -70,13 +70,14 @@ class OIDStatusChoices(models.TextChoices):
 # OID_to_show_main_dashboard_active
 # OID_to_show_main_dashboard_cancel
 
-class WorkRequestStatusChoices(models.TextChoices): 
-    PENDING = 'очікує', 'Очікує' # очікує – тільки введена"
-    IN_PROGRESS = 'в роботі', 'В роботі' # в роботі – заплановано відрядження"
-    TO_SEND = 'відправити в ДССЗЗІ', 'відправити в ДССЗЗІ' # в роботі – заплановано відрядження"
-    ON_REGISTRATION = 'на реєстрації в ДССЗЗІ', 'на реєстрації в ДССЗЗІ' # в роботі – заплановано відрядження"
-    COMPLETED = 'виконано', 'Виконано' # виконано – внесена інформацію по опрацьованих документах"
-    CANCELED = 'скасовано', 'Скасовано' # скасовано – заявка втратила чинність"
+class WorkRequestStatusChoices(models.TextChoices):  
+    PENDING = 'очікує', 'Очікує' # очікує – заявка тільки введено в систему. Відрядження по ній не сплановано.
+    IN_PROGRESS = 'в роботі', 'В роботі' # в роботі – відрядження заплановано але ще не опрацьовано.
+    TO_SEND_AA = 'готово до відправки в ДССЗЗІ', 'готово до відправки в ДССЗЗІ' # готово до відправки в ДССЗЗІ - документи опрацьовано але ще не відправлено до ДССЗЗІ (застосовується до типів робіт "ATTESTATION" "PLAND_ATTESTATION")
+    TO_SEND_VCH = 'готово до відправки в в/ч', 'готово до відправки в в/ч' # готово до відправки в в/ч - документи опрацьовано але ще не відправлено до в/ч (застосовується до типів робіт "IK")
+    ON_REGISTRATION = 'на реєстрації в ДССЗЗІ', 'на реєстрації в ДССЗЗІ' # документи відправлено на реєстрації в ДССЗЗІ  (застосовується до типів робіт "ATTESTATION" "PLAND_ATTESTATION")
+    COMPLETED = 'виконано', 'Виконано' # виконано – опрацьовані документи відправлено до військової частини. Заявка повністью виконана ("ATTESTATION", "PLAND_ATTESTATION" - вказати підготовлений та реєстраційний номер Акту атестації; "IK" - вказати підготовлений висновку інструментального контролю; Підготовлені мають бути додані на сторінку контролю заявок в додатковий стовпець)
+    CANCELED = 'скасовано', 'Скасовано' # скасовано – заявка втратила чинність 
 
 class OIDTypeChoices(models.TextChoices):
     PEMIN = 'ПЕМІН', 'ПЕМІН'
@@ -568,145 +569,263 @@ class WorkRequestItem(models.Model):
 	#  логіка оновлення статусу заявки:
     def check_and_update_status_based_on_documents(self):
         """
-        Перевіряє, чи виконані умови для завершення цього WorkRequestItem,
-        ґрунтуючись на наявності КЛЮЧОВОГО документа.
+        Перевіряє, чи виконані умови для зміни статусу цього WorkRequestItem,
+        ґрунтуючись на наявності та стані документів.
+        
+        Логіка статусів:
+        - TO_SEND_AA: Документи опрацьовано для Атестації, готові до відправки в ДССЗЗІ
+        - TO_SEND_VCH: Документи опрацьовано для ІК, готові до відправки у в/ч
+        - ON_REGISTRATION: Документи відправлено на реєстрацію в ДССЗЗІ (для Атестації)
+        - COMPLETED: Отримано реєстраційні номери або документи відправлено у в/ч
         """
-        print(f"[WRI_STATUS_CHECKER] Checking completion for WRI ID {self.id} (OID: {self.oid.cipher})")
-
+        print(f"[WRI_STATUS_CHECKER] Checking status for WRI ID {self.id} (OID: {self.oid.cipher}, Work Type: {self.work_type})")
+    
         if self.status in [WorkRequestStatusChoices.COMPLETED, WorkRequestStatusChoices.CANCELED]:
-            print(f"[WRI_STATUS_CHECKER] WRI ID {self.id} is already COMPLETED or CANCELED. No update needed.")
+            print(f"[WRI_STATUS_CHECKER] WRI ID {self.id} is already {self.status}. No update needed.")
             return
-
-        key_document_fulfilled = False
-        key_document_date = None  # ДОДАНО: зберігаємо дату документа
-         
-        # Отримуємо всі документи, вже створені для цього WorkRequestItem.
+    
         existing_docs_for_item = Document.objects.filter(work_request_item=self)
         
-		# --- Логіка для Атестації ---
+        fields_to_update = []
+        new_status = self.status
+        document_date = None
+    
+        # --- Логіка для Атестації (ATTESTATION та PLAND_ATTESTATION) ---
         if self.work_type in [WorkTypeChoices.PLAND_ATTESTATION, WorkTypeChoices.ATTESTATION]:
             attestation_act_type = DocumentType.objects.filter(name__icontains="Акт атестації").first()
-            if attestation_act_type:
-                # ВИПРАВЛЕНО: отримуємо документ з датою реєстрації
-                attestation_doc = existing_docs_for_item.filter(
-                    document_type=attestation_act_type,
-                    dsszzi_registered_number__isnull=False
-                ).exclude(
-                    dsszzi_registered_number=''
-                ).order_by('-dsszzi_registered_date').first()  # ДОДАНО: сортуємо і беремо перший
+            
+            if not attestation_act_type:
+                print(f"[WRI_STATUS_CHECKER] Attestation Act type not found in system!")
+                return
+            
+            # Шукаємо Акт Атестації для цього WRI
+            attestation_doc = existing_docs_for_item.filter(
+                document_type=attestation_act_type
+            ).order_by('-doc_process_date').first()
+            
+            if attestation_doc:
+                # Перевіряємо, чи є реєстраційний номер ДССЗЗІ
+                has_registration = (
+                    attestation_doc.dsszzi_registered_number and 
+                    attestation_doc.dsszzi_registered_number.strip() != ''
+                )
                 
-                if attestation_doc:
-                    key_document_fulfilled = True
-                    key_document_date = attestation_doc.dsszzi_registered_date  # ДОДАНО: беремо дату реєстрації
-                    print(f"[WRI_STATUS_CHECKER] Key document (Attestation Act REGISTERED) FOUND for WRI ID: {self.id}, date: {key_document_date}")
+                # Перевіряємо, чи документ відправлено на реєстрацію (має attestation_registration_sent)
+                is_sent_for_registration = attestation_doc.attestation_registration_sent is not None
+                
+                if has_registration:
+                    # Є реєстраційний номер → статус "Виконано"
+                    new_status = WorkRequestStatusChoices.COMPLETED
+                    document_date = attestation_doc.dsszzi_registered_date or attestation_doc.doc_process_date
+                    print(f"[WRI_STATUS_CHECKER] Attestation doc has registration number. Setting status to COMPLETED.")
+                    
+                elif is_sent_for_registration:
+                    # Відправлено на реєстрацію, але номера ще немає → "На реєстрації в ДССЗЗІ"
+                    new_status = WorkRequestStatusChoices.ON_REGISTRATION
+                    document_date = attestation_doc.doc_process_date
+                    print(f"[WRI_STATUS_CHECKER] Attestation doc sent for registration. Setting status to ON_REGISTRATION.")
+                    
+                elif attestation_doc.doc_process_date:
+                    # Документ опрацьовано, але не відправлено → "Готово до відправки в ДССЗЗІ"
+                    new_status = WorkRequestStatusChoices.TO_SEND_AA
+                    document_date = attestation_doc.doc_process_date
+                    print(f"[WRI_STATUS_CHECKER] Attestation doc processed but not sent. Setting status to TO_SEND_AA.")
+            else:
+                print(f"[WRI_STATUS_CHECKER] No Attestation Act found for WRI ID {self.id}.")
     
         # --- Логіка для ІК ---
         elif self.work_type == WorkTypeChoices.IK:
             ik_conclusion_type = DocumentType.objects.filter(duration_months=20).first()
-            if ik_conclusion_type:
-                # ВИПРАВЛЕНО: отримуємо документ з датою
-                ik_doc = existing_docs_for_item.filter(
-                    document_type=ik_conclusion_type
-                ).order_by('-doc_process_date').first()  # ДОДАНО: сортуємо і беремо перший
+            
+            if not ik_conclusion_type:
+                print(f"[WRI_STATUS_CHECKER] IK Conclusion type not found in system!")
+                return
+            
+            # Шукаємо Висновок ІК для цього WRI
+            ik_doc = existing_docs_for_item.filter(
+                document_type=ik_conclusion_type
+            ).order_by('-doc_process_date').first()
+            
+            if ik_doc:
+                # Перевіряємо, чи документ відправлено у в/ч (має trip_result_sent)
+                is_sent_to_unit = hasattr(ik_doc, 'trip_result_sent') and ik_doc.trip_result_sent is not None
                 
-                if ik_doc:
-                    key_document_fulfilled = True
-                    key_document_date = ik_doc.doc_process_date  # ДОДАНО: беремо дату опрацювання
-                    print(f"[WRI_STATUS_CHECKER] Key document (IK Conclusion) FOUND for WRI ID: {self.id}, date: {key_document_date}")
-    
-        # --- Оновлюємо статус, якщо ключовий документ знайдено ---
-        if key_document_fulfilled:
-            fields_to_update = []
-            
-            if self.status != WorkRequestStatusChoices.COMPLETED:
-                self.status = WorkRequestStatusChoices.COMPLETED
-                fields_to_update.append('status')
-            
-            if not self.docs_actually_processed_on:
-                self.docs_actually_processed_on = key_document_date or timezone.now().date()
-                fields_to_update.append('docs_actually_processed_on')
-            
-            if fields_to_update:
-                fields_to_update.append('updated_at')
-                self.save(update_fields=fields_to_update)
-                print(f"[WRI_STATUS_CHECKER] WRI ID {self.id} updated. Status: COMPLETED, Processed on: {self.docs_actually_processed_on}")
-                
-                # ДОДАНО: оновлюємо статус батьківської заявки
-                self.update_parent_request_status()
-        else:
-            print(f"[WRI_STATUS_CHECKER] Key document condition NOT met for WRI ID {self.id}. Status remains {self.status}.")
+                if is_sent_to_unit:
+                    # Документ відправлено у в/ч → "Виконано"
+                    new_status = WorkRequestStatusChoices.COMPLETED
+                    document_date = ik_doc.doc_process_date
+                    print(f"[WRI_STATUS_CHECKER] IK doc sent to unit. Setting status to COMPLETED.")
                     
-            
-    def save(self, *args, **kwargs):
-        is_new = self._state.adding
-
-        # Спочатку зберігаємо сам елемент заявки
-        super().save(*args, **kwargs)
-
-        # Якщо це новий елемент заявки...
-        if is_new and self.oid:
-            oid_to_update = self.oid
-            old_status = oid_to_update.get_status_display()
-            
-            # --- ПОЧАТОК ЗМІН ---
-            # Визначаємо новий статус ОІД на основі типу робіт у заявці
-            new_status_enum = None
-            if self.work_type == WorkTypeChoices.IK:
-                new_status_enum = OIDStatusChoices.RECEIVED_REQUEST_IK
-            elif self.work_type == WorkTypeChoices.ATTESTATION:
-                new_status_enum = OIDStatusChoices.RECEIVED_REQUEST_ATTESTATION
-            elif self.work_type == WorkTypeChoices.PLAND_ATTESTATION:
-                new_status_enum = OIDStatusChoices.RECEIVED_REQUEST_PLAND_ATTESTATION
+                elif ik_doc.doc_process_date:
+                    # Документ опрацьовано, але не відправлено → "Готово до відправки в в/ч"
+                    new_status = WorkRequestStatusChoices.TO_SEND_VCH
+                    document_date = ik_doc.doc_process_date
+                    print(f"[WRI_STATUS_CHECKER] IK doc processed but not sent. Setting status to TO_SEND_VCH.")
             else:
-                # Залишаємо загальний статус, якщо тип робіт не визначено
-                # або для нього немає спеціального статусу "отримано заявку"
-                new_status_enum = OIDStatusChoices.RECEIVED_REQUEST 
-            
-            # --- КІНЕЦЬ ЗМІН ---
-
-            if oid_to_update.status != new_status_enum:
-                oid_to_update.status = new_status_enum
-                oid_to_update.save(update_fields=['status'])
-
-                # Створюємо запис в історії
-                OIDStatusChange.objects.create(
-                    oid=oid_to_update,
-                    old_status=old_status,
-                    new_status=new_status_enum.label,
-                    # Додамо тип робіт до причини для ясності
-                    reason=f"ОІД додано до заявки №{self.request.incoming_number} (Тип робіт: {self.get_work_type_display()})"
-                )
-       
-        # Викликаємо існуючу логіку для оновлення статусу батьківської заявки
-        self.update_parent_request_status()
+                print(f"[WRI_STATUS_CHECKER] No IK Conclusion found for WRI ID {self.id}.")
     
-    # ... (решта методів моделі WorkRequestItem, наприклад update_parent_request_status) ...
-
+        # --- Оновлюємо статус, якщо він змінився ---
+        if new_status != self.status:
+            self.status = new_status
+            fields_to_update.append('status')
+            print(f"[WRI_STATUS_CHECKER] Status changed from {self.status} to {new_status}")
+        
+        # --- Оновлюємо дату фактичного опрацювання ---
+        if document_date and not self.docs_actually_processed_on:
+            self.docs_actually_processed_on = document_date
+            fields_to_update.append('docs_actually_processed_on')
+            print(f"[WRI_STATUS_CHECKER] Setting docs_actually_processed_on to {document_date}")
+        
+        # --- Зберігаємо зміни ---
+        if fields_to_update:
+            fields_to_update.append('updated_at')
+            self.save(update_fields=fields_to_update)
+            print(f"[WRI_STATUS_CHECKER] WRI ID {self.id} updated. New status: {self.get_status_display()}")
+            
+            # Оновлюємо статус батьківської заявки
+            self.update_parent_request_status()
+        else:
+            print(f"[WRI_STATUS_CHECKER] No changes needed for WRI ID {self.id}. Current status: {self.get_status_display()}")             
+                
+        def save(self, *args, **kwargs):
+            is_new = self._state.adding
+    
+            # Спочатку зберігаємо сам елемент заявки
+            super().save(*args, **kwargs)
+    
+            # Якщо це новий елемент заявки...
+            if is_new and self.oid:
+                oid_to_update = self.oid
+                old_status = oid_to_update.get_status_display()
+                
+                # --- ПОЧАТОК ЗМІН ---
+                # Визначаємо новий статус ОІД на основі типу робіт у заявці
+                new_status_enum = None
+                if self.work_type == WorkTypeChoices.IK:
+                    new_status_enum = OIDStatusChoices.RECEIVED_REQUEST_IK
+                elif self.work_type == WorkTypeChoices.ATTESTATION:
+                    new_status_enum = OIDStatusChoices.RECEIVED_REQUEST_ATTESTATION
+                elif self.work_type == WorkTypeChoices.PLAND_ATTESTATION:
+                    new_status_enum = OIDStatusChoices.RECEIVED_REQUEST_PLAND_ATTESTATION
+                else:
+                    # Залишаємо загальний статус, якщо тип робіт не визначено
+                    # або для нього немає спеціального статусу "отримано заявку"
+                    new_status_enum = OIDStatusChoices.RECEIVED_REQUEST 
+    
+                # --- КІНЕЦЬ ЗМІН ---
+    
+                if oid_to_update.status != new_status_enum:
+                    oid_to_update.status = new_status_enum
+                    oid_to_update.save(update_fields=['status'])
+    
+                    # Створюємо запис в історії
+                    OIDStatusChange.objects.create(
+                        oid=oid_to_update,
+                        old_status=old_status,
+                        new_status=new_status_enum.label,
+                        # Додамо тип робіт до причини для ясності
+                        reason=f"ОІД додано до заявки №{self.request.incoming_number} (Тип робіт: {self.get_work_type_display()})"
+                    )
+           
+            # Викликаємо існуючу логіку для оновлення статусу батьківської заявки
+            self.update_parent_request_status()
+        
+        # ... (решта методів моделі WorkRequestItem, наприклад update_parent_request_status) ...
+    
     def update_parent_request_status(self):
         """
-        Перевіряє статуси всіх елементів батьківської заявки і, якщо всі
-        завершені, оновлює статус самої заявки.
+        Оновлює статус батьківської заявки WorkRequest на основі статусів
+        всіх її елементів WorkRequestItem.
+        
+        Логіка:
+        - Якщо всі COMPLETED → заявка COMPLETED
+        - Якщо всі CANCELED → заявка CANCELED
+        - Якщо є хоча б один ON_REGISTRATION → заявка ON_REGISTRATION
+        - Якщо є хоча б один TO_SEND_AA або TO_SEND_VCH → відповідний статус заявки
+        - Якщо є хоча б один IN_PROGRESS → заявка IN_PROGRESS
+        - Інакше → PENDING
         """
-        parent_request = self.request
-        
-        # Отримуємо всі "братні" елементи, що належать тій самій заявці
-        all_items = parent_request.items.all()
-        
-        # Якщо елементів у заявці немає, нічого не робимо
+        work_request = self.request
+        all_items = work_request.items.all()
+    
         if not all_items.exists():
+            print(f"[REQUEST_STATUS_UPDATER] WorkRequest ID {work_request.id} has no items.")
+            if work_request.status != WorkRequestStatusChoices.PENDING:
+                work_request.status = WorkRequestStatusChoices.PENDING
+                work_request.save(update_fields=['status', 'updated_at'])
+                print(f"[REQUEST_STATUS_UPDATER] Set to PENDING (no items).")
             return
-
-        # Перевіряємо, чи ВСІ елементи мають статус "Виконано" або "Скасовано"
-        all_completed = all(
-            item.status in [WorkRequestStatusChoices.COMPLETED, WorkRequestStatusChoices.CANCELED]
-            for item in all_items
-        )
-
-        # Якщо всі елементи завершені і статус самої заявки ще не "Виконано"
-        if all_completed and parent_request.status != WorkRequestStatusChoices.COMPLETED:
-            parent_request.status = WorkRequestStatusChoices.COMPLETED
-            parent_request.save(update_fields=['status'])
+    
+        print(f"[REQUEST_STATUS_UPDATER] Updating status for WorkRequest ID {work_request.id}")
+        
+        # Підраховуємо статуси елементів
+        status_counts = {
+            'completed': all_items.filter(status=WorkRequestStatusChoices.COMPLETED).count(),
+            'canceled': all_items.filter(status=WorkRequestStatusChoices.CANCELED).count(),
+            'on_registration': all_items.filter(status=WorkRequestStatusChoices.ON_REGISTRATION).count(),
+            'to_send_aa': all_items.filter(status=WorkRequestStatusChoices.TO_SEND_AA).count(),
+            'to_send_vch': all_items.filter(status=WorkRequestStatusChoices.TO_SEND_VCH).count(),
+            'in_progress': all_items.filter(status=WorkRequestStatusChoices.IN_PROGRESS).count(),
+            'pending': all_items.filter(status=WorkRequestStatusChoices.PENDING).count(),
+            'total': all_items.count()
+        }
+        
+        print(f"[REQUEST_STATUS_UPDATER] Status counts: {status_counts}")
+        
+        original_status = work_request.status
+        new_status = original_status
+    
+        # Визначаємо новий статус заявки за пріоритетом
+        if status_counts['completed'] == status_counts['total']:
+            # Всі елементи виконані
+            new_status = WorkRequestStatusChoices.COMPLETED
+            print(f"[REQUEST_STATUS_UPDATER] All items COMPLETED.")
             
+        elif status_counts['canceled'] == status_counts['total']:
+            # Всі елементи скасовані
+            new_status = WorkRequestStatusChoices.CANCELED
+            print(f"[REQUEST_STATUS_UPDATER] All items CANCELED.")
+            
+        elif status_counts['on_registration'] > 0:
+            # Є елементи на реєстрації в ДССЗЗІ
+            new_status = WorkRequestStatusChoices.ON_REGISTRATION
+            print(f"[REQUEST_STATUS_UPDATER] Has items ON_REGISTRATION.")
+            
+        elif status_counts['to_send_aa'] > 0 and status_counts['to_send_vch'] > 0:
+            # Є елементи обох типів, готові до відправки - встановлюємо статус за першим знайденим
+            # Або можна створити окремий статус "Готово до відправки"
+            new_status = WorkRequestStatusChoices.TO_SEND_AA
+            print(f"[REQUEST_STATUS_UPDATER] Has items TO_SEND (both types).")
+            
+        elif status_counts['to_send_aa'] > 0:
+            # Є елементи, готові до відправки в ДССЗЗІ
+            new_status = WorkRequestStatusChoices.TO_SEND_AA
+            print(f"[REQUEST_STATUS_UPDATER] Has items TO_SEND_AA.")
+            
+        elif status_counts['to_send_vch'] > 0:
+            # Є елементи, готові до відправки у в/ч
+            new_status = WorkRequestStatusChoices.TO_SEND_VCH
+            print(f"[REQUEST_STATUS_UPDATER] Has items TO_SEND_VCH.")
+            
+        elif status_counts['in_progress'] > 0:
+            # Є елементи в роботі
+            new_status = WorkRequestStatusChoices.IN_PROGRESS
+            print(f"[REQUEST_STATUS_UPDATER] Has items IN_PROGRESS.")
+            
+        elif status_counts['pending'] > 0:
+            # Є елементи, що очікують
+            new_status = WorkRequestStatusChoices.PENDING
+            print(f"[REQUEST_STATUS_UPDATER] Has items PENDING.")
+    
+        # Зберігаємо новий статус, якщо він змінився
+        if original_status != new_status:
+            work_request.status = new_status
+            work_request.save(update_fields=['status', 'updated_at'])
+            print(f"[REQUEST_STATUS_UPDATER] WorkRequest ID {work_request.id} status changed: {original_status} → {new_status}")
+        else:
+            print(f"[REQUEST_STATUS_UPDATER] WorkRequest ID {work_request.id} status unchanged: {new_status}")
+    
+
     def update_request_status(self):
         """
         Оновлює статус батьківської заявки WorkRequest на основі статусів
@@ -863,7 +982,7 @@ class AttestationRegistration(models.Model):
         """
 
         return "\n".join(
-            [f"{doc.oid.cipher} (підг. № {doc.document_number} від {doc.doc_process_date.strftime('%d.%m.%Y')})" for doc in self.registered_documents.all()]
+            [f"{doc.oid.cipher} (підг. № {doc.document_number} від {doc.doc_process_date.strftime('%d.%m.%Y')})" for doc in self.sent_documents.all()]
         )
     
     def __str__(self):
@@ -921,7 +1040,7 @@ class AttestationResponse(models.Model):
             return "ші not hasattr"
         
         items = []
-        for act_doc in self.attestation_registration_sent.registered_documents.all():
+        for act_doc in self.attestation_registration_sent.sent_documents.all():
             reg_num = act_doc.dsszzi_registered_number or "немає"
             reg_date_str = act_doc.dsszzi_registered_date.strftime('%d.%m.%Y') if act_doc.dsszzi_registered_date else "N/A"
             items.append(
@@ -1053,84 +1172,34 @@ class Document(models.Model):
     """
     Опрацьовані документи Залежить від типу ОІД та виду робіт.
     """
-    oid = models.ForeignKey(
-        OID, 
-        on_delete=models.CASCADE, 
-        verbose_name="ОІД",
-        related_name='documents'
-    )
-    work_request_item = models.ForeignKey(
-        WorkRequestItem, 
-        on_delete=models.SET_NULL, 
-        blank=True, 
-        null=True, 
-        verbose_name="Елемент заявки",
-        related_name='produced_documents'
-    )
-    document_type = models.ForeignKey(
-        DocumentType, 
-        on_delete=models.PROTECT,
-        verbose_name="Тип документа"
-    )
+    oid = models.ForeignKey(OID, on_delete=models.CASCADE, verbose_name="ОІД", related_name='documents')
+    work_request_item = models.ForeignKey(WorkRequestItem, on_delete=models.SET_NULL, blank=True, null=True, verbose_name="Елемент заявки", related_name='produced_documents')
+    document_type = models.ForeignKey(DocumentType, on_delete=models.PROTECT, verbose_name="Тип документа")
     document_number = models.CharField(max_length=50, default='27/14-', verbose_name="Підг. № документа")
     doc_process_date = models.DateField(verbose_name="Дата опрацювання документу (Підг.№ від)") # Дата внесення документа
     work_date = models.DateField(verbose_name="Дата проведення робіт на ОІД") # Дата, коли роботи фактично проводилися
-    author = models.ForeignKey(
-        'Person', # Використовуємо рядок
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
-        verbose_name="Автор документа",
-        related_name='authored_documents'
-    )
+    author = models.ForeignKey('Person', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Автор документа", related_name='authored_documents')
     attachment = models.FileField(upload_to="attestation_docs/", blank=True, null=True, verbose_name="Прикріплений файл (Опційно)")
     note = models.TextField(blank=True, null=True, verbose_name="Примітки")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата внесення документу")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
     expiration_date = models.DateField(verbose_name="Дата завершення дії", blank=True, null=True)
-    processing_status = models.CharField(
-        "Статус опрацювання документа",
-        max_length=30,
-        choices=DocumentProcessingStatusChoices.choices,
-        default=DocumentProcessingStatusChoices.DRAFT,
-        db_index=True
-    )
+    processing_status = models.CharField("Статус опрацювання документа", max_length=30, choices=DocumentProcessingStatusChoices.choices, default=DocumentProcessingStatusChoices.DRAFT, db_index=True)
     history = HistoricalRecords()
 
     # --- поля для реєстрації в ДССЗЗІ (для актів атестації) ---
     # Посилання на запис про відправку (вихідний лист)
-    attestation_registration_sent = models.ForeignKey(
-        'AttestationRegistration', # Використовуємо рядок
-        on_delete=models.SET_NULL, # Якщо запис про відправку видаляється, інформація в документі залишається, але без зв'язку
-        null=True,
-        blank=True,
-        verbose_name="Відправлено на реєстрацію ДССЗЗІ (в складі листа)",
-        related_name="registered_documents" # Дозволить отримати всі документи в цій відправці
-    )
+    attestation_registration_sent = models.ForeignKey('AttestationRegistration', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Відправка на реєстрацію (атестація)", related_name='sent_documents')
+    trip_result_sent = models.ForeignKey('TripResultForUnit', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Відправка результатів у в/ч", related_name='sent_documents_direct')
     # Номер, присвоєний ДССЗЗІ цьому конкретному акту
-    dsszzi_registered_number = models.CharField(
-        max_length=50, 
-        blank=True, 
-        null=True, 
-        verbose_name="Зареєстрований номер в ДССЗЗІ (для цього акту)"
-    )
+    dsszzi_registered_number = models.CharField(max_length=50, blank=True, null=True, verbose_name="Зареєстрований номер в ДССЗЗІ (для цього акту)")
     # Дата, якою ДССЗЗІ зареєстрував цей акт
-    dsszzi_registered_date = models.DateField(
-        blank=True, 
-        null=True, 
-        verbose_name="Дата реєстрації в ДССЗЗІ (для цього акту)"
-    )
+    dsszzi_registered_date = models.DateField(blank=True, null=True, verbose_name="Дата реєстрації в ДССЗЗІ (для цього акту)")
     # Можна додати статус реєстрації саме для цього документа, якщо потрібно більш детально
     # dsszzi_document_status = models.CharField(max_length=20, choices=..., null=True, blank=True)
 	# --- НОВЕ ПОЛЕ ---
     # Цей зв'язок показує, в якому "конверті" цей АЗР був відправлений на реєстрацію
-    wcr_submission = models.ForeignKey(
-        WorkCompletionRegistration,
-        on_delete=models.SET_NULL, # Якщо відправку видалять, документ залишиться
-        null=True, blank=True,
-        verbose_name="Відправка АЗР на реєстрацію",
-        related_name="submitted_documents"
-    )
+    wcr_submission = models.ForeignKey(WorkCompletionRegistration, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Відправка АЗР на реєстрацію", related_name="submitted_documents")
     # --- КІНЕЦЬ полів для реєстрації в ДССЗЗІ (для актів атестації) ---
     
     @property
@@ -1692,18 +1761,9 @@ class TripResultForUnit(models.Model):
         verbose_name="ОІД призначення",
         related_name='received_trip_results'
     )
-    documents = models.ManyToManyField(
-        Document, 
-        verbose_name="Документи до відправки",
-        related_name='sent_in_trip_results' # Дозволить дізнатися, в яких результатах відрядження був відправлений документ
-    )
-    outgoing_letter_number = models.CharField(
-        max_length=50,
-        verbose_name="Вих. номер супровідного листа"
-    )
-    outgoing_letter_date = models.DateField(
-        verbose_name="Вих. дата супровідного листа"
-    )
+    documents = models.ManyToManyField('Document', verbose_name="Документи до відправки", related_name='sent_in_trip_results', blank=True)
+    outgoing_letter_number = models.CharField(max_length=50, verbose_name="Вих. номер супровідного листа")
+    outgoing_letter_date = models.DateField(verbose_name="Вих. дата супровідного листа")
     note = models.TextField(blank=True, null=True, verbose_name="Примітка")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата внесення запису про опрацювання відрядження")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")

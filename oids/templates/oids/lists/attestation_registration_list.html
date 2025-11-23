@@ -45,6 +45,8 @@
                     <th>Хто відправив</th>
                     <th>Статус</th>
                     <th>Дії</th>
+                    <th>ДОП</th>
+
                 </tr>
             </thead>
             <tbody>
@@ -60,9 +62,9 @@
                     </td>
                     {# --- ОНОВЛЕНИЙ СТОВПЕЦЬ З ДЕТАЛЯМИ АКТІВ --- #}
                     <td>
-                        {% if reg.registered_documents.all %}
+                        {% if reg.sent_documents.all %}
                             <ul class="list-unstyled mb-0">
-                                {% for doc in reg.registered_documents.all %}
+                                {% for doc in reg.sent_documents.all %}
                                 <li>
                                     <a href="{% url 'oids:oid_detail_view_name' doc.oid.id %}#doc-{{ doc.id }}">
                                         {{ doc.oid.cipher }} (підг. № {{ doc.document_number }} від {{ doc.doc_process_date|date:"d.m.Y" }})
@@ -85,6 +87,14 @@
                          <a href="#" class="btn btn-sm btn-outline-secondary disabled">Відповідь внесено</a>
                         {% endif %}
                     </td>
+					<td>
+{% for registration in attestation_registrations %}
+    {# ВИПРАВЛЕНО: registration.registered_documents.all → registration.sent_documents.all #}
+    {% for doc in registration.sent_documents.all %}
+        {{ doc.oid.cipher }} - {{ doc.document_type.name }}
+    {% endfor %}
+{% endfor %}
+					</td>
                 </tr>
                 {% endfor %}
             </tbody>

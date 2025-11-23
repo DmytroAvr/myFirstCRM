@@ -37,6 +37,7 @@
                     <th>Акти атестації у відповіді</th>
                     <th>Хто отримав/вніс</th>
                     <th>Дата внесення</th>
+                    <th>ДОП</th>
                 </tr>
             </thead>
             <tbody>
@@ -51,7 +52,7 @@
                     </td>
                     <td>
                         <ul class="list-unstyled mb-0">
-                            {% for act_doc in response_item.attestation_registration_sent.registered_documents.all %}
+                            {% for act_doc in response_item.attestation_registration_sent.sent_documents.all %}
                             <li>
                                 <a href="{% url 'oids:oid_detail_view_name' act_doc.oid.id %}#doc-{{act_doc.id}}"><strong>{{ act_doc.oid.cipher }}</strong></a>
                                 - Акт №{{ act_doc.document_number }}
@@ -68,6 +69,14 @@
                     </td>
                     <td>{{ response_item.received_by.full_name|default:"-" }}</td>
                     <td>{{ response_item.created_at|date:"d.m.Y H:i" }}</td>
+					<td>
+{% for response in attestation_responses %}
+    {# ВИПРАВЛЕНО: використовуємо sent_documents замість registered_documents #}
+    {% for doc in response.attestation_registration_sent.sent_documents.all %}
+        {{ doc.oid.cipher }} - {{ doc.document_type.name }}
+    {% endfor %}
+{% endfor %}
+					</td>
                 </tr>
                 {% endfor %}
             </tbody>

@@ -205,3 +205,58 @@ def check_work_request_item_completion_on_document_save(sender, instance, create
         wri = document.work_request_item
         print(f"[SIGNAL] Document saved for WRI ID {wri.id}. Checking completion status...")
         wri.check_and_update_status_based_on_documents()
+        
+
+# У signals.py
+@receiver(post_save, sender=Document)
+def check_work_request_item_on_document_save(sender, instance, created, **kwargs):
+    """
+    Перевіряє та оновлює статус WorkRequestItem при збереженні документа.
+    """
+    document = instance
+    
+    # Якщо документ пов'язаний з WorkRequestItem
+    if document.work_request_item:
+        wri = document.work_request_item
+        print(f"[SIGNAL] Document ID {document.id} saved for WRI ID {wri.id}. Triggering status check...")
+        wri.check_and_update_status_based_on_documents()
+    else:
+        print(f"[SIGNAL] Document ID {document.id} saved but not linked to any WorkRequestItem.")
+
+
+@receiver(post_save, sender='oids.AttestationRegistration')
+def check_items_on_attestation_registration_save(sender, instance, created, **kwargs):
+    """
+    Перевіряє WorkRequestItems при створенні/оновленні відправки на реєстрацію.
+    """
+    registration = instance
+    
+    # Отримуємо всі документи, відправлені в цій реєстрації
+    sent_docs = Document.objects.filter(attestation_registration_sent=registration)
+    
+    print(f"[SIGNAL] AttestationRegistration ID {registration.id} saved. Checking {sent_docs.count()} documents...")
+    
+    for doc in sent_docs:
+        if doc.work_request_item:
+            print(f"[SIGNAL] Checking WRI ID {doc.work_request_item.id} for document ID {doc.id}")
+            doc.work_request_item.check_and_update_status_based_on_documents()
+
+
+@receiver(post_save, sender='oids.TripResultForUnit')
+def check_items_on_trip_result_save(sender, instance, created, **kwargs):
+    """
+    Перевіряє WorkRequestItems при створенні/оновленні відправки результатів у в/ч.
+    """
+    trip_result = instance
+    
+    # Отримуємо всі документи, відправлені в цьому результаті відрядження
+    sent_docs = trip_result.documents.all()
+    
+    print(f"[SIGNAL] TripResultForUnit ID {trip_result.id} saved. Checking {sent_docs.count()} documents...")
+    
+    for doc in sent_docs:
+        if doc.work_request_item:
+            print(f"[SIGNAL] Checking WRI ID {doc.work_request_item.id} for document ID {doc.id}")
+            doc.work_request_item.check_and_update_status_based_on_documents()
+            
+

@@ -15,7 +15,7 @@ from .models import (OIDTypeChoices, OIDStatusChoices, SecLevelChoices, WorkRequ
     DocumentReviewResultChoices, AttestationRegistrationStatusChoices, PeminSubTypeChoices, DocumentProcessingStatusChoices, add_working_days
 )
 from .models import (Unit, UnitGroup, OID, DskEot, OIDStatusChange, TerritorialManagement, 
-	Document, DocumentType, WorkRequest, WorkRequestItem, Trip,TripResultForUnit, 
+	Document, DocumentType, WorkRequest, WorkRequestItem, Trip, TripResultForUnit, 
     Person, TechnicalTask, AttestationRegistration, AttestationResponse, WorkCompletionRegistration,
     ProcessTemplate, OIDProcess, OIDProcessStepInstance,
     Declaration, DeclarationRegistration,
@@ -2272,6 +2272,24 @@ def trip_result_for_unit_list_view(request):
     }
     return render(request, 'oids/lists/trip_result_for_unit_list.html', context)
 
+# У відповідному view після збереження TripResultForUnit
+def trip_result_send_view(request):
+    # ... existing code ...
+    
+    if form.is_valid():
+        trip_result = form.save()
+        
+        # Встановлюємо зв'язок trip_result_sent для кожного документа
+        for doc in trip_result.documents.all():
+            if not doc.trip_result_sent:
+                doc.trip_result_sent = trip_result
+                doc.save(update_fields=['trip_result_sent', 'updated_at'])
+        
+        # Перевіряємо статуси WorkRequestItems
+        for doc in trip_result.documents.all():
+            if doc.work_request_item:
+                doc.work_request_item.check_and_update_status_based_on_documents()                
+				
 @login_required 
 def oid_status_change_list_view(request):
     status_change_list_queryset = OIDStatusChange.objects.select_related(
@@ -2400,142 +2418,223 @@ def oid_status_change_list_view(request):
     }
     return render(request, 'oids/lists/oid_status_change_list.html', context)
 
-@login_required 
+@login_required
 def attestation_registration_list_view(request):
-    registration_list_queryset = AttestationRegistration.objects.select_related(
+    """
+    Список відправок на реєстрацію атестаційних актів
+    """
+    queryset = AttestationRegistration.objects.select_related(
         'sent_by'
     ).prefetch_related(
-        'units', 
-        # Одразу завантажуємо пов'язані документи та їхні ОІДи, щоб уникнути N+1 запитів
-        Prefetch('registered_documents', queryset=Document.objects.select_related('oid__unit'))
-    ).order_by('-outgoing_letter_date', '-id')
-
-    # --- НОВА ЛОГІКА ФІЛЬТРАЦІЇ ---
-    form = AttestationRegistrationFilterForm(request.GET or None)
-    if form.is_valid():
-        if form.cleaned_data.get('units'):
-            registration_list_queryset = registration_list_queryset.filter(units__in=form.cleaned_data['units']).distinct()
-        if form.cleaned_data.get('status'):
-            registration_list_queryset = registration_list_queryset.filter(status__in=form.cleaned_data['status'])
-        if form.cleaned_data.get('sent_by'):
-            registration_list_queryset = registration_list_queryset.filter(sent_by__in=form.cleaned_data['sent_by'])
-        if form.cleaned_data.get('date_from'):
-            registration_list_queryset = registration_list_queryset.filter(outgoing_letter_date__gte=form.cleaned_data['date_from'])
-        if form.cleaned_data.get('date_to'):
-            registration_list_queryset = registration_list_queryset.filter(outgoing_letter_date__lte=form.cleaned_data['date_to'])
-
-        search_query = form.cleaned_data.get('search_query')
-        if search_query:
-            registration_list_queryset = registration_list_queryset.filter(
-                Q(outgoing_letter_number__icontains=search_query) |
-                Q(note__icontains=search_query)
-            )
-
-	# --- ДОДАЄМО НОВУ ЛОГІКУ ЕКСПОРТУ ---
-    if request.GET.get('export') == 'excel':
-        columns = {
-            'outgoing_letter_number': 'Вихідний №',
-            'outgoing_letter_date': 'Дата вих. листа',
-            'get_units_for_export': 'ВЧ у відправці',
-            'get_documents_for_export': 'Акти, надіслані на реєстр.',
-            'sent_by__full_name': 'Хто відправив',
-            'get_status_display': 'Статус',
-        }
-        return export_to_excel(
-            registration_list_queryset, 
-            columns, 
-            filename='attestation_registrations_export.xlsx',
-            include_row_numbers=True
-        )
-    # --- КІНЕЦЬ БЛОКУ ЕКСПОРТУ ---
-    page_obj = get_paginated_page(registration_list_queryset, request)
-
+        'units',
+        'sent_documents',  # ВИПРАВЛЕНО: було 'registered_documents'
+        'sent_documents__oid',
+        'sent_documents__oid__unit',
+        'sent_documents__document_type'
+    ).order_by('-outgoing_letter_date', '-created_at')
+    
+    # Фільтрація
+    filter_form = AttestationRegistrationFilterForm(request.GET or None)
+    if filter_form.is_valid():
+        if filter_form.cleaned_data.get('unit'):
+            queryset = queryset.filter(units__in=filter_form.cleaned_data['unit']).distinct()
+        if filter_form.cleaned_data.get('status'):
+            queryset = queryset.filter(status=filter_form.cleaned_data['status'])
+        if filter_form.cleaned_data.get('date_from'):
+            queryset = queryset.filter(outgoing_letter_date__gte=filter_form.cleaned_data['date_from'])
+        if filter_form.cleaned_data.get('date_to'):
+            queryset = queryset.filter(outgoing_letter_date__lte=filter_form.cleaned_data['date_to'])
+    
+    # Пагінація
+    page_obj = get_paginated_page(queryset, request)
+    
     context = {
-        'page_title': 'Відправки Актів Атестації на реєстрацію (ДССЗЗІ)',
-        'object_list': page_obj,
-        'page_obj': page_obj,
-        'form': form, # Передаємо форму в шаблон
+        'page_title': 'Реєстрація атестаційних актів: Список відправок',
+        'attestation_registrations': page_obj,
+        'filter_form': filter_form,
     }
+    
     return render(request, 'oids/lists/attestation_registration_list.html', context)
 
+# @login_required 
+# def attestation_registration_list_view(request):
+#     registration_list_queryset = AttestationRegistration.objects.select_related(
+#         'sent_by'
+#     ).prefetch_related(
+#         'units', 
+#         # Одразу завантажуємо пов'язані документи та їхні ОІДи, щоб уникнути N+1 запитів
+#         Prefetch('registered_documents', queryset=Document.objects.select_related('oid__unit'))
+#     ).order_by('-outgoing_letter_date', '-id')
 
-@login_required 
+#     # --- НОВА ЛОГІКА ФІЛЬТРАЦІЇ ---
+#     form = AttestationRegistrationFilterForm(request.GET or None)
+#     if form.is_valid():
+#         if form.cleaned_data.get('units'):
+#             registration_list_queryset = registration_list_queryset.filter(units__in=form.cleaned_data['units']).distinct()
+#         if form.cleaned_data.get('status'):
+#             registration_list_queryset = registration_list_queryset.filter(status__in=form.cleaned_data['status'])
+#         if form.cleaned_data.get('sent_by'):
+#             registration_list_queryset = registration_list_queryset.filter(sent_by__in=form.cleaned_data['sent_by'])
+#         if form.cleaned_data.get('date_from'):
+#             registration_list_queryset = registration_list_queryset.filter(outgoing_letter_date__gte=form.cleaned_data['date_from'])
+#         if form.cleaned_data.get('date_to'):
+#             registration_list_queryset = registration_list_queryset.filter(outgoing_letter_date__lte=form.cleaned_data['date_to'])
+
+#         search_query = form.cleaned_data.get('search_query')
+#         if search_query:
+#             registration_list_queryset = registration_list_queryset.filter(
+#                 Q(outgoing_letter_number__icontains=search_query) |
+#                 Q(note__icontains=search_query)
+#             )
+
+# 	# --- ДОДАЄМО НОВУ ЛОГІКУ ЕКСПОРТУ ---
+#     if request.GET.get('export') == 'excel':
+#         columns = {
+#             'outgoing_letter_number': 'Вихідний №',
+#             'outgoing_letter_date': 'Дата вих. листа',
+#             'get_units_for_export': 'ВЧ у відправці',
+#             'get_documents_for_export': 'Акти, надіслані на реєстр.',
+#             'sent_by__full_name': 'Хто відправив',
+#             'get_status_display': 'Статус',
+#         }
+#         return export_to_excel(
+#             registration_list_queryset, 
+#             columns, 
+#             filename='attestation_registrations_export.xlsx',
+#             include_row_numbers=True
+#         )
+#     # --- КІНЕЦЬ БЛОКУ ЕКСПОРТУ ---
+#     page_obj = get_paginated_page(registration_list_queryset, request)
+
+#     context = {
+#         'page_title': 'Відправки Актів Атестації на реєстрацію (ДССЗЗІ)',
+#         'object_list': page_obj,
+#         'page_obj': page_obj,
+#         'form': form, # Передаємо форму в шаблон
+#     }
+#     return render(request, 'oids/lists/attestation_registration_list.html', context)
+
+
+@login_required
 def attestation_response_list_view(request):
-    response_list_queryset = AttestationResponse.objects.select_related(
-        'attestation_registration_sent__sent_by', 
+    """
+    Список відповідей на відправки атестаційних актів
+    """
+    # Отримуємо фільтр з GET-параметрів
+    current_filter_att_reg_id = request.GET.get('attestation_registration_sent', None)  # ДОДАНО цей рядок
+    
+    queryset = AttestationResponse.objects.select_related(
+        'attestation_registration_sent',
+        'attestation_registration_sent__sent_by',
         'received_by'
     ).prefetch_related(
-        # Оптимізація для доступу до даних в шаблоні та експорті
-        Prefetch('attestation_registration_sent__registered_documents', 
-                 queryset=Document.objects.select_related('oid__unit')),
-        'attestation_registration_sent__registered_documents__oid__unit', # Для доступу до ВЧ ОІДа
-        'attestation_registration_sent__registered_documents__document_type' # Для доступу до типу документа
-    ).order_by('-response_letter_date', '-id')
+        'attestation_registration_sent__units',
+        'attestation_registration_sent__sent_documents',  # ВИПРАВЛЕНО: було 'registered_documents'
+        'attestation_registration_sent__sent_documents__oid',
+        'attestation_registration_sent__sent_documents__oid__unit'
+    ).order_by('-response_letter_date', '-created_at')
+    
+    # Фільтрація
+    filter_form = AttestationResponseFilterForm(request.GET or None)
+    if filter_form.is_valid():
+        if filter_form.cleaned_data.get('attestation_registration_sent'):
+            queryset = queryset.filter(
+                attestation_registration_sent=filter_form.cleaned_data['attestation_registration_sent']
+            )
+        if filter_form.cleaned_data.get('date_from'):
+            queryset = queryset.filter(response_letter_date__gte=filter_form.cleaned_data['date_from'])
+        if filter_form.cleaned_data.get('date_to'):
+            queryset = queryset.filter(response_letter_date__lte=filter_form.cleaned_data['date_to'])
+    
+    # Пагінація
+    page_obj = get_paginated_page(queryset, request)
+    
+    context = {
+        'page_title': 'Реєстрація атестаційних актів: Список відповідей',
+        'attestation_responses': page_obj,
+        'filter_form': filter_form,
+        'current_filter_att_reg_id': current_filter_att_reg_id,  # Тепер змінна визначена
+    }
+    
+    return render(request, 'oids/lists/attestation_response_list.html', context)
+
+# @login_required 
+# def attestation_response_list_view(request):
+#     response_list_queryset = AttestationResponse.objects.select_related(
+#         'attestation_registration_sent__sent_by', 
+#         'received_by'
+#     ).prefetch_related(
+#         # Оптимізація для доступу до даних в шаблоні та експорті
+#         Prefetch('attestation_registration_sent__registered_documents', 
+#                  queryset=Document.objects.select_related('oid__unit')),
+#         'attestation_registration_sent__registered_documents__oid__unit', # Для доступу до ВЧ ОІДа
+#         'attestation_registration_sent__registered_documents__document_type' # Для доступу до типу документа
+#     ).order_by('-response_letter_date', '-id')
     
 	
-    # --- Фільтрація (приклад, якщо потрібна) ---
-    # filter_att_reg_id_str = request.GET.get('att_reg_id') 
-    # current_filter_att_reg_id = None
-    # if filter_att_reg_id_str and filter_att_reg_id_str.isdigit():
-    #     current_filter_att_reg_id = int(filter_att_reg_id_str)
-    #     response_list_queryset = response_list_queryset.filter(attestation_registration_sent__id=current_filter_att_reg_id)
+#     # --- Фільтрація (приклад, якщо потрібна) ---
+#     # filter_att_reg_id_str = request.GET.get('att_reg_id') 
+#     # current_filter_att_reg_id = None
+#     # if filter_att_reg_id_str and filter_att_reg_id_str.isdigit():
+#     #     current_filter_att_reg_id = int(filter_att_reg_id_str)
+#     #     response_list_queryset = response_list_queryset.filter(attestation_registration_sent__id=current_filter_att_reg_id)
 
-    # page_obj = get_paginated_page(response_list_queryset, request)
+#     # page_obj = get_paginated_page(response_list_queryset, request)
 
-    # --- НОВА ЛОГІКА ФІЛЬТРАЦІЇ ---
-    form = AttestationResponseFilterForm(request.GET or None)
-    if form.is_valid():
-        if form.cleaned_data.get('attestation_registration_sent'):
-            response_list_queryset = response_list_queryset.filter(
-                attestation_registration_sent__in=form.cleaned_data['attestation_registration_sent']
-            )
-        if form.cleaned_data.get('received_by'):
-            response_list_queryset = response_list_queryset.filter(
-                received_by__in=form.cleaned_data['received_by']
-            )
-        if form.cleaned_data.get('date_from'):
-            response_list_queryset = response_list_queryset.filter(
-                response_letter_date__gte=form.cleaned_data['date_from']
-            )
-        if form.cleaned_data.get('date_to'):
-            response_list_queryset = response_list_queryset.filter(
-                response_letter_date__lte=form.cleaned_data['date_to']
-            )
-        search_query = form.cleaned_data.get('search_query')
-        if search_query:
-            response_list_queryset = response_list_queryset.filter(
-                Q(response_letter_number__icontains=search_query) |
-                Q(attestation_registration_sent__outgoing_letter_number__icontains=search_query)
-            )
+#     # --- НОВА ЛОГІКА ФІЛЬТРАЦІЇ ---
+#     form = AttestationResponseFilterForm(request.GET or None)
+#     if form.is_valid():
+#         if form.cleaned_data.get('attestation_registration_sent'):
+#             response_list_queryset = response_list_queryset.filter(
+#                 attestation_registration_sent__in=form.cleaned_data['attestation_registration_sent']
+#             )
+#         if form.cleaned_data.get('received_by'):
+#             response_list_queryset = response_list_queryset.filter(
+#                 received_by__in=form.cleaned_data['received_by']
+#             )
+#         if form.cleaned_data.get('date_from'):
+#             response_list_queryset = response_list_queryset.filter(
+#                 response_letter_date__gte=form.cleaned_data['date_from']
+#             )
+#         if form.cleaned_data.get('date_to'):
+#             response_list_queryset = response_list_queryset.filter(
+#                 response_letter_date__lte=form.cleaned_data['date_to']
+#             )
+#         search_query = form.cleaned_data.get('search_query')
+#         if search_query:
+#             response_list_queryset = response_list_queryset.filter(
+#                 Q(response_letter_number__icontains=search_query) |
+#                 Q(attestation_registration_sent__outgoing_letter_number__icontains=search_query)
+#             )
 
-    # --- ЛОГІКА ЕКСПОРТУ В EXCEL ---
-    if request.GET.get('export') == 'excel':
-        columns = {
-            'response_letter_number': 'Вхідний №',
-            'response_letter_date': 'Вхідна дата',
-            'attestation_registration_sent': 'На вих. лист',
-            'get_registered_acts_for_export': 'Акти у відповіді',
-            'received_by__full_name': 'Хто отримав/вніс',
-        }
-        return export_to_excel(
-            response_list_queryset, 
-            columns, 
-            filename='attestation_responses_export.xlsx', 
-            include_row_numbers=True
-        )
+#     # --- ЛОГІКА ЕКСПОРТУ В EXCEL ---
+#     if request.GET.get('export') == 'excel':
+#         columns = {
+#             'response_letter_number': 'Вхідний №',
+#             'response_letter_date': 'Вхідна дата',
+#             'attestation_registration_sent': 'На вих. лист',
+#             'get_registered_acts_for_export': 'Акти у відповіді',
+#             'received_by__full_name': 'Хто отримав/вніс',
+#         }
+#         return export_to_excel(
+#             response_list_queryset, 
+#             columns, 
+#             filename='attestation_responses_export.xlsx', 
+#             include_row_numbers=True
+#         )
     
-    page_obj = get_paginated_page(response_list_queryset, request)
+#     page_obj = get_paginated_page(response_list_queryset, request)
 
    
-    context = {
-        'page_title': 'Відповіді від ДССЗЗІ на реєстрацію Актів',
-        'object_list': page_obj,
-        'page_obj': page_obj,
-        'all_registrations_sent': AttestationRegistration.objects.order_by('-outgoing_letter_date'),
-        'form': form, # Передаємо форму в шаблон
-        'current_filter_att_reg_id': current_filter_att_reg_id,
-    }
-    return render(request, 'oids/lists/attestation_response_list.html', context)
+#     context = {
+#         'page_title': 'Відповіді від ДССЗЗІ на реєстрацію Актів',
+#         'object_list': page_obj,
+#         'page_obj': page_obj,
+#         'all_registrations_sent': AttestationRegistration.objects.order_by('-outgoing_letter_date'),
+#         'form': form, # Передаємо форму в шаблон
+#         'current_filter_att_reg_id': current_filter_att_reg_id,
+#     }
+#     return render(request, 'oids/lists/attestation_response_list.html', context)
 
 @login_required
 def attestation_registered_acts_list_view(request):
@@ -2660,14 +2759,14 @@ def record_attestation_response_view(request, att_reg_sent_id=None): # Може 
     if att_reg_sent_id:
         try:
             attestation_registration_instance = AttestationRegistration.objects.prefetch_related(
-                'registered_documents__oid__unit', # Для відображення деталей документів у формсеті
-                'registered_documents__document_type'
+                'sent_documents__oid__unit', # Для відображення деталей документів у формсеті
+                'sent_documents__document_type'
             ).get(
                 pk=att_reg_sent_id
                 # Можна додати фільтр по статусу, наприклад, тільки ті, що 'sent'
                 # status=AttestationRegistrationStatusChoices.SENT 
             )
-            documents_to_update_qs = attestation_registration_instance.registered_documents.all().order_by('oid__cipher')
+            documents_to_update_qs = attestation_registration_instance.sent_documents.all().order_by('oid__cipher')
         except AttestationRegistration.DoesNotExist:
             messages.error(request, "Обрану відправку не знайдено або на неї вже оброблена відповідь.")
             attestation_registration_instance = None # Скидаємо, щоб не показувати формсет
@@ -3131,3 +3230,5 @@ def azr_documents_list_view(request):
         'sort_url_part': query_params.urlencode(), # <-- Передаємо готову частину URL в шаблон
     }
     return render(request, 'oids/lists/azr_document_list.html', context)
+
+
