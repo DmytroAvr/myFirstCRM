@@ -84,6 +84,7 @@
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="{% url 'taskFlow:project_list' %}">Проєкти</a></li>
             <li class="breadcrumb-item"><a href="{% url 'taskFlow:project_detail' task.project.pk %}">{{ task.project.name }}</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'taskFlow:project_board' task.project.pk %}">Дошка проєкту</a></li>
             <li class="breadcrumb-item active">{{ task.key }}</li>
         </ol>
     </nav>
