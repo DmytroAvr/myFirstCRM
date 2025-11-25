@@ -40,7 +40,7 @@
     <li class="oid-info__list-item"><strong>Примітки:</strong>  <span class="oid-info__item-underline"> {{ oid.note|default:"-" }}</span></li>
     {% if active_process %}
 		<div class="card mt-4">
-		<div class="card-header">
+		<div class="card-header"> 
 			<h5 class="mb-0">Стан поточного процесу: "{{ active_process.template.name }}"</h5>
 		</div>
 		<div class="card-body">
@@ -100,11 +100,13 @@
 	{% if last_attestation_expiration %}
         <li><strong>Атестація дійсна до:</strong> {{ last_attestation_expiration|date:"d.m.Y" }}</li>
     {% endif %}
+    {% if last_prescription_expiration %}
+        <li><strong>Припис дійсний до:</strong> {{ last_prescription_expiration|date:"d.m.Y" }}</li>
+    {% endif %}
     {% if last_ik_expiration %}
         <li><strong>ІК дійсний до:</strong> {{ last_ik_expiration|date:"d.m.Y" }}</li>
     {% endif %}
-</ul>
-
+</ul> 
 <h3>Історія змін статусу</h3>
 {% if status_changes %}
     <table>

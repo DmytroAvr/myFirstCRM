@@ -6,30 +6,63 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="mb-0">{{ page_title }}</h2>
         <div>
-            <a href="{% url 'oids:record_attestation_response' %}" class="btn btn-primary">Внести нову відповідь</a>
-            <a href="?{{ request.GET.urlencode }}&export=excel" class="btn btn-success">Експорт в Excel</a>
+            <a href="{% url 'oids:record_attestation_response' %}" class="btn btn-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 18px; height: 18px; display: inline-block; vertical-align: middle; margin-right: 4px;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+                Внести нову відповідь
+            </a>
+            <a href="?{{ request.GET.urlencode }}&export=excel" class="btn btn-success">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 18px; height: 18px; display: inline-block; vertical-align: middle; margin-right: 4px;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                </svg>
+                Експорт в Excel
+            </a>
         </div>
     </div>
     
-    {# --- НОВА ФОРМА ФІЛЬТРІВ --- #}
+    {# --- ФОРМА ФІЛЬТРІВ --- #}
     <form method="get" class="mb-4 p-3 border bg-light rounded">
         <div class="row g-3">
-            <div class="col-md-4">{{ form.attestation_registration_sent.label_tag }} {{ form.attestation_registration_sent }}</div>
-            <div class="col-md-3">{{ form.received_by.label_tag }} {{ form.received_by }}</div>
-            <div class="col-md-5">{{ form.search_query.label_tag }} {{ form.search_query }}</div>
+            <div class="col-md-4">
+                {{ form.attestation_registration_sent.label_tag }} 
+                {{ form.attestation_registration_sent }}
+            </div>
+            <div class="col-md-3">
+                {{ form.received_by.label_tag }} 
+                {{ form.received_by }}
+            </div>
+            <div class="col-md-5">
+                {{ form.search_query.label_tag }} 
+                {{ form.search_query }}
+            </div>
         </div>
         <div class="row g-3 mt-2">
-            <div class="col-md-4">{{ form.date_from.label_tag }} {{ form.date_from }}</div>
-            <div class="col-md-4">{{ form.date_to.label_tag }} {{ form.date_to }}</div>
-            <div class="col-md-2 align-self-end"><button type="submit" class="btn btn-primary w-100">Фільтрувати</button></div>
-            <div class="col-md-2 align-self-end"><a href="{% url 'oids:list_attestation_responses' %}" class="btn btn-secondary w-100">Скинути</a></div>
+            <div class="col-md-4">
+                {{ form.date_from.label_tag }} 
+                {{ form.date_from }}
+            </div>
+            <div class="col-md-4">
+                {{ form.date_to.label_tag }} 
+                {{ form.date_to }}
+            </div>
+            <div class="col-md-2 align-self-end">
+                <button type="submit" class="btn btn-primary w-100">Фільтрувати</button>
+            </div>
+            <div class="col-md-2 align-self-end">
+                <a href="{% url 'oids:list_attestation_responses' %}" class="btn btn-secondary w-100">Скинути</a>
+            </div>
         </div>
     </form>
 
     {% if object_list %}
+    <div class="alert alert-info">
+        Знайдено записів: <strong>{{ page_obj.paginator.count }}</strong>
+    </div>
+
     <div class="table-responsive">
         <table class="table table-striped table-bordered table-hover">
-            <thead class="thead-dark">
+            <thead class="-table-dark">
                 <tr>
                     <th>№</th>
                     <th>Вхідний лист № (дата)</th>
@@ -37,54 +70,111 @@
                     <th>Акти атестації у відповіді</th>
                     <th>Хто отримав/вніс</th>
                     <th>Дата внесення</th>
-                    <th>ДОП</th>
+                    <th>Типи документів</th>
                 </tr>
             </thead>
             <tbody>
                 {% for response_item in object_list %}
                 <tr>
+                    {# Номер по порядку #}
                     <td>{{ page_obj.start_index|add:forloop.counter0 }}.</td>
-                    <td>№ {{ response_item.response_letter_number }} від {{ response_item.response_letter_date|date:"d.m.Y" }}</td>
-                    <td>
+                    
+                    {# Вхідний лист #}
+                    <td class="text-nowrap">
+                        <strong>№ {{ response_item.response_letter_number }}</strong><br>
+                        <small class="text-muted">від {{ response_item.response_letter_date|date:"d.m.Y" }}</small>
+                    </td>
+                    
+                    {# Вихідний лист (на який відповідь) #}
+                    <td class="text-nowrap">
                         {% if response_item.attestation_registration_sent %}
-                            № {{ response_item.attestation_registration_sent.outgoing_letter_number }} від {{ response_item.attestation_registration_sent.outgoing_letter_date|date:"d.m.Y" }}
+                            <strong>№ {{ response_item.attestation_registration_sent.outgoing_letter_number }}</strong><br>
+                            <small class="text-muted">від {{ response_item.attestation_registration_sent.outgoing_letter_date|date:"d.m.Y" }}</small>
+                        {% else %}
+                            <span class="text-muted">-</span>
                         {% endif %}
                     </td>
+                    
+                    {# Акти атестації у відповіді #}
                     <td>
-                        <ul class="list-unstyled mb-0">
-                            {% for act_doc in response_item.attestation_registration_sent.sent_documents.all %}
-                            <li>
-                                <a href="{% url 'oids:oid_detail_view_name' act_doc.oid.id %}#doc-{{act_doc.id}}"><strong>{{ act_doc.oid.cipher }}</strong></a>
-                                - Акт №{{ act_doc.document_number }}
-                                {% if act_doc.dsszzi_registered_number %}
-                                    (Реєстр. ДССЗЗІ: №{{ act_doc.dsszzi_registered_number }} від {{ act_doc.dsszzi_registered_date|date:"d.m.Y" }})
-                                {% else %}
-                                    <span class="text-danger">(не зареєстровано)</span>
-                                {% endif %}
-                            </li>
-                            {% empty %}
-                            <li><span class="text-muted">Акти не знайдено</span></li>
-                            {% endfor %}
-                        </ul>
+                        {% if response_item.attestation_registration_sent %}
+                            <ul class="list-unstyled mb-0">
+                                {% for act_doc in response_item.attestation_registration_sent.sent_documents.all %}
+                                <li class="mb-2">
+                                    <a href="{% url 'oids:oid_detail_view_name' act_doc.oid.id %}#doc-{{act_doc.id}}" class="text-decoration-none">
+                                        <strong>{{ act_doc.oid.cipher }}</strong>
+                                    </a>
+                                    <br>
+                                    <small class="text-muted">Акт №{{ act_doc.document_number }}</small>
+                                    <br>
+                                    {% if act_doc.dsszzi_registered_number %}
+                                        <span class="badge bg-success">
+                                            Реєстр. ДССЗЗІ: №{{ act_doc.dsszzi_registered_number }} 
+                                            {% if act_doc.dsszzi_registered_date %}
+                                                від {{ act_doc.dsszzi_registered_date|date:"d.m.Y" }}
+                                            {% endif %}
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Не зареєстровано</span>
+                                    {% endif %}
+                                </li>
+                                {% empty %}
+                                <li><span class="text-muted">Акти не знайдено</span></li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
                     </td>
-                    <td>{{ response_item.received_by.full_name|default:"-" }}</td>
-                    <td>{{ response_item.created_at|date:"d.m.Y H:i" }}</td>
-					<td>
-{% for response in attestation_responses %}
-    {# ВИПРАВЛЕНО: використовуємо sent_documents замість registered_documents #}
-    {% for doc in response.attestation_registration_sent.sent_documents.all %}
-        {{ doc.oid.cipher }} - {{ doc.document_type.name }}
-    {% endfor %}
-{% endfor %}
-					</td>
+                    
+                    {# Хто отримав/вніс #}
+                    <td>
+                        {% if response_item.received_by %}
+                            {{ response_item.received_by.full_name }}
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    
+                    {# Дата внесення #}
+                    <td class="text-nowrap">
+                        {{ response_item.created_at|date:"d.m.Y H:i" }}
+                    </td>
+                    
+                    {# ВИПРАВЛЕНО: Типи документів - БЕЗ ЗАЙВОГО ЦИКЛУ #}
+                    <td>
+                        {% if response_item.attestation_registration_sent %}
+                            <ul class="list-unstyled mb-0">
+                                {% for doc in response_item.attestation_registration_sent.sent_documents.all %}
+                                <li>
+                                    {% if doc.document_type %}
+                                        <span class="badge bg-light text-dark">{{ doc.document_type.name }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-        {% include "oids/includes/pagination.html" %}
+
+    {# Пагінація #}
+    {% include "oids/includes/pagination.html" %}
+
     {% else %}
-        <p>Відповіді від ДССЗЗІ не знайдено.</p>
+        <div class="alert alert-warning" role="alert">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 8px;">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+            Відповіді від ДССЗЗІ не знайдено (або не відповідають критеріям фільтрації).
+        </div>
     {% endif %}
 </div>
 {% endblock %}
@@ -92,10 +182,12 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // TomSelect для мультиселектів
     if (typeof TomSelect !== 'undefined') {
         document.querySelectorAll('.tomselect-field').forEach(function(element) {
             new TomSelect(element, {
                 plugins: ['remove_button'],
+                placeholder: 'Оберіть...',
             });
         });
     }

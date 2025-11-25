@@ -90,7 +90,6 @@ urlpatterns = [
 	path('work-requests/<int:pk>/', views.work_request_detail_view, name='work_request_detail'),
     path('trips/', views.trip_list_view, name='list_trips'),
     path('technical-tasks/', views.technical_task_list_view, name='list_technical_tasks'),
-    path('attestation-responses/', views.attestation_response_list_view, name='list_attestation_responses'),
 	path('attestation-acts/registered/', views.attestation_registered_acts_list_view, name='list_registered_acts'),
     path('trip-results/', views.trip_result_for_unit_list_view, name='list_trip_results_for_units'),
     path('oid-status-changes/', views.oid_status_change_list_view, name='list_oid_status_changes'),

@@ -4,7 +4,7 @@ from django.dispatch import receiver
 from django.utils import timezone
 import datetime 
 from .models import (Trip, WorkRequestItem, WorkTypeChoices, OID, add_working_days,
-                     Document, OIDProcessStepInstance, ProcessStepStatusChoices, 
+                     Document, OIDProcessStepInstance, ProcessStepStatusChoices, TripResultForUnit,
                      OIDStatusChoices )
 
 # Переконайтесь, що функція add_working_days визначена коректно
@@ -259,4 +259,22 @@ def check_items_on_trip_result_save(sender, instance, created, **kwargs):
             print(f"[SIGNAL] Checking WRI ID {doc.work_request_item.id} for document ID {doc.id}")
             doc.work_request_item.check_and_update_status_based_on_documents()
             
+
+# 4. АЛЬТЕРНАТИВА: Якщо використовуєте signals.py
+# Додайте сигнал при збереженні TripResultForUnit
+
+@receiver(m2m_changed, sender=TripResultForUnit.documents.through)
+def update_wri_status_on_documents_added(sender, instance, action, **kwargs):
+    """
+    Оновлює статуси WorkRequestItem коли документи додаються до TripResultForUnit
+    """
+    if action == "post_add":
+        print(f"\n[SIGNAL] Documents added to TripResultForUnit ID {instance.id}")
+        
+        # Оновлюємо статуси для всіх пов'язаних документів
+        for document in instance.documents.all():
+            if document.work_request_item:
+                print(f"[SIGNAL] Updating status for WRI ID {document.work_request_item.id}")
+                document.work_request_item.check_and_update_status_based_on_documents()
+
 

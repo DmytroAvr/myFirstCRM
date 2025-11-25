@@ -9,6 +9,8 @@ from django.contrib import messages
 from django.db.models import Q, Max, Prefetch, Count, OuterRef, Subquery
 from django.db import  transaction
 from django.utils import timezone
+from django.core.management.base import BaseCommand
+
 from .utils import export_to_excel
 import datetime
 from .models import (OIDTypeChoices, OIDStatusChoices, SecLevelChoices, WorkRequestStatusChoices, WorkTypeChoices, 
@@ -24,7 +26,7 @@ from .models import (Unit, UnitGroup, OID, DskEot, OIDStatusChange, TerritorialM
 
 from .forms import ( TripForm, TripResultSendForm, DocumentProcessingMainForm, DocumentItemFormSet, DocumentForm, 
     OIDCreateForm, OIDStatusUpdateForm, 
-	WorkRequestForm, WorkRequestItemFormSet,  
+	WorkRequestForm, WorkRequestItemFormSet, TripResultForUnitForm,
     TechnicalTaskCreateForm, TechnicalTaskProcessForm,
 	AttestationRegistrationSendForm, AttestationResponseMainForm, AttestationActUpdateFormSet,
     WorkCompletionSendForm, WorkCompletionResponseForm,    
@@ -360,7 +362,6 @@ def ajax_load_attestation_acts_for_multiple_oids(request):
             
     return JsonResponse(acts_data, safe=False)
 
-
 # trip results
 def ajax_load_units_for_trip(request):
     trip_id_str = request.GET.get('trip_id')
@@ -501,6 +502,325 @@ def ajax_load_documents_for_trip_oids(request):
             return JsonResponse({'error': str(e)}, status=500)
             
     return JsonResponse(documents_data, safe=False)
+
+def get_last_document_expiration_date(oid_instance, document_name_keyword, work_type_choice=None):
+    try:
+        doc_type_filters = Q(name__icontains=document_name_keyword)
+        if work_type_choice:
+            doc_type_filters &= Q(work_type=work_type_choice)
+        
+        relevant_doc_type_qs = DocumentType.objects.filter(doc_type_filters)
+        if not relevant_doc_type_qs.exists():
+            return None
+        relevant_doc_type = relevant_doc_type_qs.first()
+
+        last_document = Document.objects.filter(
+            oid=oid_instance, # Використовуємо переданий екземпляр OID
+            document_type=relevant_doc_type,
+            expiration_date__isnull=False
+        ).order_by('-work_date', '-doc_process_date').first()
+        
+        return last_document.expiration_date if last_document else None
+    except Exception as e:
+        print(f"Помилка get_last_document_expiration_date для ОІД {oid_instance.cipher if oid_instance else 'N/A'} ({document_name_keyword}): {e}")
+        return None
+
+	#  логіка оновлення статусу заявки:
+def check_and_update_status_based_on_documents(self):
+    """
+    Перевіряє, чи виконані умови для зміни статусу цього WorkRequestItem,
+    ґрунтуючись на наявності та стані документів.
+    
+    Логіка статусів:
+    - TO_SEND_AA: Документи опрацьовано для Атестації, готові до відправки в ДССЗЗІ
+    - ON_REGISTRATION: Документи відправлено на реєстрацію в ДССЗЗІ (для Атестації)
+    - TO_SEND_VCH: Документи зареєстровано в ДССЗЗІ / опрацьовано для ІК, готові до відправки у в/ч
+    - COMPLETED: Документи відправлено у в/ч
+    """
+    print(f"[WRI_STATUS_CHECKER] Checking status for WRI ID {self.id} (OID: {self.oid.cipher}, Work Type: {self.work_type})")
+
+    if self.status in [WorkRequestStatusChoices.COMPLETED, WorkRequestStatusChoices.CANCELED]:
+        print(f"[WRI_STATUS_CHECKER] WRI ID {self.id} is already {self.status}. No update needed.")
+        return
+
+    existing_docs_for_item = Document.objects.filter(work_request_item=self)
+    
+    fields_to_update = []
+    new_status = self.status
+    document_date = None
+
+    # --- ОНОВЛЕНА ЛОГІКА ДЛЯ АТЕСТАЦІЇ (ATTESTATION та PLAND_ATTESTATION) ---
+    if self.work_type in [WorkTypeChoices.PLAND_ATTESTATION, WorkTypeChoices.ATTESTATION]:
+        attestation_act_type = DocumentType.objects.filter(name__icontains="Акт атестації").first()
+        
+        if not attestation_act_type:
+            print(f"[WRI_STATUS_CHECKER] Attestation Act type not found in system!")
+            return
+        
+        # Шукаємо Акт Атестації для цього WRI
+        attestation_doc = existing_docs_for_item.filter(
+            document_type=attestation_act_type
+        ).order_by('-doc_process_date').first()
+        
+        if attestation_doc:
+            # Перевіряємо, чи є реєстраційний номер ДССЗЗІ
+            has_registration = (
+                attestation_doc.dsszzi_registered_number and 
+                attestation_doc.dsszzi_registered_number.strip() != ''
+            )
+            
+            # Перевіряємо, чи документ відправлено на реєстрацію (має attestation_registration_sent)
+            is_sent_for_registration = attestation_doc.attestation_registration_sent is not None
+            
+            # НОВИНКА: Перевіряємо, чи документ відправлено у в/ч (має trip_result_sent)
+            is_sent_to_unit = hasattr(attestation_doc, 'trip_result_sent') and attestation_doc.trip_result_sent is not None
+            
+            if is_sent_to_unit:
+                # Документ відправлено у в/ч → статус "Виконано"
+                new_status = WorkRequestStatusChoices.COMPLETED
+                document_date = attestation_doc.doc_process_date
+                print(f"[WRI_STATUS_CHECKER] Attestation doc sent to unit. Setting status to COMPLETED.")
+                
+            elif has_registration:
+                # Є реєстраційний номер, але ще не відправлено у в/ч → "Готово до відправки в в/ч"
+                new_status = WorkRequestStatusChoices.TO_SEND_VCH
+                document_date = attestation_doc.dsszzi_registered_date or attestation_doc.doc_process_date
+                print(f"[WRI_STATUS_CHECKER] Attestation doc has registration number but not sent to unit. Setting status to TO_SEND_VCH.")
+                
+            elif is_sent_for_registration:
+                # Відправлено на реєстрацію, але номера ще немає → "На реєстрації в ДССЗЗІ"
+                new_status = WorkRequestStatusChoices.ON_REGISTRATION
+                document_date = attestation_doc.doc_process_date
+                print(f"[WRI_STATUS_CHECKER] Attestation doc sent for registration. Setting status to ON_REGISTRATION.")
+                
+            elif attestation_doc.doc_process_date:
+                # Документ опрацьовано, але не відправлено → "Готово до відправки в ДССЗЗІ"
+                new_status = WorkRequestStatusChoices.TO_SEND_AA
+                document_date = attestation_doc.doc_process_date
+                print(f"[WRI_STATUS_CHECKER] Attestation doc processed but not sent. Setting status to TO_SEND_AA.")
+        else:
+            print(f"[WRI_STATUS_CHECKER] No Attestation Act found for WRI ID {self.id}.")
+
+    # --- ЛОГІКА ДЛЯ ІК (БЕЗ ЗМІН) ---
+    elif self.work_type == WorkTypeChoices.IK:
+        ik_conclusion_type = DocumentType.objects.filter(duration_months=20).first()
+        
+        if not ik_conclusion_type:
+            print(f"[WRI_STATUS_CHECKER] IK Conclusion type not found in system!")
+            return
+        
+        # Шукаємо Висновок ІК для цього WRI
+        ik_doc = existing_docs_for_item.filter(
+            document_type=ik_conclusion_type
+        ).order_by('-doc_process_date').first()
+        
+        if ik_doc:
+            # Перевіряємо, чи документ відправлено у в/ч (має trip_result_sent)
+            is_sent_to_unit = hasattr(ik_doc, 'trip_result_sent') and ik_doc.trip_result_sent is not None
+            
+            if is_sent_to_unit:
+                # Документ відправлено у в/ч → "Виконано"
+                new_status = WorkRequestStatusChoices.COMPLETED
+                document_date = ik_doc.doc_process_date
+                print(f"[WRI_STATUS_CHECKER] IK doc sent to unit. Setting status to COMPLETED.")
+                
+            elif ik_doc.doc_process_date:
+                # Документ опрацьовано, але не відправлено → "Готово до відправки в в/ч"
+                new_status = WorkRequestStatusChoices.TO_SEND_VCH
+                document_date = ik_doc.doc_process_date
+                print(f"[WRI_STATUS_CHECKER] IK doc processed but not sent. Setting status to TO_SEND_VCH.")
+        else:
+            print(f"[WRI_STATUS_CHECKER] No IK Conclusion found for WRI ID {self.id}.")
+
+    # --- Оновлюємо статус, якщо він змінився ---
+    if new_status != self.status:
+        self.status = new_status
+        fields_to_update.append('status')
+        print(f"[WRI_STATUS_CHECKER] Status changed from {self.status} to {new_status}")
+    
+    # --- Оновлюємо дату фактичного опрацювання ---
+    if document_date and not self.docs_actually_processed_on:
+        self.docs_actually_processed_on = document_date
+        fields_to_update.append('docs_actually_processed_on')
+        print(f"[WRI_STATUS_CHECKER] Setting docs_actually_processed_on to {document_date}")
+    
+    # --- Зберігаємо зміни ---
+    if fields_to_update:
+        fields_to_update.append('updated_at')
+        self.save(update_fields=fields_to_update)
+        print(f"[WRI_STATUS_CHECKER] WRI ID {self.id} updated. New status: {self.get_status_display()}")
+        
+        # Оновлюємо статус батьківської заявки
+        self.update_parent_request_status()
+    else:
+        print(f"[WRI_STATUS_CHECKER] No changes needed for WRI ID {self.id}. Current status: {self.get_status_display()}")
+
+
+        # ... (решта методів моделі WorkRequestItem, наприклад update_parent_request_status) ...
+    
+def update_parent_request_status(self):
+	"""
+	Оновлює статус батьківської заявки WorkRequest на основі статусів
+	всіх її елементів WorkRequestItem.
+	
+	Логіка:
+	- Якщо всі COMPLETED → заявка COMPLETED
+	- Якщо всі CANCELED → заявка CANCELED
+	- Якщо є хоча б один ON_REGISTRATION → заявка ON_REGISTRATION
+	- Якщо є хоча б один TO_SEND_AA або TO_SEND_VCH → відповідний статус заявки
+	- Якщо є хоча б один IN_PROGRESS → заявка IN_PROGRESS
+	- Інакше → PENDING
+	"""
+	work_request = self.request
+	all_items = work_request.items.all()
+
+	if not all_items.exists():
+		print(f"[REQUEST_STATUS_UPDATER] WorkRequest ID {work_request.id} has no items.")
+		if work_request.status != WorkRequestStatusChoices.PENDING:
+			work_request.status = WorkRequestStatusChoices.PENDING
+			work_request.save(update_fields=['status', 'updated_at'])
+			print(f"[REQUEST_STATUS_UPDATER] Set to PENDING (no items).")
+		return
+
+	print(f"[REQUEST_STATUS_UPDATER] Updating status for WorkRequest ID {work_request.id}")
+	
+	# Підраховуємо статуси елементів
+	status_counts = {
+		'completed': all_items.filter(status=WorkRequestStatusChoices.COMPLETED).count(),
+		'canceled': all_items.filter(status=WorkRequestStatusChoices.CANCELED).count(),
+		'on_registration': all_items.filter(status=WorkRequestStatusChoices.ON_REGISTRATION).count(),
+		'to_send_aa': all_items.filter(status=WorkRequestStatusChoices.TO_SEND_AA).count(),
+		'to_send_vch': all_items.filter(status=WorkRequestStatusChoices.TO_SEND_VCH).count(),
+		'in_progress': all_items.filter(status=WorkRequestStatusChoices.IN_PROGRESS).count(),
+		'pending': all_items.filter(status=WorkRequestStatusChoices.PENDING).count(),
+		'total': all_items.count()
+	}
+	
+	print(f"[REQUEST_STATUS_UPDATER] Status counts: {status_counts}")
+	
+	original_status = work_request.status
+	new_status = original_status
+
+	# Визначаємо новий статус заявки за пріоритетом
+	if status_counts['completed'] == status_counts['total']:
+		# Всі елементи виконані
+		new_status = WorkRequestStatusChoices.COMPLETED
+		print(f"[REQUEST_STATUS_UPDATER] All items COMPLETED.")
+		
+	elif status_counts['canceled'] == status_counts['total']:
+		# Всі елементи скасовані
+		new_status = WorkRequestStatusChoices.CANCELED
+		print(f"[REQUEST_STATUS_UPDATER] All items CANCELED.")
+		
+	elif status_counts['on_registration'] > 0:
+		# Є елементи на реєстрації в ДССЗЗІ
+		new_status = WorkRequestStatusChoices.ON_REGISTRATION
+		print(f"[REQUEST_STATUS_UPDATER] Has items ON_REGISTRATION.")
+		
+	elif status_counts['to_send_aa'] > 0 and status_counts['to_send_vch'] > 0:
+		# Є елементи обох типів, готові до відправки - встановлюємо статус за першим знайденим
+		# Або можна створити окремий статус "Готово до відправки"
+		new_status = WorkRequestStatusChoices.TO_SEND_AA
+		print(f"[REQUEST_STATUS_UPDATER] Has items TO_SEND (both types).")
+		
+	elif status_counts['to_send_aa'] > 0:
+		# Є елементи, готові до відправки в ДССЗЗІ
+		new_status = WorkRequestStatusChoices.TO_SEND_AA
+		print(f"[REQUEST_STATUS_UPDATER] Has items TO_SEND_AA.")
+		
+	elif status_counts['to_send_vch'] > 0:
+		# Є елементи, готові до відправки у в/ч
+		new_status = WorkRequestStatusChoices.TO_SEND_VCH
+		print(f"[REQUEST_STATUS_UPDATER] Has items TO_SEND_VCH.")
+		
+	elif status_counts['in_progress'] > 0:
+		# Є елементи в роботі
+		new_status = WorkRequestStatusChoices.IN_PROGRESS
+		print(f"[REQUEST_STATUS_UPDATER] Has items IN_PROGRESS.")
+		
+	elif status_counts['pending'] > 0:
+		# Є елементи, що очікують
+		new_status = WorkRequestStatusChoices.PENDING
+		print(f"[REQUEST_STATUS_UPDATER] Has items PENDING.")
+
+	# Зберігаємо новий статус, якщо він змінився
+	if original_status != new_status:
+		work_request.status = new_status
+		work_request.save(update_fields=['status', 'updated_at'])
+		print(f"[REQUEST_STATUS_UPDATER] WorkRequest ID {work_request.id} status changed: {original_status} → {new_status}")
+	else:
+		print(f"[REQUEST_STATUS_UPDATER] WorkRequest ID {work_request.id} status unchanged: {new_status}")
+
+
+def update_request_status(self):
+	"""
+	Оновлює статус батьківської заявки WorkRequest на основі статусів
+	всіх її елементів WorkRequestItem.
+	"""
+	work_request = self.request
+	all_items = work_request.items.all()
+
+	if not all_items.exists():
+		# Якщо заявка не має елементів (наприклад, щойно створена і ще не додані, або всі видалені)
+		# Можна встановити PENDING або залишити як є, залежно від бізнес-логіки.
+		# Якщо це відбувається після видалення останнього елемента, можливо, заявку треба скасувати або повернути в PENDING.
+		if work_request.status != WorkRequestStatusChoices.PENDING: # Якщо вже не PENDING
+			work_request.status = WorkRequestStatusChoices.PENDING # або інший логічний статус
+			work_request.save(update_fields=['status', 'updated_at'])
+		return
+
+	# Перевіряємо, чи всі елементи завершені або скасовані
+	is_all_items_processed = all(
+		item.status in [WorkRequestStatusChoices.COMPLETED, WorkRequestStatusChoices.CANCELED]
+		for item in all_items
+	)
+
+	original_request_status = work_request.status
+	new_request_status = original_request_status # За замовчуванням не змінюємо
+
+
+	if is_all_items_processed:
+		# Якщо всі елементи оброблені, визначаємо фінальний статус заявки
+		if all_items.filter(status=WorkRequestStatusChoices.COMPLETED).exists():
+			# Якщо є хоча б один виконаний елемент, заявка вважається виконаною
+			new_request_status = WorkRequestStatusChoices.COMPLETED
+		elif all_items.filter(status=WorkRequestStatusChoices.CANCELED).count() == all_items.count():
+			# Якщо всі елементи скасовані (і немає виконаних)
+			new_request_status = WorkRequestStatusChoices.CANCELED
+		else:
+			# Ситуація, коли всі CANCELED, але був хоча б один COMPLETED, вже покрита першою умовою.
+			# Якщо всі CANCELED і не було COMPLETED - це друга умова.
+			# Якщо є суміш COMPLETED і CANCELED, то COMPLETED має пріоритет.
+			# Якщо логіка інша (напр. "Частково виконано"), її треба додати.
+				new_request_status = WorkRequestStatusChoices.COMPLETED # За замовчуванням для змішаних processed
+	else:
+		# Якщо не всі елементи оброблені, перевіряємо наявність "В роботі" або "Очікує"
+		if all_items.filter(status=WorkRequestStatusChoices.IN_PROGRESS).exists():
+			new_request_status = WorkRequestStatusChoices.IN_PROGRESS
+		elif all_items.filter(status=WorkRequestStatusChoices.PENDING).exists():
+			new_request_status = WorkRequestStatusChoices.PENDING
+		# Можливий випадок: немає IN_PROGRESS, немає PENDING, але не всі processed.
+		# Це може статися, якщо є власні статуси. Для стандартних це малоймовірно.
+		# У такому разі, можна залишити поточний статус заявки або встановити PENDING.
+	if original_request_status != new_request_status:
+		work_request.status = new_request_status
+		work_request.save(update_fields=['status', 'updated_at'])
+		print(f"[DEBUG] WorkRequest ID {work_request.id} status successfully saved as '{work_request.get_status_display()}'.")
+	else:
+		print(f"[DEBUG] WorkRequest ID {work_request.id} status '{work_request.get_status_display()}' remains unchanged.")
+	print(f"--- [DEBUG] WRI.update_request_status() FINISHED for WRI ID: {self.id} ---")
+
+def __str__(self):
+	# return f"{self.oid.cipher} - {self.get_work_type_display()} ({self.get_status_display()})"
+	return f"ОІД: {self.oid.cipher} ({self.oid.oid_type}) - Робота: {self.get_work_type_display()} (Статус: {self.status})"
+
+class Meta:
+	unique_together = ('request', 'oid', 'work_type') # Один ОІД не може мати двічі одну і ту ж роботу в одній заявці
+	verbose_name = "Заявки: Елемент заявки (ОІД)"
+	verbose_name_plural = "Заявки: Елементи заявки (ОІД)"
+	# ordering = ['request', 'oid'] # Додано сортування
+	ordering = ['request', 'request__incoming_date' ] # Додав сортування за замовчуванням
+
 
 def main_dashboard(request):
     """
@@ -675,8 +995,8 @@ def oid_detail_view(request, oid_id):
     # Натомість, ми будемо використовувати attestation_acts_for_oid та їх зв'язок з AttestationRegistration
 
 
-    last_attestation_expiration = get_last_document_expiration_date(oid, 'Акт атестації', WorkTypeChoices.ATTESTATION)
-    last_ik_expiration = get_last_document_expiration_date(oid, 'Висновок', WorkTypeChoices.IK)
+    last_attestation_expiration = get_last_document_expiration_date(oid, 'Акт атестації')
+    last_ik_expiration = get_last_document_expiration_date(oid, 'Висновок')
     last_prescription_expiration = get_last_document_expiration_date(oid, 'Припис')
 
     context = {
@@ -2253,15 +2573,109 @@ def technical_task_list_view(request):
     }
     return render(request, 'oids/lists/technical_task_list.html', context)
 
+
+# 1. View для СТВОРЕННЯ відправки у в/ч (основний)
+@login_required
+def send_trip_results_form(request):
+    """
+    Форма для створення відправки результатів відрядження у в/ч
+    """
+    if request.method == 'POST':
+        form = TripResultForUnitForm(request.POST)
+        
+        if form.is_valid():
+            trip_result = form.save(commit=False)
+            # Можна встановити хто створив/відправив
+            # trip_result.created_by = request.user.person
+            trip_result.save()
+            
+            # Зберігаємо M2M зв'язки
+            form.save_m2m()
+            
+            # ⭐ КЛЮЧОВИЙ МОМЕНТ: Оновлюємо статуси після відправки
+            update_statuses_after_sending_to_unit(trip_result)
+            
+            messages.success(
+                request, 
+                f'✅ Результати відрядження успішно відправлено у в/ч. '
+                f'Оновлено статуси заявок.'
+            )
+            return redirect('oids:trip_result_for_unit_list')
+    else:
+        form = TripResultForUnitForm()
+    
+    context = {
+        'form': form,
+        'page_title': 'Відправити документи в частину',
+    }
+    return render(request, 'oids/forms/send_trip_results_form.html', context)
+
+
+# 2. НОВА ФУНКЦІЯ для оновлення статусів
+def update_statuses_after_sending_to_unit(trip_result):
+    """
+    Оновлює статуси WorkRequestItem після відправки документів у в/ч
+    
+    Args:
+        trip_result: Об'єкт TripResultForUnit
+    """
+    print(f"\n{'='*60}")
+    print(f"[TRIP_RESULT_STATUS_UPDATE] Processing TripResultForUnit ID {trip_result.id}")
+    print(f"Outgoing letter: №{trip_result.outgoing_letter_number} від {trip_result.outgoing_letter_date}")
+    print(f"{'='*60}\n")
+    
+    updated_wri_count = 0
+    documents_processed = 0
+    
+    # Обробляємо всі документи у відправці
+    for document in trip_result.documents.all():
+        documents_processed += 1
+        print(f"\n📄 Processing Document ID {document.id}")
+        print(f"   Type: {document.document_type.name if document.document_type else 'Unknown'}")
+        print(f"   OID: {document.oid.cipher}")
+        print(f"   Number: {document.document_number}")
+        
+        # Перевіряємо чи є пов'язаний WorkRequestItem
+        if document.work_request_item:
+            wri = document.work_request_item
+            print(f"   ✅ Linked to WRI ID {wri.id} (Status: {wri.get_status_display()})")
+            
+            # Викликаємо оновлення статусу
+            old_status = wri.status
+            wri.check_and_update_status_based_on_documents()
+            
+            if wri.status != old_status:
+                updated_wri_count += 1
+                print(f"   🔄 Status changed: {old_status} → {wri.status}")
+            else:
+                print(f"   ℹ️  Status unchanged: {wri.status}")
+        else:
+            print(f"   ⚠️  No linked WorkRequestItem")
+    
+    print(f"\n{'='*60}")
+    print(f"[TRIP_RESULT_STATUS_UPDATE] Summary:")
+    print(f"  Documents processed: {documents_processed}")
+    print(f"  WorkRequestItems updated: {updated_wri_count}")
+    print(f"{'='*60}\n")
+
+
+# 3. View для списку (без змін, але з коментарями)
 @login_required 
 def trip_result_for_unit_list_view(request):
+    """
+    Список відправок результатів відряджень у в/ч
+    """
     result_list_queryset = TripResultForUnit.objects.select_related(
-        'trip' # Якщо потрібно бачити деталі самого відрядження
+        'trip'
     ).prefetch_related(
-        'units', # ВЧ, куди відправлено
-        Prefetch('oids', queryset=OID.objects.select_related('unit')), # ОІДи, що стосуються результату
-        Prefetch('documents', queryset=Document.objects.select_related('document_type')) # Документи, що відправлені
-    ).order_by('-outgoing_letter_date') # Сортуємо за датою відправки до частини
+        'units',
+        Prefetch('oids', queryset=OID.objects.select_related('unit')),
+        Prefetch('documents', queryset=Document.objects.select_related(
+            'document_type',
+            'work_request_item',  # ДОДАНО для перевірки зв'язку
+            'work_request_item__request'  # ДОДАНО для перевірки заявки
+        ))
+    ).order_by('-outgoing_letter_date')
 
     page_obj = get_paginated_page(result_list_queryset, request)
         
@@ -2271,6 +2685,57 @@ def trip_result_for_unit_list_view(request):
         'page_obj': page_obj
     }
     return render(request, 'oids/lists/trip_result_for_unit_list.html', context)
+
+
+
+
+# 7. TESTING: Функція для тестування
+def test_trip_result_status_update(trip_result_id):
+    """
+    Тестова функція для перевірки оновлення статусів
+    Використання: test_trip_result_status_update(1)
+    """
+    from oids.models import TripResultForUnit
+    
+    trip_result = TripResultForUnit.objects.get(id=trip_result_id)
+    
+    print("\n" + "="*60)
+    print(f"TESTING: TripResultForUnit ID {trip_result_id}")
+    print("="*60)
+    
+    for doc in trip_result.documents.all():
+        print(f"\nDocument: {doc.document_number}")
+        print(f"  Type: {doc.document_type.name if doc.document_type else 'N/A'}")
+        print(f"  OID: {doc.oid.cipher}")
+        
+        if doc.work_request_item:
+            wri = doc.work_request_item
+            print(f"  WRI ID: {wri.id}")
+            print(f"  Current Status: {wri.get_status_display()}")
+            print(f"  Work Type: {wri.get_work_type_display()}")
+            
+            # Перевірка умов
+            print(f"\n  Checking conditions:")
+            print(f"    - doc_process_date: {doc.doc_process_date}")
+            print(f"    - is_sent_to_unit: {doc.is_sent_to_unit}")
+            print(f"    - trip_result_sent: {doc.trip_result_sent}")
+            
+            if wri.work_type in ['ATTESTATION', 'PLAND_ATTESTATION']:
+                print(f"    - dsszzi_registered_number: {doc.dsszzi_registered_number}")
+                print(f"    - attestation_registration_sent: {doc.attestation_registration_sent}")
+            
+            # Викликаємо оновлення
+            print(f"\n  Calling check_and_update_status_based_on_documents()...")
+            wri.check_and_update_status_based_on_documents()
+            wri.refresh_from_db()
+            print(f"  New Status: {wri.get_status_display()}")
+        else:
+            print(f"  ⚠️  No WorkRequestItem linked")
+    
+    print("\n" + "="*60 + "\n")
+
+
+
 
 # У відповідному view після збереження TripResultForUnit
 def trip_result_send_view(request):
@@ -2418,6 +2883,8 @@ def oid_status_change_list_view(request):
     }
     return render(request, 'oids/lists/oid_status_change_list.html', context)
 
+# oids/views.py
+
 @login_required
 def attestation_registration_list_view(request):
     """
@@ -2436,25 +2903,120 @@ def attestation_registration_list_view(request):
     # Фільтрація
     filter_form = AttestationRegistrationFilterForm(request.GET or None)
     if filter_form.is_valid():
-        if filter_form.cleaned_data.get('unit'):
-            queryset = queryset.filter(units__in=filter_form.cleaned_data['unit']).distinct()
+        if filter_form.cleaned_data.get('units'):  # ВИПРАВЛЕНО: було 'unit'
+            queryset = queryset.filter(units__in=filter_form.cleaned_data['units']).distinct()
         if filter_form.cleaned_data.get('status'):
             queryset = queryset.filter(status=filter_form.cleaned_data['status'])
+        if filter_form.cleaned_data.get('sent_by'):
+            queryset = queryset.filter(sent_by=filter_form.cleaned_data['sent_by'])
         if filter_form.cleaned_data.get('date_from'):
             queryset = queryset.filter(outgoing_letter_date__gte=filter_form.cleaned_data['date_from'])
         if filter_form.cleaned_data.get('date_to'):
             queryset = queryset.filter(outgoing_letter_date__lte=filter_form.cleaned_data['date_to'])
+        if filter_form.cleaned_data.get('search_query'):
+            search = filter_form.cleaned_data['search_query']
+            queryset = queryset.filter(
+                Q(outgoing_letter_number__icontains=search) |
+                Q(sent_documents__oid__cipher__icontains=search)
+            ).distinct()
+    
+    # Експорт в Excel
+    if request.GET.get('export') == 'excel':
+        return export_attestation_registrations_to_excel(queryset)
     
     # Пагінація
     page_obj = get_paginated_page(queryset, request)
     
     context = {
         'page_title': 'Реєстрація атестаційних актів: Список відправок',
-        'attestation_registrations': page_obj,
-        'filter_form': filter_form,
+        'object_list': page_obj,  # ВИПРАВЛЕНО: було 'attestation_registrations'
+        'form': filter_form,  # ВИПРАВЛЕНО: було 'filter_form'
+        'page_obj': page_obj,  # Для пагінації
     }
     
     return render(request, 'oids/lists/attestation_registration_list.html', context)
+
+
+# Додаткова функція для експорту (якщо потрібна)
+def export_attestation_registrations_to_excel(queryset):
+    """Експорт відправок в Excel"""
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill
+    from django.http import HttpResponse
+    from datetime import datetime
+    
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Реєстрація АА"
+    
+    # Заголовки
+    headers = [
+        'Вихідний №',
+        'Дата відправки',
+        'ВЧ у відправці',
+        'Акти на реєстрацію',
+        'Хто відправив',
+        'Статус',
+        'Типи документів'
+    ]
+    
+    # Стилі для заголовків
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    
+    for col_num, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_num)
+        cell.value = header
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+    
+    # Дані
+    for row_num, reg in enumerate(queryset, 2):
+        ws.cell(row=row_num, column=1).value = reg.outgoing_letter_number
+        ws.cell(row=row_num, column=2).value = reg.outgoing_letter_date.strftime('%d.%m.%Y') if reg.outgoing_letter_date else '-'
+        
+        # ВЧ у відправці
+        units = ', '.join([unit.code for unit in reg.units.all()])
+        ws.cell(row=row_num, column=3).value = units or '-'
+        
+        # Акти на реєстрацію
+        acts = ', '.join([f"{doc.oid.cipher} (підг. № {doc.document_number})" for doc in reg.sent_documents.all()])
+        ws.cell(row=row_num, column=4).value = acts or '-'
+        
+        # Хто відправив
+        ws.cell(row=row_num, column=5).value = reg.sent_by.full_name if reg.sent_by else '-'
+        
+        # Статус
+        ws.cell(row=row_num, column=6).value = reg.get_status_display()
+        
+        # Типи документів
+        doc_types = ', '.join(set([doc.document_type.name for doc in reg.sent_documents.all() if doc.document_type]))
+        ws.cell(row=row_num, column=7).value = doc_types or '-'
+    
+    # Автоширина колонок
+    for column in ws.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 50)
+        ws.column_dimensions[column_letter].width = adjusted_width
+    
+    # Відправка файлу
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    filename = f"attestation_registrations_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    wb.save(response)
+    return response
 
 # @login_required 
 # def attestation_registration_list_view(request):
@@ -2515,13 +3077,42 @@ def attestation_registration_list_view(request):
 #     return render(request, 'oids/lists/attestation_registration_list.html', context)
 
 
+# --- ДОДАТКОВА ФУНКЦІЯ ДЛЯ ВІДЛАГОДЖЕННЯ ---
+def debug_document_status(work_request_item):
+    """
+    Функція для відлагодження статусу документів
+    """
+    print("\n" + "="*60)
+    print(f"DEBUG: WorkRequestItem ID {work_request_item.id}")
+    print(f"OID: {work_request_item.oid.cipher}")
+    print(f"Work Type: {work_request_item.get_work_type_display()}")
+    print(f"Current Status: {work_request_item.get_status_display()}")
+    print("="*60)
+    
+    docs = Document.objects.filter(work_request_item=work_request_item)
+    
+    if not docs.exists():
+        print("❌ No documents found")
+        return
+    
+    for doc in docs:
+        print(f"\n📄 Document: {doc.document_type.name if doc.document_type else 'Unknown'}")
+        print(f"   - Processed Date: {doc.doc_process_date or '❌'}")
+        print(f"   - Registration Sent: {'✅' if hasattr(doc, 'attestation_registration_sent') and doc.attestation_registration_sent else '❌'}")
+        print(f"   - DSSZZI Number: {doc.dsszzi_registered_number or '❌'}")
+        print(f"   - DSSZZI Date: {doc.dsszzi_registered_date or '❌'}")
+        print(f"   - Sent to Unit: {'✅' if hasattr(doc, 'trip_result_sent') and doc.trip_result_sent else '❌'}")
+    
+    print("\n" + "="*60 + "\n")
+
+
 @login_required
 def attestation_response_list_view(request):
     """
     Список відповідей на відправки атестаційних актів
     """
     # Отримуємо фільтр з GET-параметрів
-    current_filter_att_reg_id = request.GET.get('attestation_registration_sent', None)  # ДОДАНО цей рядок
+    current_filter_att_reg_id = request.GET.get('attestation_registration_sent', None)
     
     queryset = AttestationResponse.objects.select_related(
         'attestation_registration_sent',
@@ -2531,7 +3122,8 @@ def attestation_response_list_view(request):
         'attestation_registration_sent__units',
         'attestation_registration_sent__sent_documents',  # ВИПРАВЛЕНО: було 'registered_documents'
         'attestation_registration_sent__sent_documents__oid',
-        'attestation_registration_sent__sent_documents__oid__unit'
+        'attestation_registration_sent__sent_documents__oid__unit',
+        'attestation_registration_sent__sent_documents__document_type'
     ).order_by('-response_letter_date', '-created_at')
     
     # Фільтрація
@@ -2541,100 +3133,132 @@ def attestation_response_list_view(request):
             queryset = queryset.filter(
                 attestation_registration_sent=filter_form.cleaned_data['attestation_registration_sent']
             )
+        if filter_form.cleaned_data.get('received_by'):
+            queryset = queryset.filter(received_by=filter_form.cleaned_data['received_by'])
         if filter_form.cleaned_data.get('date_from'):
             queryset = queryset.filter(response_letter_date__gte=filter_form.cleaned_data['date_from'])
         if filter_form.cleaned_data.get('date_to'):
             queryset = queryset.filter(response_letter_date__lte=filter_form.cleaned_data['date_to'])
+        if filter_form.cleaned_data.get('search_query'):
+            search = filter_form.cleaned_data['search_query']
+            queryset = queryset.filter(
+                Q(response_letter_number__icontains=search) |
+                Q(attestation_registration_sent__outgoing_letter_number__icontains=search) |
+                Q(attestation_registration_sent__sent_documents__oid__cipher__icontains=search)
+            ).distinct()
+    
+    # Експорт в Excel
+    if request.GET.get('export') == 'excel':
+        return export_attestation_responses_to_excel(queryset)
     
     # Пагінація
     page_obj = get_paginated_page(queryset, request)
     
     context = {
         'page_title': 'Реєстрація атестаційних актів: Список відповідей',
-        'attestation_responses': page_obj,
-        'filter_form': filter_form,
-        'current_filter_att_reg_id': current_filter_att_reg_id,  # Тепер змінна визначена
+        'object_list': page_obj,  # ВИПРАВЛЕНО: було 'attestation_responses'
+        'form': filter_form,  # ВИПРАВЛЕНО: було 'filter_form'
+        'page_obj': page_obj,  # Для пагінації
+        'current_filter_att_reg_id': current_filter_att_reg_id,
     }
     
     return render(request, 'oids/lists/attestation_response_list.html', context)
 
-# @login_required 
-# def attestation_response_list_view(request):
-#     response_list_queryset = AttestationResponse.objects.select_related(
-#         'attestation_registration_sent__sent_by', 
-#         'received_by'
-#     ).prefetch_related(
-#         # Оптимізація для доступу до даних в шаблоні та експорті
-#         Prefetch('attestation_registration_sent__registered_documents', 
-#                  queryset=Document.objects.select_related('oid__unit')),
-#         'attestation_registration_sent__registered_documents__oid__unit', # Для доступу до ВЧ ОІДа
-#         'attestation_registration_sent__registered_documents__document_type' # Для доступу до типу документа
-#     ).order_by('-response_letter_date', '-id')
+
+# Функція експорту в Excel (бонус)
+def export_attestation_responses_to_excel(queryset):
+    """Експорт відповідей в Excel"""
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill
+    from django.http import HttpResponse
+    from datetime import datetime
     
-	
-#     # --- Фільтрація (приклад, якщо потрібна) ---
-#     # filter_att_reg_id_str = request.GET.get('att_reg_id') 
-#     # current_filter_att_reg_id = None
-#     # if filter_att_reg_id_str and filter_att_reg_id_str.isdigit():
-#     #     current_filter_att_reg_id = int(filter_att_reg_id_str)
-#     #     response_list_queryset = response_list_queryset.filter(attestation_registration_sent__id=current_filter_att_reg_id)
-
-#     # page_obj = get_paginated_page(response_list_queryset, request)
-
-#     # --- НОВА ЛОГІКА ФІЛЬТРАЦІЇ ---
-#     form = AttestationResponseFilterForm(request.GET or None)
-#     if form.is_valid():
-#         if form.cleaned_data.get('attestation_registration_sent'):
-#             response_list_queryset = response_list_queryset.filter(
-#                 attestation_registration_sent__in=form.cleaned_data['attestation_registration_sent']
-#             )
-#         if form.cleaned_data.get('received_by'):
-#             response_list_queryset = response_list_queryset.filter(
-#                 received_by__in=form.cleaned_data['received_by']
-#             )
-#         if form.cleaned_data.get('date_from'):
-#             response_list_queryset = response_list_queryset.filter(
-#                 response_letter_date__gte=form.cleaned_data['date_from']
-#             )
-#         if form.cleaned_data.get('date_to'):
-#             response_list_queryset = response_list_queryset.filter(
-#                 response_letter_date__lte=form.cleaned_data['date_to']
-#             )
-#         search_query = form.cleaned_data.get('search_query')
-#         if search_query:
-#             response_list_queryset = response_list_queryset.filter(
-#                 Q(response_letter_number__icontains=search_query) |
-#                 Q(attestation_registration_sent__outgoing_letter_number__icontains=search_query)
-#             )
-
-#     # --- ЛОГІКА ЕКСПОРТУ В EXCEL ---
-#     if request.GET.get('export') == 'excel':
-#         columns = {
-#             'response_letter_number': 'Вхідний №',
-#             'response_letter_date': 'Вхідна дата',
-#             'attestation_registration_sent': 'На вих. лист',
-#             'get_registered_acts_for_export': 'Акти у відповіді',
-#             'received_by__full_name': 'Хто отримав/вніс',
-#         }
-#         return export_to_excel(
-#             response_list_queryset, 
-#             columns, 
-#             filename='attestation_responses_export.xlsx', 
-#             include_row_numbers=True
-#         )
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Відповіді ДССЗЗІ"
     
-#     page_obj = get_paginated_page(response_list_queryset, request)
-
-   
-#     context = {
-#         'page_title': 'Відповіді від ДССЗЗІ на реєстрацію Актів',
-#         'object_list': page_obj,
-#         'page_obj': page_obj,
-#         'all_registrations_sent': AttestationRegistration.objects.order_by('-outgoing_letter_date'),
-#         'form': form, # Передаємо форму в шаблон
-#         'current_filter_att_reg_id': current_filter_att_reg_id,
-#     }
-#     return render(request, 'oids/lists/attestation_response_list.html', context)
+    # Заголовки
+    headers = [
+        '№',
+        'Вхідний лист №',
+        'Дата відповіді',
+        'На вихідний лист №',
+        'Дата вихідного',
+        'Акти атестації',
+        'Реєстраційні номери ДССЗЗІ',
+        'Хто отримав/вніс',
+        'Дата внесення'
+    ]
+    
+    # Стилі для заголовків
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    
+    for col_num, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_num)
+        cell.value = header
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+    
+    # Дані
+    for row_num, response in enumerate(queryset, 2):
+        ws.cell(row=row_num, column=1).value = row_num - 1
+        ws.cell(row=row_num, column=2).value = response.response_letter_number
+        ws.cell(row=row_num, column=3).value = response.response_letter_date.strftime('%d.%m.%Y') if response.response_letter_date else '-'
+        
+        # Вихідний лист
+        if response.attestation_registration_sent:
+            ws.cell(row=row_num, column=4).value = response.attestation_registration_sent.outgoing_letter_number
+            ws.cell(row=row_num, column=5).value = response.attestation_registration_sent.outgoing_letter_date.strftime('%d.%m.%Y') if response.attestation_registration_sent.outgoing_letter_date else '-'
+            
+            # Акти атестації
+            acts = []
+            registrations = []
+            for doc in response.attestation_registration_sent.sent_documents.all():
+                acts.append(f"{doc.oid.cipher} - Акт №{doc.document_number}")
+                if doc.dsszzi_registered_number:
+                    registrations.append(f"№{doc.dsszzi_registered_number} від {doc.dsszzi_registered_date.strftime('%d.%m.%Y') if doc.dsszzi_registered_date else '-'}")
+                else:
+                    registrations.append("Не зареєстровано")
+            
+            ws.cell(row=row_num, column=6).value = '; '.join(acts) if acts else '-'
+            ws.cell(row=row_num, column=7).value = '; '.join(registrations) if registrations else '-'
+        else:
+            ws.cell(row=row_num, column=4).value = '-'
+            ws.cell(row=row_num, column=5).value = '-'
+            ws.cell(row=row_num, column=6).value = '-'
+            ws.cell(row=row_num, column=7).value = '-'
+        
+        # Хто отримав
+        ws.cell(row=row_num, column=8).value = response.received_by.full_name if response.received_by else '-'
+        
+        # Дата внесення
+        ws.cell(row=row_num, column=9).value = response.created_at.strftime('%d.%m.%Y %H:%M') if response.created_at else '-'
+    
+    # Автоширина колонок
+    for column in ws.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 50)
+        ws.column_dimensions[column_letter].width = adjusted_width
+    
+    # Відправка файлу
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    filename = f"attestation_responses_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    wb.save(response)
+    return response
 
 @login_required
 def attestation_registered_acts_list_view(request):

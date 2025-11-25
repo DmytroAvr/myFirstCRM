@@ -52,9 +52,9 @@ python manage.py runserver
 
 python manage.py createsuperuser
 
-python manage.py main_unit_data  (створити в/ч з каталогу C:\myFirstCRM\oids\management\commands\main_unit_data.py)
+<!-- python manage.py main_unit_data  (створити в/ч з каталогу C:\myFirstCRM\oids\management\commands\main_unit_data.py)
 
-python manage.py oids/management/commands/populate_all_models.py
+python manage.py oids/management/commands/populate_all_models.py -->
 
 python manage.py test
 
@@ -72,13 +72,6 @@ del db.sqlite3
 запуск 
 D:\myFirstCRM\oids\management\commands\check.py
 D:\myFirstCRM\oids\management\commands\populate_other_data.py
-
-<!-- python manage.py check -->
-<!-- python manage.py populate_other_data -->
-python manage.py import_real_data tu.csv units.csv
-
-<!-- актуально -->
-python manage.py import_real_data tu.csv units.csv persons.csv document_types.csv oids.csv work_requests.csv work_request_items.csv documents.csv
 
 <!-- актуально -->
 python manage.py import_real_data ./realdata/tu.csv ./realdata/units.csv ./realdata/persons.csv ./realdata/document_types.csv ./realdata/oids.csv ./realdata/dsk_eot.csv ./realdata/work_requests.csv ./realdata/work_request_items.csv ./realdata/technical_tasks.csv ./realdata/documents.csv ./realdata/declarations.csv ./realdata/trips.csv

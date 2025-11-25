@@ -2,10 +2,12 @@ from django.db import models
 from multiselectfield import MultiSelectField
 from django.utils import timezone
 import datetime
+from django.db import models
 from django.db.models import Q
 from simple_history.models import HistoricalRecords
 from dateutil.relativedelta import relativedelta
 from django.contrib.auth.models import User
+
 	
 # --- CONSTANTS / CHOICES ---
 # Краще зберігати вибори в окремих файлах або в самих моделях, якщо вони специфічні для моделі.
@@ -272,7 +274,7 @@ class OID(models.Model):
         help_text="Тільки для ПЕМІН типу"
     )
     serial_number = models.CharField(
-        max_length=20, 
+        max_length=30, 
         verbose_name="Серійний номер", 
         blank=True,
         null=True,
@@ -566,7 +568,6 @@ class WorkRequestItem(models.Model):
     )
     history = HistoricalRecords()
 
-	#  логіка оновлення статусу заявки:
     def check_and_update_status_based_on_documents(self):
         """
         Перевіряє, чи виконані умови для зміни статусу цього WorkRequestItem,
@@ -574,9 +575,9 @@ class WorkRequestItem(models.Model):
         
         Логіка статусів:
         - TO_SEND_AA: Документи опрацьовано для Атестації, готові до відправки в ДССЗЗІ
-        - TO_SEND_VCH: Документи опрацьовано для ІК, готові до відправки у в/ч
         - ON_REGISTRATION: Документи відправлено на реєстрацію в ДССЗЗІ (для Атестації)
-        - COMPLETED: Отримано реєстраційні номери або документи відправлено у в/ч
+        - TO_SEND_VCH: Документи зареєстровано в ДССЗЗІ / опрацьовано для ІК, готові до відправки у в/ч
+        - COMPLETED: Документи відправлено у в/ч
         """
         print(f"[WRI_STATUS_CHECKER] Checking status for WRI ID {self.id} (OID: {self.oid.cipher}, Work Type: {self.work_type})")
     
@@ -590,7 +591,7 @@ class WorkRequestItem(models.Model):
         new_status = self.status
         document_date = None
     
-        # --- Логіка для Атестації (ATTESTATION та PLAND_ATTESTATION) ---
+        # --- ОНОВЛЕНА ЛОГІКА ДЛЯ АТЕСТАЦІЇ (ATTESTATION та PLAND_ATTESTATION) ---
         if self.work_type in [WorkTypeChoices.PLAND_ATTESTATION, WorkTypeChoices.ATTESTATION]:
             attestation_act_type = DocumentType.objects.filter(name__icontains="Акт атестації").first()
             
@@ -613,11 +614,20 @@ class WorkRequestItem(models.Model):
                 # Перевіряємо, чи документ відправлено на реєстрацію (має attestation_registration_sent)
                 is_sent_for_registration = attestation_doc.attestation_registration_sent is not None
                 
-                if has_registration:
-                    # Є реєстраційний номер → статус "Виконано"
+                # НОВИНКА: Перевіряємо, чи документ відправлено у в/ч (має trip_result_sent)
+                is_sent_to_unit = hasattr(attestation_doc, 'trip_result_sent') and attestation_doc.trip_result_sent is not None
+                
+                if is_sent_to_unit:
+                    # Документ відправлено у в/ч → статус "Виконано"
                     new_status = WorkRequestStatusChoices.COMPLETED
+                    document_date = attestation_doc.doc_process_date
+                    print(f"[WRI_STATUS_CHECKER] Attestation doc sent to unit. Setting status to COMPLETED.")
+                    
+                elif has_registration:
+                    # Є реєстраційний номер, але ще не відправлено у в/ч → "Готово до відправки в в/ч"
+                    new_status = WorkRequestStatusChoices.TO_SEND_VCH
                     document_date = attestation_doc.dsszzi_registered_date or attestation_doc.doc_process_date
-                    print(f"[WRI_STATUS_CHECKER] Attestation doc has registration number. Setting status to COMPLETED.")
+                    print(f"[WRI_STATUS_CHECKER] Attestation doc has registration number but not sent to unit. Setting status to TO_SEND_VCH.")
                     
                 elif is_sent_for_registration:
                     # Відправлено на реєстрацію, але номера ще немає → "На реєстрації в ДССЗЗІ"
@@ -633,7 +643,7 @@ class WorkRequestItem(models.Model):
             else:
                 print(f"[WRI_STATUS_CHECKER] No Attestation Act found for WRI ID {self.id}.")
     
-        # --- Логіка для ІК ---
+        # --- ЛОГІКА ДЛЯ ІК ---
         elif self.work_type == WorkTypeChoices.IK:
             ik_conclusion_type = DocumentType.objects.filter(duration_months=20).first()
             
@@ -685,52 +695,8 @@ class WorkRequestItem(models.Model):
             # Оновлюємо статус батьківської заявки
             self.update_parent_request_status()
         else:
-            print(f"[WRI_STATUS_CHECKER] No changes needed for WRI ID {self.id}. Current status: {self.get_status_display()}")             
-                
-        def save(self, *args, **kwargs):
-            is_new = self._state.adding
+            print(f"[WRI_STATUS_CHECKER] No changes needed for WRI ID {self.id}. Current status: {self.get_status_display()}")
     
-            # Спочатку зберігаємо сам елемент заявки
-            super().save(*args, **kwargs)
-    
-            # Якщо це новий елемент заявки...
-            if is_new and self.oid:
-                oid_to_update = self.oid
-                old_status = oid_to_update.get_status_display()
-                
-                # --- ПОЧАТОК ЗМІН ---
-                # Визначаємо новий статус ОІД на основі типу робіт у заявці
-                new_status_enum = None
-                if self.work_type == WorkTypeChoices.IK:
-                    new_status_enum = OIDStatusChoices.RECEIVED_REQUEST_IK
-                elif self.work_type == WorkTypeChoices.ATTESTATION:
-                    new_status_enum = OIDStatusChoices.RECEIVED_REQUEST_ATTESTATION
-                elif self.work_type == WorkTypeChoices.PLAND_ATTESTATION:
-                    new_status_enum = OIDStatusChoices.RECEIVED_REQUEST_PLAND_ATTESTATION
-                else:
-                    # Залишаємо загальний статус, якщо тип робіт не визначено
-                    # або для нього немає спеціального статусу "отримано заявку"
-                    new_status_enum = OIDStatusChoices.RECEIVED_REQUEST 
-    
-                # --- КІНЕЦЬ ЗМІН ---
-    
-                if oid_to_update.status != new_status_enum:
-                    oid_to_update.status = new_status_enum
-                    oid_to_update.save(update_fields=['status'])
-    
-                    # Створюємо запис в історії
-                    OIDStatusChange.objects.create(
-                        oid=oid_to_update,
-                        old_status=old_status,
-                        new_status=new_status_enum.label,
-                        # Додамо тип робіт до причини для ясності
-                        reason=f"ОІД додано до заявки №{self.request.incoming_number} (Тип робіт: {self.get_work_type_display()})"
-                    )
-           
-            # Викликаємо існуючу логіку для оновлення статусу батьківської заявки
-            self.update_parent_request_status()
-        
-        # ... (решта методів моделі WorkRequestItem, наприклад update_parent_request_status) ...
     
     def update_parent_request_status(self):
         """
@@ -792,8 +758,7 @@ class WorkRequestItem(models.Model):
             print(f"[REQUEST_STATUS_UPDATER] Has items ON_REGISTRATION.")
             
         elif status_counts['to_send_aa'] > 0 and status_counts['to_send_vch'] > 0:
-            # Є елементи обох типів, готові до відправки - встановлюємо статус за першим знайденим
-            # Або можна створити окремий статус "Готово до відправки"
+            # Є елементи обох типів, готові до відправки
             new_status = WorkRequestStatusChoices.TO_SEND_AA
             print(f"[REQUEST_STATUS_UPDATER] Has items TO_SEND (both types).")
             
@@ -825,75 +790,44 @@ class WorkRequestItem(models.Model):
         else:
             print(f"[REQUEST_STATUS_UPDATER] WorkRequest ID {work_request.id} status unchanged: {new_status}")
     
-
-    def update_request_status(self):
-        """
-        Оновлює статус батьківської заявки WorkRequest на основі статусів
-        всіх її елементів WorkRequestItem.
-        """
-        work_request = self.request
-        all_items = work_request.items.all()
-
-        if not all_items.exists():
-            # Якщо заявка не має елементів (наприклад, щойно створена і ще не додані, або всі видалені)
-            # Можна встановити PENDING або залишити як є, залежно від бізнес-логіки.
-            # Якщо це відбувається після видалення останнього елемента, можливо, заявку треба скасувати або повернути в PENDING.
-            if work_request.status != WorkRequestStatusChoices.PENDING: # Якщо вже не PENDING
-                work_request.status = WorkRequestStatusChoices.PENDING # або інший логічний статус
-                work_request.save(update_fields=['status', 'updated_at'])
-            return
-
-        # Перевіряємо, чи всі елементи завершені або скасовані
-        is_all_items_processed = all(
-            item.status in [WorkRequestStatusChoices.COMPLETED, WorkRequestStatusChoices.CANCELED]
-            for item in all_items
-        )
-
-        original_request_status = work_request.status
-        new_request_status = original_request_status # За замовчуванням не змінюємо
-
-
-        if is_all_items_processed:
-            # Якщо всі елементи оброблені, визначаємо фінальний статус заявки
-            if all_items.filter(status=WorkRequestStatusChoices.COMPLETED).exists():
-                # Якщо є хоча б один виконаний елемент, заявка вважається виконаною
-                new_request_status = WorkRequestStatusChoices.COMPLETED
-            elif all_items.filter(status=WorkRequestStatusChoices.CANCELED).count() == all_items.count():
-                # Якщо всі елементи скасовані (і немає виконаних)
-                new_request_status = WorkRequestStatusChoices.CANCELED
-            else:
-                # Ситуація, коли всі CANCELED, але був хоча б один COMPLETED, вже покрита першою умовою.
-                # Якщо всі CANCELED і не було COMPLETED - це друга умова.
-                # Якщо є суміш COMPLETED і CANCELED, то COMPLETED має пріоритет.
-                # Якщо логіка інша (напр. "Частково виконано"), її треба додати.
-                 new_request_status = WorkRequestStatusChoices.COMPLETED # За замовчуванням для змішаних processed
-        else:
-            # Якщо не всі елементи оброблені, перевіряємо наявність "В роботі" або "Очікує"
-            if all_items.filter(status=WorkRequestStatusChoices.IN_PROGRESS).exists():
-                new_request_status = WorkRequestStatusChoices.IN_PROGRESS
-            elif all_items.filter(status=WorkRequestStatusChoices.PENDING).exists():
-                new_request_status = WorkRequestStatusChoices.PENDING
-            # Можливий випадок: немає IN_PROGRESS, немає PENDING, але не всі processed.
-            # Це може статися, якщо є власні статуси. Для стандартних це малоймовірно.
-            # У такому разі, можна залишити поточний статус заявки або встановити PENDING.
-        if original_request_status != new_request_status:
-            work_request.status = new_request_status
-            work_request.save(update_fields=['status', 'updated_at'])
-            print(f"[DEBUG] WorkRequest ID {work_request.id} status successfully saved as '{work_request.get_status_display()}'.")
-        else:
-            print(f"[DEBUG] WorkRequest ID {work_request.id} status '{work_request.get_status_display()}' remains unchanged.")
-        print(f"--- [DEBUG] WRI.update_request_status() FINISHED for WRI ID: {self.id} ---")
-
-    def __str__(self):
-        # return f"{self.oid.cipher} - {self.get_work_type_display()} ({self.get_status_display()})"
-        return f"ОІД: {self.oid.cipher} ({self.oid.oid_type}) - Робота: {self.get_work_type_display()} (Статус: {self.status})"
     
-    class Meta:
-        unique_together = ('request', 'oid', 'work_type') # Один ОІД не може мати двічі одну і ту ж роботу в одній заявці
-        verbose_name = "Заявки: Елемент заявки (ОІД)"
-        verbose_name_plural = "Заявки: Елементи заявки (ОІД)"
-        # ordering = ['request', 'oid'] # Додано сортування
-        ordering = ['request', 'request__incoming_date' ] # Додав сортування за замовчуванням
+    def save(self, *args, **kwargs):
+        is_new = self._state.adding
+
+        # Спочатку зберігаємо сам елемент заявки
+        super().save(*args, **kwargs)
+
+        # Якщо це новий елемент заявки...
+        if is_new and self.oid:
+            oid_to_update = self.oid
+            old_status = oid_to_update.get_status_display()
+            
+            # Визначаємо новий статус ОІД на основі типу робіт у заявці
+            new_status_enum = None
+            if self.work_type == WorkTypeChoices.IK:
+                new_status_enum = OIDStatusChoices.RECEIVED_REQUEST_IK
+            elif self.work_type == WorkTypeChoices.ATTESTATION:
+                new_status_enum = OIDStatusChoices.RECEIVED_REQUEST_ATTESTATION
+            elif self.work_type == WorkTypeChoices.PLAND_ATTESTATION:
+                new_status_enum = OIDStatusChoices.RECEIVED_REQUEST_PLAND_ATTESTATION
+            else:
+                # Залишаємо загальний статус
+                new_status_enum = OIDStatusChoices.RECEIVED_REQUEST 
+
+            if oid_to_update.status != new_status_enum:
+                oid_to_update.status = new_status_enum
+                oid_to_update.save(update_fields=['status'])
+
+                # Створюємо запис в історії
+                OIDStatusChange.objects.create(
+                    oid=oid_to_update,
+                    old_status=old_status,
+                    new_status=new_status_enum.label,
+                    reason=f"ОІД додано до заявки №{self.request.incoming_number} (Тип робіт: {self.get_work_type_display()})"
+                )
+       
+        # Викликаємо існуючу логіку для оновлення статусу батьківської заявки
+        self.update_parent_request_status()
 
 
 class DocumentType(models.Model):
@@ -1202,6 +1136,16 @@ class Document(models.Model):
     wcr_submission = models.ForeignKey(WorkCompletionRegistration, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Відправка АЗР на реєстрацію", related_name="submitted_documents")
     # --- КІНЕЦЬ полів для реєстрації в ДССЗЗІ (для актів атестації) ---
     
+    @property
+    def is_sent_to_unit(self):
+        """Перевіряє чи документ відправлено у в/ч"""
+        return TripResultForUnit.objects.filter(documents=self).exists()
+    
+    @property
+    def trip_result_sent(self):
+        """Повертає TripResultForUnit, якщо документ відправлено"""
+        return TripResultForUnit.objects.filter(documents=self).first()
+
     @property
     def get_sent_info_for_export(self):
         """Повертає рядок з інформацією про відправку для експорту."""
@@ -1771,7 +1715,24 @@ class TripResultForUnit(models.Model):
     # related_request - можна отримати через trip.work_requests.all() або через documents.work_request_item.request
     # Тому, якщо це не критично для прямого доступу, можна прибрати для уникнення дублювання.
     # related_request = models.ForeignKey('WorkRequest', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Пов’язана заявка")
+
+    def save(self, *args, **kwargs):
+        """Оновлюємо статуси після збереження"""
+        is_new = self._state.adding
+        super().save(*args, **kwargs)
+        
+        # Якщо не новий об'єкт - оновлюємо статуси
+        if not is_new:
+            self.update_related_wri_statuses()
     
+    def update_related_wri_statuses(self):
+        """Оновлює статуси всіх пов'язаних WorkRequestItem"""
+        for document in self.documents.all():
+            if document.work_request_item:
+                document.work_request_item.check_and_update_status_based_on_documents()
+
+
+
     def __str__(self):
         return f"Відправка результатів від {self.outgoing_letter_date}"
     

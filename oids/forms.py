@@ -10,6 +10,7 @@ from .models import (
     AttestationRegistration, AttestationResponse, WorkCompletionRegistration, WorkCompletionResponse, 
     Declaration, DeclarationRegistration, TechnicalTask, 
 )
+
 from django_tomselect.forms import TomSelectModelChoiceField, TomSelectConfig
 from django.utils import timezone
 import datetime
@@ -200,6 +201,315 @@ class TripForm(forms.ModelForm):
             ).distinct().order_by('unit__code', 'cipher')
         else:
             self.fields['oids'].queryset = OID.objects.none()
+
+# oids/forms.py
+class TripResultForUnitForm(forms.ModelForm):
+    """
+    Форма для створення/редагування відправки результатів відрядження у в/ч
+    """
+    
+    class Meta:
+        model = TripResultForUnit
+        fields = [
+            'trip',
+            'outgoing_letter_number',
+            'outgoing_letter_date',
+            'units',
+            'oids',
+            'documents',
+            'note'
+        ]
+        widgets = {
+            'trip': forms.Select(attrs={
+                'class': 'form-control',
+                'placeholder': 'Оберіть відрядження'
+            }),
+            'outgoing_letter_number': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Наприклад: 123/45'
+            }),
+            'outgoing_letter_date': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date'
+            }),
+            'units': forms.SelectMultiple(attrs={
+                'class': 'form-control tomselect-field',
+                'multiple': 'multiple'
+            }),
+            'oids': forms.SelectMultiple(attrs={
+                'class': 'form-control tomselect-field',
+                'multiple': 'multiple'
+            }),
+            'documents': forms.SelectMultiple(attrs={
+                'class': 'form-control tomselect-field',
+                'multiple': 'multiple'
+            }),
+            'note': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Додаткова інформація (необов\'язково)'
+            })
+        }
+        labels = {
+            'trip': 'Відрядження',
+            'outgoing_letter_number': 'Номер вихідного листа',
+            'outgoing_letter_date': 'Дата вихідного листа',
+            'units': 'Військові частини (куди відправляємо)',
+            'oids': 'ОІД (які стосуються цієї відправки)',
+            'documents': 'Документи для відправки',
+            'note': 'Примітка'
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Робимо деякі поля необов'язковими
+        self.fields['trip'].required = False
+        self.fields['note'].required = False
+        self.fields['oids'].required = False
+        
+        # Фільтруємо тільки активні в/ч
+        self.fields['units'].queryset = Unit.objects.filter(
+            is_active=True
+        ).order_by('code')
+        
+        # Фільтруємо тільки документи, які ще не відправлені або готові до відправки
+        # (мають doc_process_date і не відправлені)
+        self.fields['documents'].queryset = Document.objects.filter(
+            doc_process_date__isnull=False
+        ).select_related(
+            'oid', 
+            'document_type',
+            'work_request_item'
+        ).order_by('-doc_process_date')
+        
+        # Додаємо кастомний label для документів (показуємо більше інфо)
+        self.fields['documents'].label_from_instance = self.document_label
+    
+    def document_label(self, obj):
+        """
+        Кастомний label для документів у селекті
+        Показує: ОІД, Тип документу, Номер, Дата
+        """
+        doc_type = obj.document_type.name if obj.document_type else "Без типу"
+        doc_num = obj.document_number or "Без номера"
+        doc_date = obj.doc_process_date.strftime('%d.%m.%Y') if obj.doc_process_date else ""
+        
+        label = f"{obj.oid.cipher} | {doc_type} | №{doc_num}"
+        if doc_date:
+            label += f" від {doc_date}"
+        
+        # Додаємо статус заявки, якщо є
+        if obj.work_request_item:
+            wri_status = obj.work_request_item.get_status_display()
+            label += f" [{wri_status}]"
+        
+        return label
+    
+    def clean(self):
+        """Додаткова валідація форми"""
+        cleaned_data = super().clean()
+        
+        outgoing_letter_number = cleaned_data.get('outgoing_letter_number')
+        outgoing_letter_date = cleaned_data.get('outgoing_letter_date')
+        documents = cleaned_data.get('documents')
+        units = cleaned_data.get('units')
+        
+        # Перевіряємо обов'язкові поля
+        if not outgoing_letter_number:
+            raise forms.ValidationError("Вкажіть номер вихідного листа")
+        
+        if not outgoing_letter_date:
+            raise forms.ValidationError("Вкажіть дату вихідного листа")
+        
+        if not documents:
+            raise forms.ValidationError("Оберіть хоча б один документ для відправки")
+        
+        if not units:
+            raise forms.ValidationError("Оберіть хоча б одну військову частину")
+        
+        # Перевіряємо чи документи вже не відправлені
+        for doc in documents:
+            existing_trip_results = TripResultForUnit.objects.filter(
+                documents=doc
+            )
+            
+            # Якщо редагуємо - виключаємо поточний об'єкт
+            if self.instance.pk:
+                existing_trip_results = existing_trip_results.exclude(pk=self.instance.pk)
+            
+            if existing_trip_results.exists():
+                trip_result = existing_trip_results.first()
+                raise forms.ValidationError(
+                    f"Документ {doc.document_number} ({doc.oid.cipher}) вже відправлено "
+                    f"листом №{trip_result.outgoing_letter_number} "
+                    f"від {trip_result.outgoing_letter_date.strftime('%d.%m.%Y')}"
+                )
+        
+        return cleaned_data
+
+
+# АЛЬТЕРНАТИВА: Спрощена версія без складної валідації
+class TripResultForUnitFormSimple(forms.ModelForm):
+    """
+    Спрощена версія форми
+    """
+    
+    class Meta:
+        model = TripResultForUnit
+        fields = '__all__'
+        widgets = {
+            'outgoing_letter_date': forms.DateInput(attrs={'type': 'date'}),
+            'units': forms.SelectMultiple(attrs={'class': 'tomselect-field'}),
+            'oids': forms.SelectMultiple(attrs={'class': 'tomselect-field'}),
+            'documents': forms.SelectMultiple(attrs={'class': 'tomselect-field'}),
+        }
+
+
+# ВАРІАНТ 3: Форма з фільтрацією по відрядженню
+class TripResultForUnitFormWithTripFilter(forms.ModelForm):
+    """
+    Форма з можливістю автоматичного фільтрування документів по відрядженню
+    """
+    
+    trip = forms.ModelChoiceField(
+        queryset=Trip.objects.all(),
+        required=False,
+        label='Відрядження',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        help_text='Оберіть відрядження для автоматичного підбору документів'
+    )
+    
+    class Meta:
+        model = TripResultForUnit
+        fields = [
+            'trip',
+            'outgoing_letter_number',
+            'outgoing_letter_date',
+            'units',
+            'oids',
+            'documents',
+        ]
+        widgets = {
+            'outgoing_letter_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'outgoing_letter_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'units': forms.SelectMultiple(attrs={'class': 'form-control tomselect-field'}),
+            'oids': forms.SelectMultiple(attrs={'class': 'form-control tomselect-field'}),
+            'documents': forms.SelectMultiple(attrs={'class': 'form-control tomselect-field'}),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        trip_id = kwargs.pop('trip_id', None)
+        super().__init__(*args, **kwargs)
+        
+        # Якщо передано trip_id - фільтруємо документи
+        if trip_id:
+            self.fields['documents'].queryset = Document.objects.filter(
+                trip_id=trip_id,
+                doc_process_date__isnull=False
+            )
+
+
+# ВИКОРИСТАННЯ У VIEWS:
+
+"""
+# Варіант 1: Базове використання
+@login_required
+def send_trip_results_form(request):
+    if request.method == 'POST':
+        form = TripResultForUnitForm(request.POST)
+        
+        if form.is_valid():
+            trip_result = form.save()
+            
+            # Оновлюємо статуси
+            update_statuses_after_sending_to_unit(trip_result)
+            
+            messages.success(request, 'Документи відправлено у в/ч')
+            return redirect('oids:trip_result_for_unit_list')
+    else:
+        form = TripResultForUnitForm()
+    
+    return render(request, 'oids/forms/send_trip_results_form.html', {
+        'form': form,
+        'page_title': 'Відправити документи у в/ч'
+    })
+
+
+# Варіант 2: З передачею trip_id
+@login_required
+def send_trip_results_for_trip(request, trip_id):
+    if request.method == 'POST':
+        form = TripResultForUnitFormWithTripFilter(request.POST)
+        
+        if form.is_valid():
+            trip_result = form.save()
+            update_statuses_after_sending_to_unit(trip_result)
+            messages.success(request, 'Документи відправлено')
+            return redirect('oids:trip_result_for_unit_list')
+    else:
+        form = TripResultForUnitFormWithTripFilter(trip_id=trip_id)
+        # Автоматично встановлюємо відрядження
+        form.initial['trip'] = trip_id
+    
+    return render(request, 'oids/forms/send_trip_results_form.html', {
+        'form': form
+    })
+
+
+# Варіант 3: Спрощена версія без форми (якщо вже є готові дані)
+@login_required
+def send_documents_to_unit(request):
+    if request.method == 'POST':
+        # Отримуємо дані з POST
+        outgoing_number = request.POST.get('outgoing_letter_number')
+        outgoing_date = request.POST.get('outgoing_letter_date')
+        document_ids = request.POST.getlist('documents')
+        unit_ids = request.POST.getlist('units')
+        
+        # Створюємо запис
+        trip_result = TripResultForUnit.objects.create(
+            outgoing_letter_number=outgoing_number,
+            outgoing_letter_date=outgoing_date,
+        )
+        
+        # Додаємо зв'язки M2M
+        trip_result.documents.set(document_ids)
+        trip_result.units.set(unit_ids)
+        
+        # Оновлюємо статуси
+        update_statuses_after_sending_to_unit(trip_result)
+        
+        messages.success(request, 'Документи відправлено')
+        return redirect('oids:trip_result_for_unit_list')
+    
+    # GET - показуємо форму
+    documents = Document.objects.filter(doc_process_date__isnull=False)
+    units = Unit.objects.filter(is_active=True)
+    
+    return render(request, 'oids/forms/send_documents_simple.html', {
+        'documents': documents,
+        'units': units
+    })
+"""
+
+
+def update_statuses_after_sending_to_unit(trip_result):
+    """Оновлює статуси WorkRequestItem після відправки у в/ч"""
+    print(f"\n[TRIP_RESULT_STATUS_UPDATE] Processing TripResultForUnit ID {trip_result.id}")
+    
+    updated_count = 0
+    for document in trip_result.documents.all():
+        if document.work_request_item:
+            old_status = document.work_request_item.status
+            document.work_request_item.check_and_update_status_based_on_documents()
+            
+            if document.work_request_item.status != old_status:
+                updated_count += 1
+                print(f"[STATUS_UPDATE] WRI ID {document.work_request_item.id}: {old_status} → {document.work_request_item.status}")
+    
+    print(f"[TRIP_RESULT_STATUS_UPDATE] Updated {updated_count} WorkRequestItems\n")
+    return updated_count
             
 class DocumentForm(forms.ModelForm): 
     # Поле для вибору типу документа. Фільтрація на основі OID.oid_type та work_type
