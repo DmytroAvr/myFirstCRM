@@ -5,79 +5,160 @@
 
 {% block content %}
 <div class="container mt-4">
-    <div class="card">
-        <div class="card-header">
-            <h3>{{ page_title }}</h3>
+    {# --- БЛОК ПОВІДОМЛЕНЬ --- #}
+    {% if messages %}
+    <div class="messages-container mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags|lower }}{% if message.tags == 'error' %} alert-danger{% elif message.tags == 'success'%} alert-success{% elif message.tags == 'warning'%} alert-warning{% elif message.tags == 'info'%} alert-info{% endif %} alert-dismissible fade show" role="alert">
+            {% if 'safe' in message.tags %}
+                {{ message|safe }}
+            {% else %}
+                {{ message }}
+            {% endif %}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h3 class="mb-0">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 24px; height: 24px; display: inline-block; vertical-align: middle; margin-right: 8px;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
+                </svg>
+                {{ page_title }}
+            </h3>
         </div>
         <div class="card-body">
-            <form method="post" novalidate>
+            <form method="post" novalidate id="azr-form">
                 {% csrf_token %}
 				
-				{# --- Блок 1: Дані супровідного листа --- #}
-               
-                <h5 class="mb-3">Дані супровідного листа</h5>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label for="{{ submission_form.outgoing_letter_number.id_for_label }}" class="form-label">{{ submission_form.outgoing_letter_number.label }}</label>
-                        {{ submission_form.outgoing_letter_number }}
+                {# --- Блок 1: Дані супровідного листа --- #}
+                <div class="mb-4">
+                    <h5 class="mb-3 border-bottom pb-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                        </svg>
+                        Дані супровідного листа
+                    </h5>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ submission_form.outgoing_letter_number.id_for_label }}" class="form-label">
+                                {{ submission_form.outgoing_letter_number.label }} <span class="text-danger">*</span>
+                            </label>
+                            {{ submission_form.outgoing_letter_number }}
+                            {% if submission_form.outgoing_letter_number.errors %}
+                                <div class="text-danger small mt-1">{{ submission_form.outgoing_letter_number.errors }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ submission_form.outgoing_letter_date.id_for_label }}" class="form-label">
+                                {{ submission_form.outgoing_letter_date.label }} <span class="text-danger">*</span>
+                            </label>
+                            {{ submission_form.outgoing_letter_date }}
+                            {% if submission_form.outgoing_letter_date.errors %}
+                                <div class="text-danger small mt-1">{{ submission_form.outgoing_letter_date.errors }}</div>
+                            {% endif %}
+                        </div>
                     </div>
-                    <div class="col-md-6 mb-3">
-                        <label for="{{ submission_form.outgoing_letter_date.id_for_label }}" class="form-label">{{ submission_form.outgoing_letter_date.label }}</label>
-                        {{ submission_form.outgoing_letter_date }}
+                    <div class="mb-3">
+                        <label for="{{ submission_form.note.id_for_label }}" class="form-label">{{ submission_form.note.label }}</label>
+                        {{ submission_form.note }}
+                        {% if submission_form.note.errors %}
+                            <div class="text-danger small mt-1">{{ submission_form.note.errors }}</div>
+                        {% endif %}
                     </div>
                 </div>
-                <div class="mb-3">
-                     <label for="{{ submission_form.note.id_for_label }}" class="form-label">{{ submission_form.note.label }}</label>
-                     {{ submission_form.note }}
-                </div>
-                <hr class="mt-4">
+                
+                <hr class="my-4">
 				
-                {# Службові поля для формсету. JavaScript буде ними керувати. #}
+                {# Службові поля для формсету #}
                 {{ item_formset.management_form }}
 
                 {# --- Блок 2: Вибір ОІДів --- #}
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label for="unit_selector_id" class="form-label">1. Оберіть військові частини</label>
-                        {{ unit_selector.label_tag }}
-                        <select name="unit_selector" id="unit_selector_id" multiple class="form-control"></select>
+                <div class="mb-4">
+                    <h5 class="mb-3 border-bottom pb-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
+                        </svg>
+                        Вибір ОІДів для створення АЗР
+                    </h5>
+                    <div class="alert alert-info">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                        </svg>
+                        <strong>Порядок дій:</strong> Спочатку оберіть військові частини, потім оберіть ОІДи для створення АЗР
                     </div>
-                    <div class="col-md-6">
-                        <label for="oid_selector_id" class="form-label">2. Оберіть ОІДи для створення АЗР</label>
-                        <select name="oid_selector" id="oid_selector_id" multiple class="form-control"></select>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="unit_selector_id" class="form-label">
+                                1. Оберіть військові частини <span class="text-danger">*</span>
+                            </label>
+                            <select name="unit_selector" id="unit_selector_id" multiple class="form-control"></select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="oid_selector_id" class="form-label">
+                                2. Оберіть ОІДи для створення АЗР <span class="text-danger">*</span>
+                            </label>
+                            <select name="oid_selector" id="oid_selector_id" multiple class="form-control"></select>
+                        </div>
                     </div>
                 </div>
 
                 {# --- Блок 3: Динамічні поля для кожного ОІДа --- #}
-                <div id="azr-items-container">
+                <div id="azr-items-container" class="mb-4">
                     {# Сюди JavaScript буде додавати форми #}
                 </div>
 
-                
-				<br>
-				<br>
+                {# Лічильник обраних ОІДів #}
+                <div id="selected-oids-info" class="alert alert-secondary d-none mb-4">
+                    <strong>Обрано ОІДів:</strong> <span id="selected-oids-count">0</span>
+                </div>
+
+                {# Кнопка відправки #}
                 <div class="d-grid gap-2">
-                    <button type="submit" class="btn btn-primary ">Створити відправку</button>
+                    <button type="submit" class="btn btn-primary btn-lg" id="submit-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                        </svg>
+                        Створити відправку
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-{# Шаблон для одного рядка формсету. Він прихований і використовується для копіювання. #}
+{# Шаблон для одного рядка формсету #}
 <template id="azr-item-template">
-    <div class="azr-item-form row p-3 mb-2 border rounded align-items-center" data-oid-id="">
-        <div class="col-md-4">
-           	<strong>ВЧ: <span class="unit-code-text"></span> | ОІД: <span class="oid-cipher-text"></span></strong>
-            <input type="hidden" name="form-__prefix__-oid" value="">
-        </div>
-        <div class="col-md-4">
-            <label for="id_form-__prefix__-prepared_number" class="form-label-sm">Підг. № АЗР</label>
-            <input type="text" name="form-__prefix__-prepared_number" class="form-control form-control-sm" required>
-        </div>
-        <div class="col-md-4">
-            <label for="id_form-__prefix__-prepared_date" class="form-label-sm">від (АЗР)</label>
-            <input type="date" name="form-__prefix__-prepared_date" class="form-control form-control-sm" required>
+    <div class="azr-item-form p-3 mb-3 border rounded bg-light" data-oid-id="">
+        <div class="row align-items-center">
+            <div class="col-md-4 mb-2 mb-md-0">
+                <strong class="d-block mb-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle;">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
+                    </svg>
+                    ВЧ: <span class="unit-code-text text-primary"></span> | 
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle;">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                    </svg>
+                    ОІД: <span class="oid-cipher-text text-success"></span>
+                </strong>
+                <input type="hidden" name="form-__prefix__-oid" value="">
+            </div>
+            <div class="col-md-4 mb-2 mb-md-0">
+                <label for="id_form-__prefix__-prepared_number" class="form-label-sm mb-1">
+                    Підг. № АЗР <span class="text-danger">*</span>
+                </label>
+                <input type="text" name="form-__prefix__-prepared_number" class="form-control form-control-sm" required placeholder="Введіть номер">
+            </div>
+            <div class="col-md-4">
+                <label for="id_form-__prefix__-prepared_date" class="form-label-sm mb-1">
+                    Дата від АЗР <span class="text-danger">*</span>
+                </label>
+                <input type="date" name="form-__prefix__-prepared_date" class="form-control form-control-sm" required>
+            </div>
         </div>
     </div>
 </template>
@@ -107,24 +188,34 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     oidTomSelect.disable();
 
+    // --- Елементи DOM ---
+    const container = document.getElementById('azr-items-container');
+    const template = document.getElementById('azr-item-template');
+    const totalFormsInput = document.querySelector('#id_form-TOTAL_FORMS');
+    const selectedOidsInfo = document.getElementById('selected-oids-info');
+    const selectedOidsCount = document.getElementById('selected-oids-count');
+    const submitButton = document.getElementById('submit-button');
+    
+    let formCount = 0;
+
     // --- Логіка завантаження ОІДів ---
     unitTomSelect.on('change', (value) => {
         oidTomSelect.clear();
         oidTomSelect.clearOptions();
         oidTomSelect.disable();
         if (!value || value.length === 0) return;
+        
         const url = `{% url 'oids:ajax_load_oids_for_multiple_units' %}?unit_ids[]=${value.join('&unit_ids[]=')}`;
         
         fetch(url)
             .then(response => response.json())
             .then(data => {
-                // Тепер ми зберігаємо всю інформацію (id, шифр, код ВЧ) для кожної опції
                 const options = data.map(oid => ({
                     id: oid.id.toString(),
                     text: oid.cipher,
-                    unitCode: oid.unit_code // Зберігаємо код ВЧ
+                    unitCode: oid.unit_code
                 }));
-				 console.log('Опції, підготовлені для TomSelect:', options);
+                console.log('Опції, підготовлені для TomSelect:', options);
 
                 oidTomSelect.addOptions(options);
                 oidTomSelect.enable();
@@ -132,13 +223,15 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // --- Головна логіка: динамічне створення форм ---
-    const container = document.getElementById('azr-items-container');
-    const template = document.getElementById('azr-item-template');
-    const totalFormsInput = document.querySelector('#id_form-TOTAL_FORMS');
-    let formCount = container.querySelectorAll('.azr-item-form').length; // Починаємо з існуючих форм
-    // let formCount = 0;
-
     oidTomSelect.on('change', (selectedOids) => {
+        // Оновлюємо лічильник
+        selectedOidsCount.textContent = selectedOids.length;
+        if (selectedOids.length > 0) {
+            selectedOidsInfo.classList.remove('d-none');
+        } else {
+            selectedOidsInfo.classList.add('d-none');
+        }
+
         // Синхронізуємо форми з обраними ОІДами
         const currentOidIds = Array.from(container.querySelectorAll('.azr-item-form')).map(form => form.dataset.oidId);
 
@@ -152,17 +245,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const oidsToAdd = selectedOids.filter(id => !currentOidIds.includes(id));
         oidsToAdd.forEach(oidId => {
             const selectedOption = oidTomSelect.options[oidId];
-			console.log('Об\'єкт обраної опції (selectedOption):', selectedOption);
+            console.log('Об\'єкт обраної опції (selectedOption):', selectedOption);
 
             const newFormHtml = template.innerHTML.replace(/__prefix__/g, formCount);
             const newFormNode = document.createElement('div');
             newFormNode.innerHTML = newFormHtml;
             
             newFormNode.querySelector('.azr-item-form').dataset.oidId = oidId;
-			if (selectedOption && selectedOption.unitCode) {
-                 newFormNode.querySelector('.unit-code-text').textContent = selectedOption.unitCode;
+            if (selectedOption && selectedOption.unitCode) {
+                newFormNode.querySelector('.unit-code-text').textContent = selectedOption.unitCode;
             }
-			newFormNode.querySelector('.oid-cipher-text').textContent = selectedOption.text;
+            newFormNode.querySelector('.oid-cipher-text').textContent = selectedOption.text;
             newFormNode.querySelector('input[type="hidden"]').value = oidId;
             container.appendChild(newFormNode.firstElementChild);
             formCount++;
@@ -171,6 +264,35 @@ document.addEventListener('DOMContentLoaded', function() {
         // Оновлюємо кількість форм у менеджмент-формі
         totalFormsInput.value = container.querySelectorAll('.azr-item-form').length;
     });
+
+    // --- Валідація перед відправкою ---
+    document.getElementById('azr-form').addEventListener('submit', function(e) {
+        const oidCount = container.querySelectorAll('.azr-item-form').length;
+        if (oidCount === 0) {
+            e.preventDefault();
+            alert('❌ Оберіть хоча б один ОІД для створення відправки!');
+            return false;
+        }
+        
+        // Блокуємо кнопку щоб запобігти повторній відправці
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Відправка...';
+    });
 });
 </script>
+
+<style>
+    .azr-item-form {
+        transition: all 0.3s ease;
+    }
+    
+    .azr-item-form:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .form-label-sm {
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+</style>
 {% endblock %}

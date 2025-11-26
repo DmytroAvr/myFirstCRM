@@ -3,16 +3,17 @@ from django import forms
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.core.management.base import BaseCommand
 from django.http import JsonResponse
 from django.urls import reverse_lazy, reverse
 from django.contrib import messages
 from django.db.models import Q, Max, Prefetch, Count, OuterRef, Subquery
 from django.db import  transaction
 from django.utils import timezone
-from django.core.management.base import BaseCommand
-
-from .utils import export_to_excel
 import datetime
+from django.utils.safestring import mark_safe
+from .utils import export_to_excel
+
 from .models import (OIDTypeChoices, OIDStatusChoices, SecLevelChoices, WorkRequestStatusChoices, WorkTypeChoices, 
     DocumentReviewResultChoices, AttestationRegistrationStatusChoices, PeminSubTypeChoices, DocumentProcessingStatusChoices, add_working_days
 )
@@ -1415,18 +1416,131 @@ def update_oid_status_view(request, oid_id_from_url=None):
 
 
 @login_required 
-@transaction.atomic # Використовуємо транзакцію для цілісності даних
+@transaction.atomic
 def send_attestation_for_registration_view(request):
+    """
+    Формування відправки Актів Атестації на реєстрацію в ДССЗЗІ
+    """
     if request.method == 'POST':
         form = AttestationRegistrationSendForm(request.POST, request.FILES)
+        
         if form.is_valid():
-            attestation_registration = form.save() # Тепер save() форми робить всю роботу
-            messages.success(request, f'Відправку №{attestation_registration.outgoing_letter_number} на реєстрацію успішно сформовано.')
-            return redirect('oids:list_attestation_registrations') 
+            try:
+                # Зберігаємо форму (вона сама створює AttestationRegistration та зв'язує документи)
+                attestation_registration = form.save()
+                
+                # Отримуємо дані для повідомлення
+                sent_documents = attestation_registration.sent_documents.all()
+                units = attestation_registration.units.all()
+                
+                # Групуємо документи по ВЧ для зручності
+                units_dict = {}
+                for doc in sent_documents:
+                    unit_code = doc.oid.unit.code if doc.oid.unit else 'Без ВЧ'
+                    if unit_code not in units_dict:
+                        units_dict[unit_code] = []
+                    
+                    units_dict[unit_code].append({
+                        'cipher': doc.oid.cipher,
+                        'doc_number': doc.document_number,
+                        'doc_date': doc.doc_process_date,
+                        'doc_type': doc.document_type.name if doc.document_type else 'Невідомий тип'
+                    })
+                
+                # Формуємо детальне повідомлення
+                success_message = (
+                    f"✅ <strong>Відправку на реєстрацію успішно сформовано!</strong><br>"
+                    f"📋 Вихідний лист: <strong>№{attestation_registration.outgoing_letter_number}</strong> "
+                    f"від <strong>{attestation_registration.outgoing_letter_date.strftime('%d.%m.%Y')}</strong><br>"
+                    f"📄 Актів атестації: <strong>{sent_documents.count()}</strong><br>"
+                    f"🏢 Військових частин: <strong>{units.count()}</strong><br>"
+                )
+                
+                # Додаємо інформацію про відправника, якщо є
+                if attestation_registration.sent_by:
+                    success_message += f"👤 Відправник: <strong>{attestation_registration.sent_by.full_name}</strong><br>"
+                
+                success_message += "<br><strong>Деталі по військових частинах:</strong><br>"
+                
+                # Додаємо інформацію згруповану по ВЧ
+                for unit_code, docs_list in units_dict.items():
+                    success_message += f"<br><strong>📍 ВЧ {unit_code}</strong> ({len(docs_list)} актів):<br>"
+                    for doc_info in docs_list:
+                        success_message += (
+                            f"&nbsp;&nbsp;&nbsp;• ОІД: <strong>{doc_info['cipher']}</strong><br>"
+                            f"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{doc_info['doc_type']}: №<strong>{doc_info['doc_number']}</strong> "
+                        )
+                        if doc_info['doc_date']:
+                            success_message += f"від {doc_info['doc_date'].strftime('%d.%m.%Y')}"
+                        success_message += "<br>"
+                
+                messages.success(request, mark_safe(success_message))
+                
+                # Додаткове інформаційне повідомлення
+                messages.info(
+                    request,
+                    mark_safe(
+                        f"ℹ️ Наступний крок: після отримання відповіді від ДССЗЗІ, "
+                        f"<a href=\"{reverse('oids:record_attestation_response_for_registration', args=[attestation_registration.id])}\">внесіть реєстраційні номери</a>. "
+                        f"Або переглянте <a href=\"{reverse('oids:list_attestation_registrations')}\">всі відправки</a>."
+                    )
+                )
+                
+                return redirect('oids:list_attestation_registrations')
+                
+            except Exception as e:
+                # Обробка помилок
+                messages.error(
+                    request,
+                    mark_safe(
+                        f"❌ <strong>Помилка при створенні відправки:</strong><br>"
+                        f"{str(e)}<br><br>"
+                        f"Зміни не були збережені."
+                    )
+                )
+                print(f"SendAttestationForm save error: {str(e)}")
+                return redirect('oids:send_attestation_for_registration')
+        
         else:
-            messages.error(request, 'Будь ласка, виправте помилки у формі.')
-            print(f"SendAttestationForm errors: {form.errors.as_json()}") # Для дебагу
-    else: # GET request
+            # Якщо форма не валідна - показуємо помилки
+            error_messages = []
+            
+            # Загальні помилки форми
+            if form.non_field_errors():
+                error_messages.append("<strong>Загальні помилки:</strong>")
+                for error in form.non_field_errors():
+                    error_messages.append(f"• {error}")
+            
+            # Помилки конкретних полів
+            for field_name, errors in form.errors.items():
+                if field_name == '__all__':
+                    continue
+                
+                field_label = form.fields[field_name].label or field_name
+                
+                # Спеціальна обробка для різних полів
+                if field_name == 'selected_units':
+                    error_messages.append("<br><strong>Крок 1 - Військові частини:</strong>")
+                elif field_name == 'selected_oids':
+                    error_messages.append("<br><strong>Крок 2 - ОІДи:</strong>")
+                elif field_name == 'attestation_acts_to_send':
+                    error_messages.append("<br><strong>Крок 3 - Акти атестації:</strong>")
+                
+                for error in errors:
+                    error_messages.append(f"• {field_label}: {error}")
+            
+            messages.error(
+                request,
+                mark_safe(
+                    "❌ <strong>Будь ласка, виправте помилки у формі:</strong><br>" + 
+                    "<br>".join(error_messages)
+                )
+            )
+            
+            # Додаємо помилки в консоль для дебагу
+            print(f"SendAttestationForm errors: {form.errors.as_json()}")
+    
+    else:  # GET request
         form = AttestationRegistrationSendForm()
 
     context = {
@@ -1434,6 +1548,37 @@ def send_attestation_for_registration_view(request):
         'page_title': 'Сформувати відправку Актів Атестації на реєстрацію'
     }
     return render(request, 'oids/forms/send_attestation_form.html', context)
+
+
+# ДОДАТКОВА ФУНКЦІЯ: Статистика про відправку (опціонально)
+def get_attestation_registration_stats(attestation_registration):
+    """
+    Повертає детальну статистику про відправку
+    Можна використовувати для додаткових повідомлень
+    """
+    stats = {
+        'total_documents': attestation_registration.sent_documents.count(),
+        'total_units': attestation_registration.units.count(),
+        'total_oids': attestation_registration.oids.count(),
+        'documents_by_unit': {},
+        'documents_by_type': {},
+    }
+    
+    # Групування по ВЧ
+    for doc in attestation_registration.sent_documents.all():
+        unit_code = doc.oid.unit.code if doc.oid.unit else 'Без ВЧ'
+        if unit_code not in stats['documents_by_unit']:
+            stats['documents_by_unit'][unit_code] = 0
+        stats['documents_by_unit'][unit_code] += 1
+        
+        # Групування по типу документу
+        doc_type = doc.document_type.name if doc.document_type else 'Невідомий'
+        if doc_type not in stats['documents_by_type']:
+            stats['documents_by_type'][doc_type] = 0
+        stats['documents_by_type'][doc_type] += 1
+    
+    return stats
+
 
 @login_required
 def send_document_for_registration_view(request, pk):
@@ -1466,6 +1611,8 @@ def send_document_for_registration_view(request, pk):
     return render(request, 'oids/action_confirm_form.html', context)
 
 
+# oids/views.py
+
 @login_required
 def send_azr_for_registration_view(request):
     """
@@ -1473,70 +1620,128 @@ def send_azr_for_registration_view(request):
     """
     if request.method == 'POST':
         submission_form = AzrSubmissionForm(request.POST)
-        item_formset = AzrItemFormSet (request.POST)
+        item_formset = AzrItemFormSet(request.POST)
 
         if submission_form.is_valid() and item_formset.is_valid():
-            # 1. Створюємо "конверт" - запис про відправку
-            registration_request = WorkCompletionRegistration.objects.create(
-                outgoing_letter_number=submission_form.cleaned_data['outgoing_letter_number'],
-                outgoing_letter_date=submission_form.cleaned_data['outgoing_letter_date'],
-                note=submission_form.cleaned_data['note'],
-                # created_by=request.user.person # Якщо потрібно
-            )
-
             try:
-                azr_doc_type = DocumentType.objects.get(name__icontains="Акт завершення")
-            except DocumentType.DoesNotExist:
-                messages.error(request, "Критична помилка: Тип документу 'Акт завершення робіт' не знайдено.")
-                return redirect('oids:main_dashboard') # Або на сторінку помилки
+                # 1. Створюємо "конверт" - запис про відправку
+                registration_request = WorkCompletionRegistration.objects.create(
+                    outgoing_letter_number=submission_form.cleaned_data['outgoing_letter_number'],
+                    outgoing_letter_date=submission_form.cleaned_data['outgoing_letter_date'],
+                    note=submission_form.cleaned_data['note'],
+                    # created_by=request.user.person # Якщо потрібно
+                )
 
-            docs_to_create = []
-            oids_for_m2m = []
-            # 2. Проходимо по даних з формсету і створюємо документи
-            with transaction.atomic():
-                for form in item_formset:
-                    oid_id = form.cleaned_data.get('oid')
-                    oid_instance = OID.objects.get(pk=oid_id)
-                    # Створюємо документ стандартним способом (викличеться save())
-                    doc = Document(
-                        oid=oid_instance,
-                        document_type=azr_doc_type,
-                        document_number=form.cleaned_data.get('prepared_number'),
-                        doc_process_date=form.cleaned_data.get('prepared_date'),
-                        work_date=form.cleaned_data.get('prepared_date'),
-                        wcr_submission=registration_request,
+                # Перевіряємо наявність типу документу
+                try:
+                    azr_doc_type = DocumentType.objects.get(name__icontains="Акт завершення")
+                except DocumentType.DoesNotExist:
+                    messages.error(
+                        request, 
+                        "❌ Критична помилка: Тип документу 'Акт завершення робіт' не знайдено в системі."
                     )
-                    doc.save() # <--- ВАЖЛИВО: Це запустить логіку оновлення статусів в models.py
-                
-                    oids_for_m2m.append(oid_instance)
-            #! fix from gemini раніше було
-            # for form in item_formset:
-            #     oid_id = form.cleaned_data.get('oid')
-            #     oid_instance = OID.objects.get(pk=oid_id)
-                
-                # docs_to_create.append(
-                #     Document(
-                #         oid=oid_instance,
-                #         document_type=azr_doc_type,
-                #         document_number=form.cleaned_data.get('prepared_number'),
-                #         doc_process_date=form.cleaned_data.get('prepared_date'),
-                #         work_date=form.cleaned_data.get('prepared_date'), # Можна використовувати одну дату
-                #         wcr_submission=registration_request,
-                #         # author=request.user.person
-                #     )
-                # )
-                # oids_for_m2m.append(oid_instance)
+                    return redirect('oids:main_dashboard')
 
-            # 3. Ефективно створюємо всі документи
-    			# було Document.objects.bulk_create(docs_to_create)
-            # for doc in docs_to_create:
-            #     doc.save() # Це запустить всю логіку оновлення статусів 
+                docs_created = []
+                oids_for_m2m = []
+                oids_info = []  # Для детального повідомлення
+                
+                # 2. Проходимо по даних з формсету і створюємо документи
+                with transaction.atomic():
+                    for form in item_formset:
+                        oid_id = form.cleaned_data.get('oid')
+                        if not oid_id:
+                            continue
+                        
+                        oid_instance = OID.objects.get(pk=oid_id)
+                        
+                        # Створюємо документ стандартним способом (викличеться save())
+                        doc = Document(
+                            oid=oid_instance,
+                            document_type=azr_doc_type,
+                            document_number=form.cleaned_data.get('prepared_number'),
+                            doc_process_date=form.cleaned_data.get('prepared_date'),
+                            work_date=form.cleaned_data.get('prepared_date'),
+                            wcr_submission=registration_request,
+                            # author=request.user.person
+                        )
+                        doc.save()  # Це запустить логіку оновлення статусів
+                        
+                        docs_created.append(doc)
+                        oids_for_m2m.append(oid_instance)
+                        
+                        # Збираємо інформацію для повідомлення
+                        oids_info.append({
+                            'cipher': oid_instance.cipher,
+                            'unit': oid_instance.unit.code if oid_instance.unit else 'Без ВЧ',
+                            'doc_number': doc.document_number
+                        })
+                
+                # 3. Додаємо ОІДи до m2m поля "конверта"
+                registration_request.oids.set(oids_for_m2m)
+                
+                # 4. Формуємо детальне повідомлення про успіх
+                success_message = (
+                    f"✅ <strong>Успішно відправлено на реєстрацію!</strong><br>"
+                    f"📋 Вихідний лист: <strong>№{registration_request.outgoing_letter_number}</strong> "
+                    f"від <strong>{registration_request.outgoing_letter_date.strftime('%d.%m.%Y')}</strong><br>"
+                    f"📄 Створено актів завершення робіт: <strong>{len(docs_created)}</strong><br>"
+                    f"<br><strong>Деталі:</strong><br>"
+                )
+                
+                # Додаємо список ОІДів
+                for info in oids_info:
+                    success_message += (
+                        f"• ВЧ <strong>{info['unit']}</strong> | "
+                        f"ОІД <strong>{info['cipher']}</strong> | "
+                        f"АЗР №<strong>{info['doc_number']}</strong><br>"
+                    )
+                
+                messages.success(request, mark_safe(success_message))
+                
+                # Додаткове інформаційне повідомлення
+                messages.info(
+                    request,
+                    f"ℹ️ Ви можете переглянути статус відправки в <a href=\"{reverse('oids:list_azr_registrations')}\">списку відправок АЗР</a>",
+                    extra_tags='safe'
+                )
+                
+                return redirect('oids:list_azr_registrations')
+                
+            except Exception as e:
+                # Обробка помилок
+                messages.error(
+                    request,
+                    f"❌ <strong>Помилка при створенні відправки:</strong><br>{str(e)}",
+                    extra_tags='safe'
+                )
+                return redirect('oids:send_azr_for_registration')
+        
+        else:
+            # Якщо форма або формсет не валідні
+            error_messages = []
             
-            # Додаємо ОІДи до m2m поля "конверта"
-            registration_request.oids.set(oids_for_m2m)
-
-            messages.success(request, f"Створено та відправлено на реєстрацію {len(docs_to_create)} АЗР.")
-            return redirect('oids:list_azr_registrations') # Перенаправляємо на список відправок
+            if not submission_form.is_valid():
+                error_messages.append("<strong>Помилки в даних супровідного листа:</strong>")
+                for field, errors in submission_form.errors.items():
+                    field_label = submission_form.fields[field].label or field
+                    for error in errors:
+                        error_messages.append(f"• {field_label}: {error}")
+            
+            if not item_formset.is_valid():
+                error_messages.append("<br><strong>Помилки в даних актів:</strong>")
+                for i, form_errors in enumerate(item_formset.errors):
+                    if form_errors:
+                        error_messages.append(f"<br><strong>Акт #{i+1}:</strong>")
+                        for field, errors in form_errors.items():
+                            for error in errors:
+                                error_messages.append(f"• {field}: {error}")
+            
+            messages.error(
+                request,
+                mark_safe("❌ <strong>Виправте помилки у формі:</strong><br>" + "<br>".join(error_messages))
+            )
+    
     else:
         submission_form = AzrSubmissionForm()
         item_formset = AzrItemFormSet()
@@ -1544,11 +1749,15 @@ def send_azr_for_registration_view(request):
     context = {
         'submission_form': submission_form,
         'item_formset': item_formset,
-        # Поле для вибору ВЧ передаємо окремо, воно не є частиною форми
-        'unit_selector': forms.ModelMultipleChoiceField(queryset=Unit.objects.order_by('name').filter(is_active=True), required=False),
+        'unit_selector': forms.ModelMultipleChoiceField(
+            queryset=Unit.objects.order_by('name').filter(is_active=True),
+            required=False
+        ),
         'page_title': 'Відправка Актів Завершення Робіт на реєстрацію'
     }
     return render(request, 'oids/forms/send_azr_for_registration.html', context)
+
+
 
 @login_required
 def record_azr_response_view(request, registration_id):
@@ -1593,49 +1802,148 @@ def record_azr_response_view(request, registration_id):
 
 # view declaration
 
+
 @login_required
 @transaction.atomic
 def send_declaration_for_registration_view(request):
     """
-    ОНОВЛЕНА ВЕРСІЯ: Гарантовано створює зв'язки між відправкою та деклараціями.
+    ОНОВЛЕНА ВЕРСІЯ: Створює декларації та відображає детальні повідомлення.
     """
     if request.method == 'POST':
         submission_form = DeclarationSubmissionForm(request.POST)
         item_formset = DeclarationItemFormSet(request.POST, prefix='items')
 
         if submission_form.is_valid() and item_formset.is_valid():
-            # 1. Створюємо "конверт"
-            submission = submission_form.save(commit=False)
-            # submission.created_by = request.user.person # Якщо потрібно
-            submission.save() # Зберігаємо, щоб отримати ID
+            try:
+                # 1. Створюємо "конверт"
+                submission = submission_form.save(commit=False)
+                # submission.created_by = request.user.person # Якщо потрібно
+                submission.save()
 
-            declarations_to_link = []
-            
-            # 2. Проходимо по всіх формах з формсету
-            for form in item_formset:
-                # 3. Створюємо ДСК ЕОТ
-                dsk_eot = DskEot.objects.create(
-                    unit=form.cleaned_data.get('unit'),
-                    cipher=form.cleaned_data.get('cipher'),
-                    serial_number=form.cleaned_data.get('serial_number'),
-                    inventory_number=form.cleaned_data.get('inventory_number'),
-                    room=form.cleaned_data.get('room'),
+                declarations_to_link = []
+                declarations_info = []  # Для детального повідомлення
+                units_dict = {}  # Групування по ВЧ
+                
+                # 2. Проходимо по всіх формах з формсету
+                for form in item_formset:
+                    # 3. Створюємо ДСК ЕОТ
+                    unit = form.cleaned_data.get('unit')
+                    cipher = form.cleaned_data.get('cipher')
+                    
+                    dsk_eot = DskEot.objects.create(
+                        unit=unit,
+                        cipher=cipher,
+                        serial_number=form.cleaned_data.get('serial_number'),
+                        inventory_number=form.cleaned_data.get('inventory_number'),
+                        room=form.cleaned_data.get('room'),
+                    )
+                    
+                    # 4. Створюємо відповідну Декларацію
+                    declaration = Declaration.objects.create(
+                        dsk_eot=dsk_eot,
+                        prepared_number=form.cleaned_data.get('prepared_number'),
+                        prepared_date=form.cleaned_data.get('prepared_date'),
+                    )
+                    declarations_to_link.append(declaration)
+                    
+                    # Збираємо інформацію для повідомлення
+                    unit_code = unit.code if unit else 'Без ВЧ'
+                    if unit_code not in units_dict:
+                        units_dict[unit_code] = []
+                    
+                    units_dict[unit_code].append({
+                        'cipher': cipher,
+                        'prepared_number': declaration.prepared_number,
+                        'prepared_date': declaration.prepared_date,
+                        'serial_number': dsk_eot.serial_number or '-',
+                        'room': dsk_eot.room
+                    })
+
+                # 5. Прив'язуємо всі створені декларації до нашої відправки
+                if declarations_to_link:
+                    submission.declarations.set(declarations_to_link)
+
+                # 6. Формуємо детальне повідомлення про успіх
+                success_message = (
+                    f"✅ <strong>Успішно відправлено на реєстрацію!</strong><br>"
+                    f"📋 Вихідний лист: <strong>№{submission.outgoing_letter_number}</strong> "
+                    f"від <strong>{submission.outgoing_letter_date.strftime('%d.%m.%Y')}</strong><br>"
+                    f"📄 Створено декларацій відповідності: <strong>{len(declarations_to_link)}</strong><br>"
+                    f"🏢 Військових частин: <strong>{len(units_dict)}</strong><br>"
+                    f"<br><strong>Деталі по військових частинах:</strong><br>"
                 )
                 
-                # 4. Створюємо відповідну Декларацію
-                declaration = Declaration.objects.create(
-                    dsk_eot=dsk_eot,
-                    prepared_number=form.cleaned_data.get('prepared_number'),
-                    prepared_date=form.cleaned_data.get('prepared_date'),
+                # Додаємо інформацію згруповану по ВЧ
+                for unit_code, declarations_list in units_dict.items():
+                    success_message += f"<br><strong>📍 ВЧ {unit_code}</strong> ({len(declarations_list)} декл.):<br>"
+                    for decl_info in declarations_list:
+                        success_message += (
+                            f"&nbsp;&nbsp;&nbsp;• Шифр: <strong>{decl_info['cipher']}</strong> | "
+                            f"Підг. №<strong>{decl_info['prepared_number']}</strong> "
+                            f"від {decl_info['prepared_date'].strftime('%d.%m.%Y')}<br>"
+                            f"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Серійний №: {decl_info['serial_number']} | "
+                            f"Приміщення: {decl_info['room']}<br>"
+                        )
+                
+                messages.success(request, mark_safe(success_message))
+                
+                # Додаткове інформаційне повідомлення
+                messages.info(
+                    request,
+                    mark_safe(
+                        f"ℹ️ Ви можете переглянути статус відправки в "
+                        f"<a href=\"{reverse('oids:list_declaration_registrations')}\">списку відправок Декларацій</a>"
+                    )
                 )
-                declarations_to_link.append(declaration)
-
-            # 5. Прив'язуємо всі створені декларації до нашої відправки
-            if declarations_to_link:
-                submission.declarations.set(declarations_to_link)
-
-            messages.success(request, f"Створено та відправлено на реєстрацію {len(declarations_to_link)} Декларацій.")
-            return redirect('oids:list_declaration_registrations')
+                
+                return redirect('oids:list_declaration_registrations')
+                
+            except Exception as e:
+                # Обробка помилок
+                messages.error(
+                    request,
+                    mark_safe(
+                        f"❌ <strong>Помилка при створенні відправки:</strong><br>"
+                        f"{str(e)}<br><br>"
+                        f"Зміни не були збережені."
+                    )
+                )
+                return redirect('oids:send_declaration_for_registration')
+        
+        else:
+            # Якщо форма або формсет не валідні
+            error_messages = []
+            
+            if not submission_form.is_valid():
+                error_messages.append("<strong>Помилки в даних супровідного листа:</strong>")
+                for field, errors in submission_form.errors.items():
+                    field_label = submission_form.fields[field].label or field
+                    for error in errors:
+                        error_messages.append(f"• {field_label}: {error}")
+            
+            if not item_formset.is_valid():
+                error_messages.append("<br><strong>Помилки в даних декларацій:</strong>")
+                for i, form_errors in enumerate(item_formset.errors):
+                    if form_errors:
+                        error_messages.append(f"<br><strong>Декларація #{i+1}:</strong>")
+                        for field, errors in form_errors.items():
+                            for error in errors:
+                                error_messages.append(f"• {field}: {error}")
+                
+                # Показуємо також non_form_errors якщо є
+                if item_formset.non_form_errors():
+                    error_messages.append("<br><strong>Загальні помилки формсету:</strong>")
+                    for error in item_formset.non_form_errors():
+                        error_messages.append(f"• {error}")
+            
+            messages.error(
+                request,
+                mark_safe(
+                    "❌ <strong>Виправте помилки у формі:</strong><br>" + 
+                    "<br>".join(error_messages)
+                )
+            )
+    
     else:
         submission_form = DeclarationSubmissionForm()
         item_formset = DeclarationItemFormSet(prefix='items')

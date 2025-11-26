@@ -5,41 +5,91 @@
 
 {% block content %}
 <div class="container mt-4">
-    <div class="card">
-        <div class="card-header">
-            <h3>{{ page_title }}</h3>
+    {# --- БЛОК ПОВІДОМЛЕНЬ --- #}
+    {% if messages %}
+    <div class="messages-container mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags|lower }}{% if message.tags == 'error' %} alert-danger{% elif message.tags == 'success'%} alert-success{% elif message.tags == 'warning'%} alert-warning{% elif message.tags == 'info'%} alert-info{% endif %} alert-dismissible fade show" role="alert">
+            {{ message|safe }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h3 class="mb-0">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 24px; height: 24px; display: inline-block; vertical-align: middle; margin-right: 8px;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z" />
+                </svg>
+                {{ page_title }}
+            </h3>
         </div>
         <div class="card-body">
             <form method="post" novalidate id="declaration-submission-form">
                 {% csrf_token %}
                 
-                {# Службові поля для формсету. JS буде оновлювати 'TOTAL_FORMS'. #}
+                {# Службові поля для формсету #}
                 {{ item_formset.management_form }}
 
                 {# --- Блок 1: Дані супровідного листа --- #}
-                <fieldset class="mb-4 p-3 border rounded">
-                    <legend class="fs-5">Дані супровідного листа</legend>
+                <fieldset class="mb-4 p-3 border rounded bg-light">
+                    <legend class="fs-5 text-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                        </svg>
+                        Дані супровідного листа
+                    </legend>
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="{{ submission_form.outgoing_letter_number.id_for_label }}" class="form-label">{{ submission_form.outgoing_letter_number.label }}</label>
+                            <label for="{{ submission_form.outgoing_letter_number.id_for_label }}" class="form-label">
+                                {{ submission_form.outgoing_letter_number.label }} <span class="text-danger">*</span>
+                            </label>
                             {{ submission_form.outgoing_letter_number }}
+                            {% if submission_form.outgoing_letter_number.errors %}
+                                <div class="text-danger small mt-1">{{ submission_form.outgoing_letter_number.errors }}</div>
+                            {% endif %}
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label for="{{ submission_form.outgoing_letter_date.id_for_label }}" class="form-label">{{ submission_form.outgoing_letter_date.label }}</label>
+                            <label for="{{ submission_form.outgoing_letter_date.id_for_label }}" class="form-label">
+                                {{ submission_form.outgoing_letter_date.label }} <span class="text-danger">*</span>
+                            </label>
                             {{ submission_form.outgoing_letter_date }}
+                            {% if submission_form.outgoing_letter_date.errors %}
+                                <div class="text-danger small mt-1">{{ submission_form.outgoing_letter_date.errors }}</div>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="mb-3">
                          <label for="{{ submission_form.note.id_for_label }}" class="form-label">{{ submission_form.note.label }}</label>
                          {{ submission_form.note }}
+                         {% if submission_form.note.errors %}
+                            <div class="text-danger small mt-1">{{ submission_form.note.errors }}</div>
+                        {% endif %}
                     </div>
                 </fieldset>
 
                 {# --- Блок 2: Вибір ВЧ та динамічні блоки --- #}
                 <fieldset class="mb-4">
-                    <legend class="fs-5">Об'єкти ДСК ЕОТ</legend>
+                    <legend class="fs-5 text-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 21v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21m0 0h4.5V3.545M12.75 21h7.5V10.75M2.25 21h1.5m18 0h-18M2.25 9l4.5-1.636M18.75 3l-1.5.545m0 6.205l3 1m1.5.5l-1.5-.5M6.75 7.364V3h-3v18m3-13.636l10.5-3.819" />
+                        </svg>
+                        Об'єкти ДСК ЕОТ
+                    </legend>
+                    
+                    <div class="alert alert-info">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                        </svg>
+                        <strong>Порядок дій:</strong> Оберіть військові частини, потім натисніть "Додати ЕОТ" для додавання об'єктів
+                    </div>
+                    
                     <div class="mb-3">
-                        <label for="unit_selector_id" class="form-label">1. Оберіть військові частини</label>
+                        <label for="unit_selector_id" class="form-label">
+                            1. Оберіть військові частини <span class="text-danger">*</span>
+                        </label>
                         <select id="unit_selector_id" multiple>
                             {% for unit in all_units %}
                                 <option value="{{ unit.pk }}">{{ unit.code }} - {{ unit.name }}</option>
@@ -51,8 +101,21 @@
                     <div id="unit-formsets-container"></div>
                 </fieldset>
 
+                {# Статистика #}
+                <div id="stats-info" class="alert alert-secondary d-none mb-4">
+                    <strong>Статистика:</strong><br>
+                    Обрано військових частин: <span id="units-count" class="badge bg-primary">0</span><br>
+                    Загально декларацій: <span id="declarations-count" class="badge bg-success">0</span>
+                </div>
+
+                {# Кнопка відправки #}
                 <div class="d-grid gap-2">
-                    <button type="submit" class="btn btn-primary btn-lg">Створити та відправити</button>
+                    <button type="submit" class="btn btn-primary btn-lg" id="submit-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                        </svg>
+                        Створити та відправити
+                    </button>
                 </div>
             </form>
         </div>
@@ -63,11 +126,20 @@
 
 {# Шаблон для блоку однієї військової частини #}
 <template id="unit-fieldset-template">
-    <fieldset class="unit-fieldset mb-3 p-3 border rounded" data-unit-id="">
+    <fieldset class="unit-fieldset mb-3 p-3 border rounded bg-light" data-unit-id="">
         <legend class="fs-6 d-flex justify-content-between align-items-center">
-            <span>ВЧ: <strong class="unit-name-text"></strong></span>
-            <button type="button" class="btn btn-sm btn-outline-primary add-eot-btn">
-                <i class="fas fa-plus"></i> Додати ЕОТ
+            <span>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 18px; height: 18px; display: inline-block; vertical-align: middle; margin-right: 4px;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
+                </svg>
+                ВЧ: <strong class="unit-name-text text-primary"></strong>
+                <span class="badge bg-info ms-2 eot-count-badge">0 ЕОТ</span>
+            </span>
+            <button type="button" class="btn btn-sm btn-success add-eot-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+                Додати ЕОТ
             </button>
         </legend>
         <div class="eot-forms-container">
@@ -78,17 +150,48 @@
 
 {# Шаблон для одного рядка форми ДСК ЕОТ #}
 <template id="dsk-eot-item-template">
-    <div class="dsk-eot-form row g-2 p-2 mb-2 border-start border-4 border-info rounded-end align-items-center">
-        {# Використовуємо префікс 'items' #}
+    <div class="dsk-eot-form p-3 mb-3 border-start border-4 border-info rounded-end bg-white shadow-sm">
         <input type="hidden" name="items-__prefix__-unit" value="">
-        <div class="col-md-4"><input type="text" name="items-__prefix__-cipher" placeholder="Шифр" class="form-control form-control-sm" required></div>
-        <div class="col-md-4"><input type="text" name="items-__prefix__-serial_number" placeholder="Серійний №" class="form-control form-control-sm"></div>
-        <div class="col-md-4"><input type="text" name="items-__prefix__-inventory_number" placeholder="Інв. №" class="form-control form-control-sm"></div>
-        <div class="col-12"><input type="text" name="items-__prefix__-room" placeholder="Приміщення" class="form-control form-control-sm" required></div>
-        <div class="col-md-5"><input type="text" name="items-__prefix__-prepared_number" placeholder="Підготовлений № Декларації" class="form-control form-control-sm" required></div>
-        <div class="col-md-5"><input type="date" name="items-__prefix__-prepared_date" title="Дата опрацювання Декларації" class="form-control form-control-sm" required></div>
-        <div class="col-md-2 text-end">
-            <button type="button" class="btn btn-sm btn-outline-danger remove-eot-btn">Видалити</button>
+        
+        <div class="row g-2">
+            <div class="col-md-4">
+                <label class="form-label-sm">Шифр <span class="text-danger">*</span></label>
+                <input type="text" name="items-__prefix__-cipher" placeholder="Введіть шифр" class="form-control form-control-sm" required>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label-sm">Серійний №</label>
+                <input type="text" name="items-__prefix__-serial_number" placeholder="Опціонально" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label-sm">Інв. №</label>
+                <input type="text" name="items-__prefix__-inventory_number" placeholder="Опціонально" class="form-control form-control-sm">
+            </div>
+        </div>
+        
+        <div class="row g-2 mt-2">
+            <div class="col-md-12">
+                <label class="form-label-sm">Приміщення <span class="text-danger">*</span></label>
+                <input type="text" name="items-__prefix__-room" placeholder="Введіть приміщення" class="form-control form-control-sm" required>
+            </div>
+        </div>
+        
+        <div class="row g-2 mt-2">
+            <div class="col-md-5">
+                <label class="form-label-sm">Підготовлений № Декларації <span class="text-danger">*</span></label>
+                <input type="text" name="items-__prefix__-prepared_number" placeholder="Введіть номер" class="form-control form-control-sm" required>
+            </div>
+            <div class="col-md-5">
+                <label class="form-label-sm">Дата опрацювання <span class="text-danger">*</span></label>
+                <input type="date" name="items-__prefix__-prepared_date" class="form-control form-control-sm" required>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="button" class="btn btn-sm btn-outline-danger w-100 remove-eot-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle;">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                    </svg>
+                    Видалити
+                </button>
+            </div>
         </div>
     </div>
 </template>
@@ -102,6 +205,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const unitTemplate = document.getElementById('unit-fieldset-template');
     const eotTemplate = document.getElementById('dsk-eot-item-template');
     const totalFormsInput = document.querySelector('#id_items-TOTAL_FORMS');
+    const statsInfo = document.getElementById('stats-info');
+    const unitsCountSpan = document.getElementById('units-count');
+    const declarationsCountSpan = document.getElementById('declarations-count');
+    const submitButton = document.getElementById('submit-button');
+    
     let formCount = 0;
 
     const unitTomSelect = new TomSelect('#unit_selector_id', {
@@ -109,9 +217,30 @@ document.addEventListener('DOMContentLoaded', function () {
         placeholder: 'Оберіть одну або декілька ВЧ...'
     });
 
+    // Оновлення статистики
+    const updateStats = () => {
+        const unitsCount = unitContainer.querySelectorAll('.unit-fieldset').length;
+        const declarationsCount = unitContainer.querySelectorAll('.dsk-eot-form').length;
+        
+        unitsCountSpan.textContent = unitsCount;
+        declarationsCountSpan.textContent = declarationsCount;
+        
+        if (unitsCount > 0 || declarationsCount > 0) {
+            statsInfo.classList.remove('d-none');
+        } else {
+            statsInfo.classList.add('d-none');
+        }
+        
+        // Оновлюємо лічильники ЕОТ для кожної ВЧ
+        unitContainer.querySelectorAll('.unit-fieldset').forEach(fieldset => {
+            const eotCount = fieldset.querySelectorAll('.dsk-eot-form').length;
+            fieldset.querySelector('.eot-count-badge').textContent = `${eotCount} ЕОТ`;
+        });
+    };
+
     // Функція для додавання блоку ВЧ
     const addUnitBlock = (unitId, unitText) => {
-        if (document.querySelector(`.unit-fieldset[data-unit-id="${unitId}"]`)) return; // Вже існує
+        if (document.querySelector(`.unit-fieldset[data-unit-id="${unitId}"]`)) return;
 
         const newUnitHtml = unitTemplate.innerHTML;
         const newUnitNode = document.createElement('div');
@@ -122,16 +251,17 @@ document.addEventListener('DOMContentLoaded', function () {
         fieldset.querySelector('.unit-name-text').textContent = unitText;
         
         unitContainer.appendChild(fieldset);
+        updateStats();
     };
 
     // Функція для видалення блоку ВЧ
     const removeUnitBlock = (unitId) => {
         const fieldset = document.querySelector(`.unit-fieldset[data-unit-id="${unitId}"]`);
         if (fieldset) {
-            // Перед видаленням блоку оновлюємо загальну кількість форм
             const formsInBlock = fieldset.querySelectorAll('.dsk-eot-form').length;
             totalFormsInput.value = parseInt(totalFormsInput.value) - formsInBlock;
             fieldset.remove();
+            updateStats();
         }
     };
     
@@ -139,11 +269,9 @@ document.addEventListener('DOMContentLoaded', function () {
     unitTomSelect.on('change', (selectedUnits) => {
         const currentUnitIds = Array.from(unitContainer.querySelectorAll('.unit-fieldset')).map(fs => fs.dataset.unitId);
 
-        // Видаляємо блоки
         const unitsToRemove = currentUnitIds.filter(id => !selectedUnits.includes(id));
         unitsToRemove.forEach(removeUnitBlock);
 
-        // Додаємо блоки
         const unitsToAdd = selectedUnits.filter(id => !currentUnitIds.includes(id));
         unitsToAdd.forEach(unitId => {
             const unitText = unitTomSelect.getOption(unitId).textContent;
@@ -151,11 +279,11 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Слухач для кнопок "Додати ЕОТ" та "Видалити" (використовуємо делегування подій)
+    // Слухач для кнопок "Додати ЕОТ" та "Видалити"
     unitContainer.addEventListener('click', function(event) {
-        // Якщо клікнули на кнопку "Додати ЕОТ"
-        if (event.target.classList.contains('add-eot-btn')) {
-            const fieldset = event.target.closest('.unit-fieldset');
+        if (event.target.classList.contains('add-eot-btn') || event.target.closest('.add-eot-btn')) {
+            const button = event.target.classList.contains('add-eot-btn') ? event.target : event.target.closest('.add-eot-btn');
+            const fieldset = button.closest('.unit-fieldset');
             const unitId = fieldset.dataset.unitId;
             const eotContainer = fieldset.querySelector('.eot-forms-container');
 
@@ -163,21 +291,57 @@ document.addEventListener('DOMContentLoaded', function () {
             const newFormNode = document.createElement('div');
             newFormNode.innerHTML = newFormHtml;
 
-            // Встановлюємо ID військової частини у приховане поле
             newFormNode.querySelector('input[name$="-unit"]').value = unitId;
             
             eotContainer.appendChild(newFormNode.firstElementChild);
             formCount++;
             totalFormsInput.value = formCount;
+            updateStats();
         }
 
-        // Якщо клікнули на кнопку "Видалити"
-        if (event.target.classList.contains('remove-eot-btn')) {
+        if (event.target.classList.contains('remove-eot-btn') || event.target.closest('.remove-eot-btn')) {
             event.target.closest('.dsk-eot-form').remove();
-            // Оновлюємо загальну кількість форм
             totalFormsInput.value = unitContainer.querySelectorAll('.dsk-eot-form').length;
+            updateStats();
         }
+    });
+
+    // Валідація перед відправкою
+    document.getElementById('declaration-submission-form').addEventListener('submit', function(e) {
+        const declarationsCount = unitContainer.querySelectorAll('.dsk-eot-form').length;
+        if (declarationsCount === 0) {
+            e.preventDefault();
+            alert('❌ Додайте хоча б одну декларацію перед відправкою!');
+            return false;
+        }
+        
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Відправка...';
     });
 });
 </script>
+
+<style>
+    .dsk-eot-form {
+        transition: all 0.3s ease;
+    }
+    
+    .dsk-eot-form:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .form-label-sm {
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+    
+    .unit-fieldset {
+        transition: all 0.3s ease;
+    }
+    
+    .eot-count-badge {
+        font-size: 0.75rem;
+    }
+</style>
 {% endblock %}

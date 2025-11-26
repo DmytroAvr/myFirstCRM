@@ -5,72 +5,165 @@
 {% block title %}{{ page_title }}{% endblock %}
 
 {% block content %}
-<div class="container form-container">
-    <h2 class="mb-4">{{ page_title }}</h2>
-
-    <form method="post" enctype="multipart/form-data" novalidate id="sendAttestationRegForm">
-        {% csrf_token %}
-        
-        {% if form.non_field_errors %}
-            <div class="alert alert-danger" role="alert">
-                {% for error in form.non_field_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
-            </div>
-        {% endif %}
-
-        <fieldset class="mb-3 p-3 border rounded">
-            <legend class="w-auto px-2 h6">Крок 1: Оберіть Військові Частини</legend>
-            <div class="mb-3">
-                <label for="{{ form.selected_units.id_for_label }}" class="form-label fw-bold">{{ form.selected_units.label }}:</label>
-                {{ form.selected_units }}
-                {% if form.selected_units.help_text %}<small class="form-text text-muted d-block">{{ form.selected_units.help_text }}</small>{% endif %}
-                {% for error in form.selected_units.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
-            </div>
-        </fieldset>
-
-        <fieldset class="mb-3 p-3 border rounded">
-            <legend class="w-auto px-2 h6">Крок 2: Оберіть ОІДи</legend>
-            <div class="mb-3">
-                <label for="{{ form.selected_oids.id_for_label }}" class="form-label fw-bold">{{ form.selected_oids.label }}:</label>
-                {{ form.selected_oids }}
-                {% if form.selected_oids.help_text %}<small class="form-text text-muted d-block">{{ form.selected_oids.help_text }}</small>{% endif %}
-                {% for error in form.selected_oids.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
-            </div>
-        </fieldset>
-
-        <fieldset class="mb-3 p-3 border rounded">
-            <legend class="w-auto px-2 h6">Крок 3: Оберіть Акти Атестації для відправки</legend>
-            <div class="mb-3">
-                <label for="{{ form.attestation_acts_to_send.id_for_label }}" class="form-label fw-bold">{{ form.attestation_acts_to_send.label }}:</label>
-                {{ form.attestation_acts_to_send }}
-                {% if form.attestation_acts_to_send.help_text %}<small class="form-text text-muted d-block">{{ form.attestation_acts_to_send.help_text }}</small>{% endif %}
-                {% for error in form.attestation_acts_to_send.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
-            </div>
-        </fieldset>
-
-        <fieldset class="mb-3 p-3 border rounded">
-            <legend class="w-auto px-2 h6">Дані вихідного супровідного листа</legend>
-            {# Рендеримо решту полів форми #}
-            {% for field in form %}
-                {% if field.name != 'selected_units' and field.name != 'selected_oids' and field.name != 'attestation_acts_to_send' %}
-                <div class="row mb-3 align-items-center">
-                    <label for="{{ field.id_for_label }}" class="col-sm-3 col-form-label text-sm-end fw-bold">
-                        {{ field.label }}{% if field.field.required %}<span class="text-danger">*</span>{% endif %}:
-                    </label>
-                    <div class="col-sm-9">
-                        {{ field }}
-                        {% if field.help_text %}<small class="form-text text-muted d-block">{{ field.help_text }}</small>{% endif %}
-                        {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
-                    </div>
-                </div>
-                {% endif %}
-            {% endfor %}
-        </fieldset>
-
-        <div class="form-actions mt-4">
-            <button type="submit" class="btn btn-primary">Сформувати та зберегти відправку</button>
-            <a href="{% url 'oids:list_attestation_registrations' %}" class="btn btn-secondary">Скасувати</a>
+<div class="container form-container mt-4">
+    {# --- БЛОК ПОВІДОМЛЕНЬ --- #}
+    {% if messages %}
+    <div class="messages-container mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags|lower }}{% if message.tags == 'error' %} alert-danger{% elif message.tags == 'success'%} alert-success{% elif message.tags == 'warning'%} alert-warning{% elif message.tags == 'info'%} alert-info{% endif %} alert-dismissible fade show" role="alert">
+            {{ message|safe }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
-    </form>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h3 class="mb-0 h4">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 24px; height: 24px; display: inline-block; vertical-align: middle; margin-right: 8px;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z" />
+                </svg>
+                {{ page_title }}
+            </h3>
+        </div>
+
+        <div class="card-body">
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger" role="alert">
+                    <strong>Помилки форми:</strong>
+                    {% for error in form.non_field_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
+                </div>
+            {% endif %}
+
+            <form method="post" enctype="multipart/form-data" novalidate id="sendAttestationRegForm">
+                {% csrf_token %}
+
+                {# Крок 1: Військові частини #}
+                <fieldset class="mb-4 p-3 border rounded bg-light">
+                    <legend class="w-auto px-3 h6 text-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
+                        </svg>
+                        Крок 1: Оберіть Військові Частини
+                    </legend>
+                    <div class="mb-3">
+                        <label for="{{ form.selected_units.id_for_label }}" class="form-label fw-bold">
+                            {{ form.selected_units.label }} <span class="text-danger">*</span>:
+                        </label>
+                        {{ form.selected_units }}
+                        {% if form.selected_units.help_text %}
+                            <small class="form-text text-muted d-block mt-1">{{ form.selected_units.help_text }}</small>
+                        {% endif %}
+                        {% for error in form.selected_units.errors %}
+                            <div class="text-danger small mt-1">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </fieldset>
+
+                {# Крок 2: ОІДи #}
+                <fieldset class="mb-4 p-3 border rounded bg-light">
+                    <legend class="w-auto px-3 h6 text-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                        </svg>
+                        Крок 2: Оберіть ОІДи
+                    </legend>
+                    <div class="alert alert-info">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 18px; height: 18px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                        </svg>
+                        ОІДи будуть завантажені після вибору військових частин
+                    </div>
+                    <div class="mb-3">
+                        <label for="{{ form.selected_oids.id_for_label }}" class="form-label fw-bold">
+                            {{ form.selected_oids.label }} <span class="text-danger">*</span>:
+                        </label>
+                        {{ form.selected_oids }}
+                        {% if form.selected_oids.help_text %}
+                            <small class="form-text text-muted d-block mt-1">{{ form.selected_oids.help_text }}</small>
+                        {% endif %}
+                        {% for error in form.selected_oids.errors %}
+                            <div class="text-danger small mt-1">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </fieldset>
+
+                {# Крок 3: Акти Атестації #}
+                <fieldset class="mb-4 p-3 border rounded bg-light">
+                    <legend class="w-auto px-3 h6 text-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
+                        </svg>
+                        Крок 3: Оберіть Акти Атестації для відправки
+                    </legend>
+                    <div class="alert alert-info">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 18px; height: 18px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                        </svg>
+                        Акти будуть завантажені після вибору ОІДів
+                    </div>
+                    <div class="mb-3">
+                        <label for="{{ form.attestation_acts_to_send.id_for_label }}" class="form-label fw-bold">
+                            {{ form.attestation_acts_to_send.label }} <span class="text-danger">*</span>:
+                        </label>
+                        {{ form.attestation_acts_to_send }}
+                        {% if form.attestation_acts_to_send.help_text %}
+                            <small class="form-text text-muted d-block mt-1">{{ form.attestation_acts_to_send.help_text }}</small>
+                        {% endif %}
+                        {% for error in form.attestation_acts_to_send.errors %}
+                            <div class="text-danger small mt-1">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </fieldset>
+
+                {# Дані вихідного листа #}
+                <fieldset class="mb-4 p-3 border rounded bg-light">
+                    <legend class="w-auto px-3 h6 text-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                        </svg>
+                        Дані вихідного супровідного листа
+                    </legend>
+                    {# Рендеримо решту полів форми #}
+                    {% for field in form %}
+                        {% if field.name != 'selected_units' and field.name != 'selected_oids' and field.name != 'attestation_acts_to_send' %}
+                        <div class="row mb-3 align-items-center">
+                            <label for="{{ field.id_for_label }}" class="col-sm-4 col-form-label text-sm-end fw-bold">
+                                {{ field.label }}{% if field.field.required %}<span class="text-danger">*</span>{% endif %}:
+                            </label>
+                            <div class="col-sm-8">
+                                {{ field }}
+                                {% if field.help_text %}
+                                    <small class="form-text text-muted d-block mt-1">{{ field.help_text }}</small>
+                                {% endif %}
+                                {% for error in field.errors %}
+                                    <div class="text-danger small mt-1">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </fieldset>
+
+                {# Кнопки #}
+                <div class="form-actions mt-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg flex-fill" id="submit-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                        </svg>
+                        Сформувати та зберегти відправку
+                    </button>
+                    <a href="{% url 'oids:list_attestation_registrations' %}" class="btn btn-secondary btn-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                        </svg>
+                        Скасувати
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -82,32 +175,49 @@ document.addEventListener('DOMContentLoaded', function() {
     const unitsSelectorElement = document.getElementById('id_att_reg_send_units_selector');
     const oidsSelectorElement = document.getElementById('id_att_reg_send_oids_selector');
     const actsSelectorElement = document.getElementById('id_att_reg_send_acts_selector');
-    const sentBySelectorElement = document.getElementById('{{ form.sent_by.id_for_label }}'); // ID з форми
+    const sentBySelectorElement = document.getElementById('{{ form.sent_by.id_for_label }}');
+    const submitButton = document.getElementById('submit-button');
 
     const oidsForUnitsUrl = window.AJAX_LOAD_OIDS_FOR_MULTIPLE_UNITS_URL || "{% url 'oids:ajax_load_oids_for_multiple_units' %}";
     const actsForOidsUrl = window.AJAX_LOAD_ATTESTATION_ACTS_FOR_MULTIPLE_OIDS_URL || "{% url 'oids:ajax_load_attestation_acts_for_multiple_oids' %}";
 
-    if (typeof TomSelect === 'undefined') { console.error("SendAttestationRegForm JS: TomSelect NOT loaded!"); return; }
+    if (typeof TomSelect === 'undefined') { 
+        console.error("SendAttestationRegForm JS: TomSelect NOT loaded!"); 
+        return; 
+    }
     console.log("SendAttestationRegForm JS: TomSelect library loaded.");
 
     let tsUnits, tsOids, tsActs, tsSentBy;
 
     function initTomSelect(element, placeholder, isDisabled = false, isMulti = true, initialOpts = []) {
-        if (!element) { console.warn("TomSelect init: Element not found for placeholder:", placeholder); return null; }
+        if (!element) { 
+            console.warn("TomSelect init: Element not found for placeholder:", placeholder); 
+            return null; 
+        }
         console.log(`TomSelect init: For #${element.id}. Placeholder: "${placeholder}", Disabled: ${isDisabled}, Multi: ${isMulti}`);
+        
         let config = {
-            plugins: isMulti ? ['remove_button'] : [], create: false, placeholder: placeholder,
-            allowEmptyOption: !isMulti, // Для single select дозволяємо порожню опцію, для multi - ні, якщо required
-            valueField: 'id', labelField: 'text', searchField: ['text'],
-            options: initialOpts, disabled: isDisabled
+            plugins: isMulti ? ['remove_button'] : [], 
+            create: false, 
+            placeholder: placeholder,
+            allowEmptyOption: !isMulti,
+            valueField: 'id', 
+            labelField: 'text', 
+            searchField: ['text'],
+            options: initialOpts, 
+            disabled: isDisabled
         };
+        
         const instance = new TomSelect(element, config);
         element.tomselectInstance = instance;
         
         let htmlOptions = [];
-        Array.from(element.options).forEach(opt => { if (opt.value) htmlOptions.push({id:opt.value, text:opt.text, selected:opt.selected});});
+        Array.from(element.options).forEach(opt => { 
+            if (opt.value) htmlOptions.push({id:opt.value, text:opt.text, selected:opt.selected});
+        });
+        
         const domOptsCount = instance.dropdown_content.querySelectorAll('.option').length;
-        if (domOptsCount === 0 && htmlOptions.length > 0 && !initialOpts.length) { // Якщо не передавали опції в config
+        if (domOptsCount === 0 && htmlOptions.length > 0 && !initialOpts.length) {
             console.warn(`TomSelect init: #${element.id} empty, manual add.`);
             instance.addOptions(htmlOptions);
             instance.refreshOptions(false);
@@ -124,35 +234,51 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function loadOidsForUnits(unitIds) {
         if (!tsOids) return;
-        tsOids.clear(); tsOids.clearOptions(); tsOids.sync();
-        loadActsForOids([]); // Очистити акти, бо ОІДи зміняться
+        tsOids.clear(); 
+        tsOids.clearOptions(); 
+        tsOids.sync();
+        loadActsForOids([]);
 
         if (unitIds && unitIds.length > 0) {
-            tsOids.enable(); tsOids.placeholder = 'Завантаження ОІДів...';
+            tsOids.enable(); 
+            tsOids.placeholder = 'Завантаження ОІДів...';
             const params = new URLSearchParams();
             unitIds.forEach(id => params.append('unit_ids[]', id));
+            
             fetch(`${oidsForUnitsUrl}?${params.toString()}`)
                 .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t || `Error ${r.status}`); }))
                 .then(data => {
                     console.log("SendAttestationRegForm JS: OIDs for Units received:", data);
-                    const options = data.map(oid => ({ id: oid.id.toString(), text: `${oid.cipher} (${oid.full_name || oid.unit_code})` }));
+                    const options = data.map(oid => ({ 
+                        id: oid.id.toString(), 
+                        text: `${oid.cipher} (${oid.full_name || oid.unit_code})` 
+                    }));
                     tsOids.addOptions(options);
                     tsOids.refreshOptions(false);
                     tsOids.placeholder = options.length ? 'Оберіть ОІД(и)...' : 'Для обраних ВЧ немає ОІДів';
-                }).catch(e => { console.error("SendAttestationRegForm JS: Error loading OIDs:", e); if (tsOids) tsOids.placeholder = 'Помилка завантаження ОІДів';});
+                })
+                .catch(e => { 
+                    console.error("SendAttestationRegForm JS: Error loading OIDs:", e); 
+                    if (tsOids) tsOids.placeholder = 'Помилка завантаження ОІДів';
+                });
         } else {
-            tsOids.disable(); tsOids.placeholder = 'Спочатку оберіть ВЧ';
+            tsOids.disable(); 
+            tsOids.placeholder = 'Спочатку оберіть ВЧ';
         }
     }
 
     function loadActsForOids(oidIds) {
         if (!tsActs) return;
-        tsActs.clear(); tsActs.clearOptions(); tsActs.sync();
+        tsActs.clear(); 
+        tsActs.clearOptions(); 
+        tsActs.sync();
 
         if (oidIds && oidIds.length > 0) {
-            tsActs.enable(); tsActs.placeholder = 'Завантаження Актів...';
+            tsActs.enable(); 
+            tsActs.placeholder = 'Завантаження Актів...';
             const params = new URLSearchParams();
             oidIds.forEach(id => params.append('oid_ids[]', id));
+            
             fetch(`${actsForOidsUrl}?${params.toString()}`)
                 .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t || `Error ${r.status}`); }))
                 .then(data => {
@@ -161,31 +287,58 @@ document.addEventListener('DOMContentLoaded', function() {
                     tsActs.addOptions(options);
                     tsActs.refreshOptions(false);
                     tsActs.placeholder = options.length ? 'Оберіть Акти Атестації...' : 'Для обраних ОІДів немає доступних Актів';
-                }).catch(e => { console.error("SendAttestationRegForm JS: Error loading Acts:", e); if (tsActs) tsActs.placeholder = 'Помилка завантаження Актів';});
+                })
+                .catch(e => { 
+                    console.error("SendAttestationRegForm JS: Error loading Acts:", e); 
+                    if (tsActs) tsActs.placeholder = 'Помилка завантаження Актів';
+                });
         } else {
-            tsActs.disable(); tsActs.placeholder = 'Спочатку оберіть ОІД(и)';
+            tsActs.disable(); 
+            tsActs.placeholder = 'Спочатку оберіть ОІД(и)';
         }
     }
 
     // Слухачі подій
     if (tsUnits) {
-        tsUnits.on('change', function(value) { // value - це масив ID
+        tsUnits.on('change', function(value) {
             console.log("SendAttestationRegForm JS: Units changed to:", value);
             loadOidsForUnits(value);
         });
-        // Початкове завантаження ОІДів, якщо ВЧ вже обрані (наприклад, при помилці валідації)
+        
         const initialUnits = tsUnits.getValue();
         if (initialUnits && initialUnits.length > 0) loadOidsForUnits(initialUnits);
     }
 
     if (tsOids) {
-        tsOids.on('change', function(value) { // value - це масив ID
+        tsOids.on('change', function(value) {
             console.log("SendAttestationRegForm JS: OIDs changed to:", value);
             loadActsForOids(value);
         });
-        // Початкове завантаження Актів, якщо ОІДи вже обрані (складніше, бо залежить від ВЧ)
-        // Можна викликати, якщо initialUnits та initialOids встановлені
     }
+
+    // Валідація перед відправкою
+    document.getElementById('sendAttestationRegForm').addEventListener('submit', function(e) {
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Обробка...';
+    });
 });
 </script>
+
+<style>
+    .card {
+        border: none;
+    }
+    
+    fieldset {
+        transition: all 0.3s ease;
+    }
+    
+    fieldset:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .form-label {
+        margin-bottom: 0.5rem;
+    }
+</style>
 {% endblock %}
