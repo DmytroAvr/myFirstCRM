@@ -1,12 +1,12 @@
 from django.db import models
-from multiselectfield import MultiSelectField
 from django.utils import timezone
 import datetime
 from django.db import models
 from django.db.models import Q
-from simple_history.models import HistoricalRecords
 from dateutil.relativedelta import relativedelta
 from django.contrib.auth.models import User
+from multiselectfield import MultiSelectField
+from simple_history.models import HistoricalRecords
 
 	
 # --- CONSTANTS / CHOICES ---
@@ -838,73 +838,41 @@ class DocumentType(models.Model):
     # oid_type = models.CharField(max_length=30, choices=OIDTypeChoices.choices, default=OIDTypeChoices.SAMEDOC, verbose_name="Тип ОІД")
     # work_type = models.CharField(max_length=30, choices=WorkTypeChoices.choices, default=WorkTypeChoices.SAMEDOC, verbose_name="Тип робіт")
 
-    oid_type = models.CharField(
-        "Тип ОІД",
-        max_length=20,
-        choices=[('МОВНА', 'МОВНА'), ('ПЕМІН', 'ПЕМІН'), ('СПІЛЬНИЙ', 'СПІЛЬНИЙ')],
-    )
-    work_type = models.CharField(
-        "Тип робіт",
-        max_length=20,
-        choices=[('Атестація', 'Атестація'), ('ІК', 'ІК'), ('СПІЛЬНИЙ', 'СПІЛЬНИЙ')], 
-    )
+    oid_type = models.CharField("Тип ОІД", max_length=20, choices=[('МОВНА', 'МОВНА'), ('ПЕМІН', 'ПЕМІН'), ('СПІЛЬНИЙ', 'СПІЛЬНИЙ')],)
+    work_type = models.CharField("Тип робіт", max_length=20, choices=[('Атестація', 'Атестація'), ('ІК', 'ІК'), ('СПІЛЬНИЙ', 'СПІЛЬНИЙ')],)
     name = models.CharField("Назва документа", max_length=100) # Прибрав unique=True, оскільки назва може повторюватись для різних типів ОІД/робіт (наприклад, "План пошуку ЗП")
     has_expiration = models.BooleanField("Має термін дії", default=False) # Змінив на Boolean
-    duration_months = models.PositiveIntegerField(
-        "Тривалість (у місяцях)", 
-        default=0, 
-        help_text="Якщо документ має термін дії, вкажіть тривалість у місяцях. Якщо не обмежений — залишити 0."
-    )
+    duration_months = models.PositiveIntegerField("Тривалість (у місяцях)", default=0, help_text="Якщо документ має термін дії, вкажіть тривалість у місяцях. Якщо не обмежений — залишити 0.")
     # is_required = models.BooleanField("Обов'язковість", default=True) # раніше логіка будувалась на обов`язковості документів, зараз перебудував на duration
-    history = HistoricalRecords()
-    def __str__(self):
-    #     return f"{self.name} ({self.oid_type}, {self.work_type})"
-        return f"{self.name} ({self.get_oid_type_display()}, {self.get_work_type_display()})"
+    sort_order = models.PositiveIntegerField("Порядок сортування", default=0, blank=False, null=False, db_index=True, help_text="Менше число виводиться раніше (0, 1, 2...)")
+    is_active = models.BooleanField("Активний", default=True, db_index=True)
     
-    class Meta:
-        unique_together = ('oid_type', 'work_type', 'name') # Документ унікальний для комбінації тип ОІД/робота/назва
-        verbose_name = "Довідково: Тип документа"
-        verbose_name_plural = "Довідково: Типи документів"
-        ordering = ['oid_type', 'work_type', 'name'] # Додано сортування
+    history = HistoricalRecords()
 
+    def __str__(self):
+        # return f"{self.name} ({self.get_oid_type_display()})"
+        # return f"{self.name} ({self.oid_type}, {self.work_type})"
+        return f"{self.name} ({self.get_oid_type_display()}, {self.get_work_type_display()})"
+
+    class Meta:
+        unique_together = ('oid_type', 'work_type', 'name')
+        verbose_name = "Довідково: Тип документа"
+        verbose_name_plural = "Довідково: Типи документів"        
+        # Змінюємо сортування: спочатку активні, потім за пріоритетом, потім алфавіт
+        ordering = ['-is_active', 'sort_order', 'work_type', 'oid_type', 'name']
+        
 class AttestationRegistration(models.Model):
     """
     Відправка пакету актів атестації на реєстрацію в ДССЗЗІ (вихідний лист).
     """
-    units = models.ManyToManyField(
-        Unit,
-        verbose_name="Військові частини (акти яких включено)",
-        related_name='sent_for_attestation_registrations',
-        blank=True 
-    )
-    outgoing_letter_number = models.CharField(
-        max_length=50,
-        verbose_name="Вихідний номер листа до ДССЗЗІ"
-    )
-    outgoing_letter_date = models.DateField(
-        verbose_name="Дата вихідного листа"
-    )
-    sent_by = models.ForeignKey(
-        Person,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        verbose_name="Хто відправив лист",
-        related_name='sent_attestation_packages'
-    )
-    status = models.CharField(
-        max_length=25,
-        choices=AttestationRegistrationStatusChoices.choices,
-        default=AttestationRegistrationStatusChoices.SENT,
-        verbose_name="Статус відправки"
-    )
+    units = models.ManyToManyField(Unit, verbose_name="Військові частини (акти яких включено)", related_name='sent_for_attestation_registrations', blank=True)
+    outgoing_letter_number = models.CharField(max_length=50, verbose_name="Вихідний номер листа до ДССЗЗІ")
+    outgoing_letter_date = models.DateField(verbose_name="Дата вихідного листа")
+    sent_by = models.ForeignKey(Person, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Хто відправив лист", related_name='sent_attestation_packages')
+    status = models.CharField(max_length=25, choices=AttestationRegistrationStatusChoices.choices, default=AttestationRegistrationStatusChoices.SENT, verbose_name="Статус відправки")
     # Поле attachment видалено
     # attachment = models.FileField(...) 
-    note = models.TextField(
-        blank=True,
-        null=True,
-        verbose_name="Примітка до відправки"
-    )
+    note = models.TextField(blank=True, null=True, verbose_name="Примітка до відправки")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата внесення інф. про реєстрацію Атестації")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата останнього оновлення")
     history = HistoricalRecords()

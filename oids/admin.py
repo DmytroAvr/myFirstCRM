@@ -326,14 +326,13 @@ class WorkRequestItemAdmin(SimpleHistoryAdmin):
     list_filter = ('work_type', 'status', 'request__unit')
     search_fields = ('oid__cipher', 'request__incoming_number')
 
-
 @admin.register(DocumentType)
-class DocumentTypeAdmin(SimpleHistoryAdmin):
-    list_display = ('name', 'oid_type', 'work_type', 'has_expiration', 'duration_months')
-    list_filter = ('oid_type', 'work_type', 'has_expiration')
+class DocumentTypeAdmin(admin.ModelAdmin):
+    list_display = ('name', 'oid_type', 'work_type', 'sort_order', 'is_active', 'has_expiration', 'duration_months')
+    list_editable = ('sort_order', 'is_active') # Дозволяє редагувати прямо в таблиці, не заходячи всередину
+    list_filter = ('oid_type', 'work_type', 'is_active', 'has_expiration')
     search_fields = ('name',)
-
-
+    
 @admin.register(Document)
 class DocumentAdmin(SimpleHistoryAdmin):
     list_display = (

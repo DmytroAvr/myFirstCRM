@@ -5,6 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.management.base import BaseCommand
 from django.http import JsonResponse
+from django.views.decorators.http import require_GET
 from django.urls import reverse_lazy, reverse
 from django.contrib import messages
 from django.db.models import Q, Max, Prefetch, Count, OuterRef, Subquery
@@ -13,6 +14,8 @@ from django.utils import timezone
 import datetime
 from django.utils.safestring import mark_safe
 from .utils import export_to_excel
+
+
 
 from .models import (OIDTypeChoices, OIDStatusChoices, SecLevelChoices, WorkRequestStatusChoices, WorkTypeChoices, 
     DocumentReviewResultChoices, AttestationRegistrationStatusChoices, PeminSubTypeChoices, DocumentProcessingStatusChoices, add_working_days
@@ -168,8 +171,7 @@ def ajax_load_work_request_items_for_oid(request):
             items_queryset = WorkRequestItem.objects.filter(
                 oid_id=oid_id,
                 # status__in=[WorkRequestStatusChoices.PENDING, WorkRequestStatusChoices.IN_PROGRESS] # Приклад фільтрації
-            ).select_related('request').order_by('-request__incoming_date')
-            
+            ).select_related('request').order_by('-request__incoming_date')  
             for item in items_queryset:
                 items_data.append({
                     'id': item.id,
@@ -177,9 +179,37 @@ def ajax_load_work_request_items_for_oid(request):
                     'work_type': item.work_type # Передаємо work_type для подальшої фільтрації DocumentType
                 })
         except ValueError:
-            return JsonResponse({'error': 'Невірний ID ОІД'}, status=400)
-            
+            return JsonResponse({'error': 'Невірний ID ОІД'}, status=400)    
     return JsonResponse(items_data, safe=False)
+
+def ajax_load_oids_for_unit(request):
+    unit_id_str = request.GET.get('unit_id')
+    oids_data = []
+    if unit_id_str and unit_id_str.isdigit():
+        unit_id = int(unit_id_str)
+        try:
+            # Отримуємо всі ОІДи для вказаної ВЧ.
+            # Можна додати додаткові фільтри, якщо потрібно (наприклад, тільки активні ОІДи)
+            # OID.objects.filter(unit_id=unit_id, status=OIDStatusChoices.ACTIVE).order_by('cipher')
+            oids_queryset = OID.objects.filter(unit_id=unit_id).order_by('cipher')
+            
+            for oid in oids_queryset:
+                oids_data.append({
+                    'id': oid.id,
+                    'cipher': oid.cipher, 
+                    'full_name': oid.full_name or "", # Повертаємо порожній рядок, якщо full_name None
+					'oid_type': oid.oid_type, 
+					'status': oid.status, 
+				    # Додайте інші поля, якщо вони потрібні для відображення в TomSelect у JS:
+                    # наприклад, 'unit_code': oid.unit.code (якщо unit вже завантажено через select_related у запиті)
+                })
+        except ValueError: # На випадок, якщо unit_id не є валідним числом (хоча isdigit вже перевіряє)
+            return JsonResponse({'error': 'Невірний ID військової частини'}, status=400)
+        # except Unit.DoesNotExist: # Якщо ВЧ з таким ID не існує
+            # return JsonResponse({'error': 'Військова частина не знайдена'}, status=404) 
+            # Зазвичай, якщо queryset порожній, повернеться порожній список, що є нормальним.
+    
+    return JsonResponse(oids_data, safe=False) # safe=False, оскільки ми повертаємо список
 
 def ajax_load_document_types_for_oid_and_work(request):
     oid_id_str = request.GET.get('oid_id')
@@ -227,34 +257,6 @@ def ajax_load_document_types_for_oid_and_work(request):
             
     return JsonResponse(doc_types_data, safe=False)
 # Цей view НЕ використовується для оновлення списків ОІД на головній панелі в цьому сценарії
-def ajax_load_oids_for_unit(request):
-    unit_id_str = request.GET.get('unit_id')
-    oids_data = []
-    if unit_id_str and unit_id_str.isdigit():
-        unit_id = int(unit_id_str)
-        try:
-            # Отримуємо всі ОІДи для вказаної ВЧ.
-            # Можна додати додаткові фільтри, якщо потрібно (наприклад, тільки активні ОІДи)
-            # OID.objects.filter(unit_id=unit_id, status=OIDStatusChoices.ACTIVE).order_by('cipher')
-            oids_queryset = OID.objects.filter(unit_id=unit_id).order_by('cipher')
-            
-            for oid in oids_queryset:
-                oids_data.append({
-                    'id': oid.id,
-                    'cipher': oid.cipher, 
-                    'full_name': oid.full_name or "", # Повертаємо порожній рядок, якщо full_name None
-					'oid_type': oid.oid_type, 
-					'status': oid.status, 
-				    # Додайте інші поля, якщо вони потрібні для відображення в TomSelect у JS:
-                    # наприклад, 'unit_code': oid.unit.code (якщо unit вже завантажено через select_related у запиті)
-                })
-        except ValueError: # На випадок, якщо unit_id не є валідним числом (хоча isdigit вже перевіряє)
-            return JsonResponse({'error': 'Невірний ID військової частини'}, status=400)
-        # except Unit.DoesNotExist: # Якщо ВЧ з таким ID не існує
-            # return JsonResponse({'error': 'Військова частина не знайдена'}, status=404) 
-            # Зазвичай, якщо queryset порожній, повернеться порожній список, що є нормальним.
-    
-    return JsonResponse(oids_data, safe=False) # safe=False, оскільки ми повертаємо список
 
 # oids/urls.py - не забудьте додати:
 # path('ajax/load-oids-for-unit/', views.ajax_load_oids_for_unit, name='ajax_load_oids_for_unit'),
@@ -1045,7 +1047,11 @@ def oid_create_view(request):
 
 
 @login_required 
+@transaction.atomic
 def add_work_request_view(request):
+    """
+    Створення нової заявки на проведення робіт
+    """
     # Отримуємо екземпляр Unit, якщо ID передано в GET-запиті
     unit_instance = None
     unit_id_from_get = request.GET.get('unit')
@@ -1053,66 +1059,212 @@ def add_work_request_view(request):
         try:
             unit_instance = Unit.objects.get(pk=unit_id_from_get)
         except Unit.DoesNotExist:
-            messages.error(request, "Обрану військову частину не знайдено.")
-            # Можна перенаправити або показати помилку
+            messages.error(request, "❌ Обрану військову частину не знайдено.")
 
     initial_main_form = {}
     if unit_instance:
         initial_main_form['unit'] = unit_instance
 
     if request.method == 'POST':
-        main_form = WorkRequestForm(request.POST, request.FILES, prefix='main') # Додаємо префікс для основної форми
+        main_form = WorkRequestForm(request.POST, request.FILES, prefix='main')
+        
         # Передаємо екземпляр unit у form_kwargs для кожної форми у формсеті
-        selected_unit_id = request.POST.get('main-unit') # Зверніть увагу на префікс 'main-'
+        selected_unit_id = request.POST.get('main-unit')
         parent_unit_for_formset = None
         if selected_unit_id:
             try:
                 parent_unit_for_formset = Unit.objects.get(pk=selected_unit_id)
             except Unit.DoesNotExist:
-                pass # Помилка буде оброблена валідацією форми 'main_form'
+                pass
         
         formset = WorkRequestItemFormSet(
             request.POST, 
             request.FILES, 
-            prefix='items', # Префікс для формсету
-            form_kwargs={'parent_instance_unit': parent_unit_for_formset} # Передаємо ВЧ у кожну форму формсету
+            prefix='items',
+            form_kwargs={'parent_instance_unit': parent_unit_for_formset}
         )
 
         if main_form.is_valid() and formset.is_valid():
-            work_request_instance = main_form.save() # Зберігаємо основну заявку
-            
-            formset.instance = work_request_instance # Прив'язуємо формсет до збереженої заявки
-            formset.save() # Зберігаємо елементи заявки (WorkRequestItem)
-
-            messages.success(request, f'Заявку №{work_request_instance.incoming_number} успішно створено!')
-            return redirect('oids:list_work_requests') # Або куди вам потрібно
+            try:
+                # Зберігаємо основну заявку
+                work_request_instance = main_form.save()
+                
+                # Прив'язуємо формсет до збереженої заявки
+                formset.instance = work_request_instance
+                saved_items = formset.save()
+                
+                # Збираємо статистику для повідомлення
+                work_types_count = {}
+                oids_list = []
+                
+                for item in saved_items:
+                    # Рахуємо типи робіт
+                    work_type_display = item.get_work_type_display()
+                    if work_type_display not in work_types_count:
+                        work_types_count[work_type_display] = 0
+                    work_types_count[work_type_display] += 1
+                    
+                    # Збираємо інфо про ОІДи
+                    oids_list.append({
+                        'cipher': item.oid.cipher,
+                        'unit_code': item.oid.unit.code if item.oid.unit else 'Без ВЧ',
+                        'work_type': work_type_display
+                    })
+                
+                # Формуємо детальне повідомлення
+                success_message = (
+                    f"✅ <strong>Заявку успішно створено!</strong><br>"
+                    f"📋 Номер заявки: <strong>№{work_request_instance.incoming_number}</strong> "
+                    f"від <strong>{work_request_instance.incoming_date.strftime('%d.%m.%Y')}</strong><br>"
+                )
+                
+                # Додаємо інформацію про військову частину
+                if work_request_instance.unit:
+                    success_message += f"🏢 Військова частина: <strong>{work_request_instance.unit.code}</strong><br>"
+                
+                success_message += (
+                    f"📝 ОІДів у заявці: <strong>{len(saved_items)}</strong><br>"
+                    f"<br><strong>Типи робіт:</strong><br>"
+                )
+                
+                # Виводимо статистику по типах робіт
+                for work_type, count in work_types_count.items():
+                    success_message += f"&nbsp;&nbsp;&nbsp;• {work_type}: <strong>{count}</strong><br>"
+                
+                success_message += "<br><strong>Деталі по ОІДам:</strong><br>"
+                
+                # Виводимо кожен ОІД
+                for oid_info in oids_list:
+                    success_message += (
+                        f"&nbsp;&nbsp;&nbsp;• ВЧ <strong>{oid_info['unit_code']}</strong> | "
+                        f"ОІД <strong>{oid_info['cipher']}</strong> | "
+                        f"Робота: {oid_info['work_type']}<br>"
+                    )
+                
+                messages.success(request, mark_safe(success_message))
+                
+                # Додаткове інформаційне повідомлення
+                messages.info(
+                    request,
+                    mark_safe(
+                        f"ℹ️ Наступний крок: <a href=\"{reverse('oids:work_request_detail', args=[work_request_instance.id])}\">переглянути деталі заявки</a> "
+                        f"або <a href=\"{reverse('oids:list_work_requests')}\">повернутись до списку заявок</a>."
+                    )
+                )
+                
+                return redirect('oids:list_work_requests')
+                
+            except Exception as e:
+                # Обробка помилок
+                messages.error(
+                    request,
+                    mark_safe(
+                        f"❌ <strong>Помилка при створенні заявки:</strong><br>"
+                        f"{str(e)}<br><br>"
+                        f"Зміни не були збережені. Спробуйте ще раз."
+                    )
+                )
+                return redirect('oids:add_work_request')
+        
         else:
-            messages.error(request, 'Будь ласка, виправте помилки у формі.')
-            # Якщо помилки, виводимо форми з помилками
-    else:
+            # Якщо форми не валідні - показуємо детальні помилки
+            error_messages = []
+            
+            # Помилки основної форми
+            if not main_form.is_valid():
+                error_messages.append("<strong>Помилки в загальній інформації:</strong>")
+                
+                if main_form.non_field_errors():
+                    for error in main_form.non_field_errors():
+                        error_messages.append(f"• {error}")
+                
+                for field_name, errors in main_form.errors.items():
+                    if field_name == '__all__':
+                        continue
+                    field_label = main_form.fields[field_name].label or field_name
+                    for error in errors:
+                        error_messages.append(f"• {field_label}: {error}")
+            
+            # Помилки формсету
+            if not formset.is_valid():
+                error_messages.append("<br><strong>Помилки в елементах заявки (ОІДи та роботи):</strong>")
+                
+                # Загальні помилки формсету
+                if formset.non_form_errors():
+                    for error in formset.non_form_errors():
+                        error_messages.append(f"• {error}")
+                
+                # Помилки окремих форм
+                for i, form_errors in enumerate(formset.errors):
+                    if form_errors:
+                        error_messages.append(f"<br><strong>ОІД/Робота #{i+1}:</strong>")
+                        for field, errors in form_errors.items():
+                            if field == '__all__':
+                                for error in errors:
+                                    error_messages.append(f"• {error}")
+                            else:
+                                field_label = formset.forms[i].fields.get(field).label if field in formset.forms[i].fields else field
+                                for error in errors:
+                                    error_messages.append(f"• {field_label}: {error}")
+            
+            messages.error(
+                request,
+                mark_safe(
+                    "❌ <strong>Будь ласка, виправте помилки у формі:</strong><br>" + 
+                    "<br>".join(error_messages)
+                )
+            )
+    
+    else:  # GET request
         main_form = WorkRequestForm(initial=initial_main_form, prefix='main')
         formset = WorkRequestItemFormSet(prefix='items', form_kwargs={'parent_instance_unit': unit_instance})
-
-    # Для модального вікна створення ОІД (якщо воно використовується з цієї сторінки)
-    # Переконайтеся, що ці choices доступні у base.html або передаються туди
-    # з кожного view, де може бути викликана модалка.
-    # from .models import OIDTypeChoices, OIDStatusChoices, SecLevelChoices (якщо потрібно тут)
-    # context_modal_choices = {
-    #     'view_choices': { 
-    #         'get_oid_type_choices': OIDTypeChoices.choices,
-    #         'get_oid_status_choices': OIDStatusChoices.choices,
-    #         'get_sec_level_choices': SecLevelChoices.choices,
-    #     }
-    # }
 
     context = {
         'main_form': main_form,
         'formset': formset,
         'page_title': 'Створення нової заявки на проведення робіт',
-        'selected_unit_instance': unit_instance, # Для JS, щоб знати поточну ВЧ
-        # **context_modal_choices
+        'selected_unit_instance': unit_instance,
     }
     return render(request, 'oids/forms/add_work_request_form.html', context)
+
+
+# ДОДАТКОВА ФУНКЦІЯ: Статистика про заявку
+def get_work_request_stats(work_request):
+    """
+    Повертає детальну статистику про заявку
+    Можна використовувати для додаткових звітів
+    """
+    items = work_request.items.all()
+    
+    stats = {
+        'total_items': items.count(),
+        'by_work_type': {},
+        'by_status': {},
+        'oids_list': []
+    }
+    
+    for item in items:
+        # Статистика по типу робіт
+        work_type = item.get_work_type_display()
+        if work_type not in stats['by_work_type']:
+            stats['by_work_type'][work_type] = 0
+        stats['by_work_type'][work_type] += 1
+        
+        # Статистика по статусу
+        status = item.get_status_display()
+        if status not in stats['by_status']:
+            stats['by_status'][status] = 0
+        stats['by_status'][status] += 1
+        
+        # Список ОІДів
+        stats['oids_list'].append({
+            'cipher': item.oid.cipher,
+            'work_type': work_type,
+            'status': status,
+            'unit_code': item.oid.unit.code if item.oid.unit else None
+        })
+    
+    return stats
 
 @login_required 
 def work_request_detail_view(request, pk):
@@ -1414,7 +1566,6 @@ def update_oid_status_view(request, oid_id_from_url=None):
     }
     return render(request, 'oids/forms/update_oid_status_form.html', context)
 
-
 @login_required 
 @transaction.atomic
 def send_attestation_for_registration_view(request):
@@ -1549,7 +1700,6 @@ def send_attestation_for_registration_view(request):
     }
     return render(request, 'oids/forms/send_attestation_form.html', context)
 
-
 # ДОДАТКОВА ФУНКЦІЯ: Статистика про відправку (опціонально)
 def get_attestation_registration_stats(attestation_registration):
     """
@@ -1578,7 +1728,6 @@ def get_attestation_registration_stats(attestation_registration):
         stats['documents_by_type'][doc_type] += 1
     
     return stats
-
 
 @login_required
 def send_document_for_registration_view(request, pk):
@@ -1609,9 +1758,6 @@ def send_document_for_registration_view(request, pk):
         'page_title': f'Підтвердження: Відправити на реєстрацію {document}'
     }
     return render(request, 'oids/action_confirm_form.html', context)
-
-
-# oids/views.py
 
 @login_required
 def send_azr_for_registration_view(request):
@@ -1756,8 +1902,6 @@ def send_azr_for_registration_view(request):
         'page_title': 'Відправка Актів Завершення Робіт на реєстрацію'
     }
     return render(request, 'oids/forms/send_azr_for_registration.html', context)
-
-
 
 @login_required
 def record_azr_response_view(request, registration_id):
@@ -2203,7 +2347,7 @@ def technical_task_process_view(request, task_id=None): # Може прийма�
     }
     return render(request, 'oids/forms/technical_task_process_form.html', context)
 
-
+ 
 # list info 
 @login_required 
 def summary_information_hub_view(request):
