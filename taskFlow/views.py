@@ -404,8 +404,15 @@ def task_edit(request, pk):
             task.status = Status.objects.get(pk=status_id)
         
         # Термін
-        due_date = request.POST.get('due_date')
-        task.due_date = due_date if due_date else None
+        due_date_str = request.POST.get('due_date')
+        if due_date_str:
+            try:
+                from datetime import datetime
+                task.due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                messages.warning(request, 'Неправильний формат дати')
+        else:
+            task.due_date = None
         
         try:
             task.save()
