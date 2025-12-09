@@ -263,7 +263,7 @@ def task_detail(request, pk):
             return redirect('taskFlow:task_detail', pk=pk)
     
     # Коментарі
-    comments = task.comments.select_related('author').order_by('created_at')
+    comments = task.comments.select_related('author').order_by('-created_at')
     
     # Історія
     history = task.history.select_related('changed_by').order_by('-changed_at')[:20]
