@@ -323,6 +323,8 @@
 
                     <!-- Назва -->
                     <div class="task-title">{{ task.title }}</div>
+                    <!-- Опис завдання -->
+                    <div class="small overflow-hidden" da-data="short-text">{{ task.description }}</div>
 
                     <!-- Метадані -->
                     <div class="task-meta">
@@ -532,5 +534,20 @@
             e.stopPropagation();
         });
     });
+
+// повернути короткий опис задачі
+const divElements = document.querySelectorAll('div[da-data="short-text"]');
+if (divElements.length > 0) {
+    divElements.forEach(divElement => {
+        const fullText = divElement.textContent;
+        const maxLength = 50;
+
+        if (fullText && fullText.length > maxLength) {
+            const shortText = fullText.substring(0, maxLength);
+            divElement.textContent = shortText.trim() + '...';
+        }
+    });
+} 
+
 </script>
 {% endblock %}
