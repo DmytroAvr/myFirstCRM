@@ -30,6 +30,7 @@ urlpatterns = [
     # URLs для форм
     path('trip/plan/', views.plan_trip_view, name='plan_trip_view_name'),
     path('document/add/', views.add_document_processing_view, name='add_document_processing_view_name'),
+	path('documents/quick-add/', views.bulk_add_documents_view, name='bulk_add_documents'),
 	path('document/<int:pk>/send-for-registration/', views.send_document_for_registration_view, name='send_document_for_registration'),
     path('trip/result/', views.send_trip_results_view, name='send_trip_results_form'),
     # Якщо форма додавання документа викликається з контексту ОІД:

@@ -1502,6 +1502,66 @@ def add_document_processing_view(request, oid_id=None, work_request_item_id=None
     return render(request, 'oids/forms/add_document_processing_form.html', context)
 
 @login_required 
+def bulk_add_documents_view(request):
+    """
+    Сторінка вільного додавання документів до ОІД без прив'язки до заявок.
+    """
+    # 1. Отримуємо Person, пов'язаного з поточним користувачем
+    # Припускаємо, що у вас OneToOneField(User) у моделі Person
+    try:
+        current_person = request.user.person_profile # Замініть на ваш reverse relationship
+    except Exception:
+        current_person = Person.objects.filter(user=request.user).first()
+
+    initial_main_form_data = {
+        'author': current_person,
+        'doc_process_date': datetime.date.today(),
+    }
+
+    if request.method == 'POST':
+        # Передаємо prefix='main', як у вашому JS
+        main_form = DocumentProcessingMainForm(request.POST, prefix='main')
+        formset = DocumentItemFormSet(request.POST, request.FILES, prefix='docs')
+
+        if main_form.is_valid() and formset.is_valid():
+            oid_instance = main_form.cleaned_data['oid']
+            # work_request_item може бути None — це нормально для "вільного" режиму
+            work_request_item_instance = main_form.cleaned_data.get('work_request_item')
+            doc_process_date = main_form.cleaned_data['doc_process_date']
+            work_date = main_form.cleaned_data['work_date']
+            author = main_form.cleaned_data.get('author')
+
+            saved_docs_count = 0
+            for item_form in formset:
+                if item_form.is_valid() and item_form.has_changed():
+                    doc = item_form.save(commit=False)
+                    doc.oid = oid_instance
+                    doc.work_request_item = work_request_item_instance
+                    doc.doc_process_date = doc_process_date
+                    doc.work_date = work_date
+                    doc.author = author
+                    doc.save() # Тут спрацює ваша логіка expiration_date
+                    saved_docs_count += 1
+            
+            if saved_docs_count > 0:
+                messages.success(request, f'Успішно додано {saved_docs_count} документів до {oid_instance.cipher}')
+                return redirect('oids:oid_detail_view_name', oid_id=oid_instance.id)
+            else:
+                messages.info(request, "Форма порожня, нічого не збережено.")
+    else:
+        main_form = DocumentProcessingMainForm(initial=initial_main_form_data, prefix='main')
+        formset = DocumentItemFormSet(prefix='docs')
+
+    context = {
+        'main_form': main_form,
+        'formset': formset,
+        'page_title': 'Набивання бази документів (без заявки)',
+        'is_free_mode': True # Прапорець для шаблону
+    }
+    return render(request, 'oids/forms/add_document_processing_form_bulk.html', context)
+
+
+@login_required 
 def update_oid_status_view(request, oid_id_from_url=None):
     initial_unit = None
     initial_oid = None
